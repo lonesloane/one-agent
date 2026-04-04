@@ -2,6 +2,8 @@
 
 > Replacing the "ONE MP" (ONE for Members and Partners) form-based web application with an agentic application — "ONE Agent".
 >
+> **ONE MP** is an OECD application used by delegations of member countries and partner organizations. It provides three core services: (1) access to official documents from the OECD document management system, governed by complex visibility rules based on document classification, country membership status, and committee participation; (2) access to events organized by OECD committees, where individual delegates participate based on their professional function; and (3) a register of all delegates, with role-based visibility. The current UI is form-driven and multi-step; the goal is to replace key workflows with a conversational agent that compresses interactions and adds proactive intelligence.
+>
 > **Agent technology: [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/?pivots=programming-language-python)** (Python) — the unified successor to Semantic Kernel and AutoGen.
 >
 > **PoC Model Constraint**: Development runs on a Visual Studio Enterprise subscription with limited Azure credits. Claude Sonnet and Opus are not viable for the PoC budget. The primary model path is Azure OpenAI via `FoundryChatClient` (gpt-4o-mini / gpt-4.1-mini as starting points), with local Ollama models for zero-cost iteration during development. A short **Model Exploration Phase** (see PoC Strategy below) is needed to validate which model provides the minimum reasoning quality required for reliable tool selection in the ONE MP domain.
@@ -47,16 +49,21 @@ The Agent Framework offers two levels of orchestration:
 
 Example agentic loop:
 ```
-User: "Register the new partner Acme Corp, they're based in Lyon, main contact is Claire Dupont"
+User: "I need to add a new delegate to our delegation — Marie Laurent,
+       she's an advisor on education policy"
 
 Agent reasoning:
-  1. Look up if Acme Corp already exists → call lookup_partner_by_name
-  2. Not found → determine required fields for partner creation
-  3. Have: name, city, contact name → missing: partner type, VAT, contract terms
-  4. Ask user for missing required fields
-  5. Once complete → call create_partner with all fields
-  6. Call assign_contact to link Claire Dupont
-  7. Confirm completion with summary
+  1. Identify the user's delegation → call get_delegation_info
+  2. Look up if Marie Laurent already exists → call lookup_delegate
+  3. Not found → determine required fields for delegate creation
+  4. Have: name, function (education policy advisor)
+  5. Infer relevant committees from function → "Education Policy Committee"
+  6. Ask user to confirm committee participations and provide email
+  7. Determine delegation's membership type (member vs partner) → drives access levels
+  8. Once complete → call create_delegate
+  9. Apply business rules → call create_document_access_rights for each committee
+     (classification level depends on membership type and any Framework Agreements)
+  10. Confirm completion with summary of delegate and access rights created
 ```
 
 ### 3. Tool / Action Layer
@@ -68,7 +75,7 @@ Every form submission becomes a typed function tool with:
 
 **Tool design principles:**
 - Use the `@tool` decorator with `Annotated` type hints and `Field(description=...)` for self-documenting schemas
-- Consolidate related operations (one `create_member` with optional params, not multiple variants)
+- Consolidate related operations (one `create_delegate` with optional params, not multiple variants)
 - Return semantic identifiers, not opaque IDs
 - Include validation logic in the tool, not the prompt — the tool is the authority
 - Tool descriptions act as contracts: if it can't do X, say so explicitly
@@ -80,20 +87,47 @@ from typing import Annotated
 from pydantic import Field
 from agent_framework import tool, FunctionInvocationContext
 
-@tool(approval_mode="always_require")
-def create_partner(
-    legal_name: Annotated[str, Field(description="Legal name of the partner entity")],
-    vat_number: Annotated[str, Field(description="EU VAT number, e.g. FR12345678")],
-    contract_type: Annotated[str, Field(description="Standard, Framework, or Project")],
-    primary_contact_name: Annotated[str, Field(description="Full name of the primary contact")],
-    city: Annotated[str, Field(description="City where the partner is based")] = "",
-    billing_email: Annotated[str, Field(description="Billing email address")] = "",
+@tool(approval_mode="never_require")
+def get_delegation_info(
+    delegation_id: Annotated[str, Field(description="Delegation ID or country/organization name")],
     ctx: FunctionInvocationContext = None,
 ) -> str:
-    """Create a new Service Partner in ONE MP. Requires confirmation."""
+    """Retrieve delegation details: country/organization, membership type (member/partner),
+    active delegate count, and any Framework Agreements in effect."""
     user = ctx.kwargs.get("user_identity")
     # ... call ONE MP backend API as the authenticated user ...
-    return f"Partner '{legal_name}' created successfully (ID: PART-12345)"
+    return '{"name": "France", "type": "member", "delegates": 42, "framework_agreements": []}'
+
+@tool(approval_mode="always_require")
+def create_delegate(
+    full_name: Annotated[str, Field(description="Full name of the delegate")],
+    delegation_id: Annotated[str, Field(description="Delegation this delegate belongs to")],
+    function: Annotated[str, Field(description="Professional function, e.g. 'Education Policy Advisor'")],
+    email: Annotated[str, Field(description="Professional email address")],
+    committee_ids: Annotated[list[str], Field(description="Committees the delegate will participate in")],
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Create a new delegate within a delegation. Requires confirmation."""
+    user = ctx.kwargs.get("user_identity")
+    # ... call ONE MP backend API as the authenticated user ...
+    return "Delegate 'Marie Laurent' created (ID: DEL-2026-0891)"
+
+@tool(approval_mode="always_require")
+def create_document_access_rights(
+    delegate_id: Annotated[str, Field(description="Delegate to grant access to")],
+    committee_id: Annotated[str, Field(description="Committee scoping the document access")],
+    classification_level: Annotated[str, Field(description="Max classification: General, Restricted, or Confidential")],
+    retroactive: Annotated[bool, Field(description="Include documents published before accreditation date")] = False,
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Create Document Access Rights for a delegate, scoped to a committee and classification level.
+    Requires confirmation.
+    Rules: member delegates get up to 'Restricted'; partner delegates get 'General' only
+    (unless a Framework Agreement covers the committee). 'Confidential' and retroactive
+    access require OECD secretariat approval."""
+    user = ctx.kwargs.get("user_identity")
+    # ... call ONE MP backend API as the authenticated user ...
+    return f"Document Access Rights created: delegate={delegate_id}, committee={committee_id}, level={classification_level}"
 ```
 
 ### 4. State Management
@@ -106,9 +140,9 @@ Three kinds of state:
 ```python
 # Session creation and multi-turn conversation
 session = agent.create_session()
-first = await agent.run("Register Acme Corp as a partner", session=session)
+first = await agent.run("Add Marie Laurent as a delegate, she works on education policy", session=session)
 # ... user provides clarification ...
-second = await agent.run("Service partner, VAT is FR12345678", session=session)
+second = await agent.run("Yes, assign her to the Education Policy Committee", session=session)
 
 # Session persistence for resumption
 serialized = session.to_dict()   # store in Redis/DB
@@ -172,7 +206,7 @@ The *why* is captured alongside the *what* — a significant improvement over fo
 ```python
 # Pass user identity at runtime — invisible to the model
 result = await agent.run(
-    "Register Acme Corp as a partner",
+    "Add Marie Laurent as a delegate, she works on education policy",
     session=session,
     function_invocation_kwargs={"user_identity": current_user},
 )
@@ -200,17 +234,17 @@ A form is a transaction boundary. An agent workflow spanning 5 tool calls is not
 **Solutions**: Transactional tooling (all-or-nothing), compensating actions (the agent knows how to undo), or explicit partial state with a "resume" capability via `AgentSession` serialization and Workflow checkpointing.
 
 ### Problem 3: Intent Ambiguity in High-Stakes Domain
-"Add the new partner" might mean 15 different things depending on ONE MP's domain model.
+"Add a new delegate" sounds simple but hides significant complexity: which delegation? Which committees? What document access levels? Does a Framework Agreement apply? Should access be retroactive?
 
-**Solution**: Encode domain specificity in tool names and descriptions — `create_service_partner`, `create_reseller_partner` is clearer than one `create_partner` with a `type` field. The `@tool` decorator's `name` and `description` parameters encode the domain contract explicitly.
+**Solution**: Encode domain specificity in tool names and descriptions — `create_delegate` and `create_document_access_rights` are separate tools with distinct schemas rather than one monolithic operation. The `@tool` decorator's `name` and `description` parameters encode the domain contract explicitly. The agent reasons through the steps sequentially, querying delegation info to determine membership type before deciding access levels.
 
 ### Problem 4: The "What Did the Agent Do?" UX Problem
 Users in a form app always know what happened. In an agentic app, the agent might execute 7 tool calls and produce a 3-sentence summary.
 
-**Solution**: A transparency layer — real-time streaming of tool calls as they happen ("Looking up Acme Corp... Not found. Creating new partner record..."). The Agent Framework's streaming mode (`stream=True`) combined with function middleware for tool-call events solves both transparency and the "nothing is happening" UX problem simultaneously.
+**Solution**: A transparency layer — real-time streaming of tool calls as they happen ("Checking delegation info for France... Looking up Marie Laurent... Not found. Creating delegate record... Setting up Document Access Rights..."). The Agent Framework's streaming mode (`stream=True`) combined with function middleware for tool-call events solves both transparency and the "nothing is happening" UX problem simultaneously.
 
 ### Problem 5: Regulatory and Compliance Constraints
-"Members and Partners" implies regulated data, fiduciary relationships, and potentially real financial or legal consequences:
+ONE MP manages OECD delegation data — regulated institutional data with diplomatic, legal, and data protection implications:
 - GDPR/data protection obligations
 - Contract law implications (agent-initiated actions may constitute legal commitments)
 - Financial regulations (if ONE MP handles payments or financial instruments)
@@ -232,11 +266,27 @@ The agent will occasionally call a tool with an incorrect argument or misinterpr
 
 ## PoC Strategy: The Minimal Compelling Slice
 
-**Do not replicate all of ONE MP.** Pick ONE workflow that:
-- Has 3-7 form screens in the current app (so the compression is visible)
-- Has conditional logic (so agent reasoning is genuinely valuable)
-- Is frequently performed (so stakeholders recognize the value)
-- Is commonly the most *painful* workflow (best candidate for demonstrating improvement)
+**Do not replicate all of ONE MP.** Two specific use cases have been identified as PoC targets, chosen because they demonstrate complementary strengths of the agentic approach:
+
+**Use Case 1 — Proactive Meeting Brief** (read-only, proactive intelligence)
+A delegate connects to ONE MP. The agent greets them with information about their next scheduled committee meeting — which committee, when, how many agenda documents. If any documents were added or modified since the delegate's last visit, the agent highlights them and provides direct links. *This use case is structurally impossible in a form-based app — it demonstrates what an agent can do that forms cannot.*
+
+**Use Case 2 — Delegate Creation with Document Access Rights** (write, complex reasoning)
+A delegation editor creates a new delegate. Based on the information provided (name, function, committees) and the delegation's membership type, the agent must reason through business rules to determine the correct Document Access Rights — what document classification levels the delegate can see, for which committees, and whether any special conditions apply (Framework Agreements, retroactive access, approval routing). *This use case compresses a multi-screen form workflow into a guided conversation and demonstrates the agent's ability to apply conditional business logic.*
+
+### PoC Business Rules (Illustrative)
+
+For the PoC, the following business rules drive Document Access Rights. These are designed to demonstrate reasoning complexity rather than mirror the production system exactly:
+
+| Rule | Description |
+|---|---|
+| Classification tiers | Documents are classified as Public, General, Restricted, or Confidential |
+| Member access | Delegates from member countries get General + Restricted access for their committees |
+| Partner access | Delegates from partner organizations get General access only |
+| Framework Agreement | If a partner has a Framework Agreement covering specific committees, their delegates get Restricted access for those committees |
+| Confidential access | Requires explicit OECD secretariat approval, regardless of membership type |
+| Retroactive access | Access to documents published before the delegate's accreditation date requires secretariat approval |
+| Approval routing | General access → auto-approved; Restricted → delegation head; Confidential/retroactive → secretariat |
 
 ### Three Phases, Each a Standalone Demo
 
@@ -275,14 +325,14 @@ client = FoundryChatClient(model="gpt-4o-mini")    # or gpt-4.1-mini
 client = FoundryChatClient(model="gpt-4o")         # or gpt-4.1
 ```
 
-**Phase 1 — "The Read Agent" (Weeks 1-2)**
-The agent can look up, search, and summarize information from ONE MP's data. No writes. Proves: conversational interface works, tools integrate with the backend, agent can reason over domain data. Zero risk of data corruption.
+**Phase 1 — "The Proactive Read Agent" (Weeks 1-2)**
+Implements Use Case 1. The agent greets delegates with their upcoming meeting brief, highlights new agenda documents, and answers questions about schedules and document content. No writes. Proves: proactive conversational interface works, document visibility rules function correctly, streaming UX gives real-time feedback. Zero risk of data corruption.
 
-**Phase 2 — "The Write Agent with Full Confirmation" (Weeks 3-4)**
-Add write tools with `approval_mode="always_require"` on every mutation. Proves: full workflow works end-to-end, confirmation UX is usable, audit trail (via function middleware) is correct.
+**Phase 2 — "The Write Agent with Reasoning" (Weeks 3-4)**
+Implements Use Case 2. The agent guides delegation editors through delegate creation, reasons through Document Access Rights business rules, and executes writes with `approval_mode="always_require"` on every mutation. Proves: multi-step reasoning over business rules works end-to-end, confirmation UX is usable, audit trail (via function middleware) captures the full chain of reasoning and approvals.
 
 **Phase 3 — "The Trust-Calibrated Agent" (Weeks 5-6)**
-Tune the approval policy: `approval_mode="never_require"` on low-risk operations, `"always_require"` only on high-risk ones. Demonstrates the production-ready UX. This is the stakeholder demo.
+Combines both use cases. Tunes the approval policy: lookups and reads are auto-approved, General-level DAR creation can be auto-approved for member delegates, Restricted/Confidential access always requires confirmation. Demonstrates the production-ready UX. This is the stakeholder demo.
 
 Each phase is a shippable, demonstrable artifact. Stakeholders can engage at each phase.
 
@@ -330,50 +380,102 @@ from agent_framework import Agent, tool, FunctionInvocationContext, AgentSession
 from agent_framework.azure import FoundryChatClient  # primary: Azure OpenAI via VS Enterprise
 
 # --- System prompt encodes ONE MP domain, user permissions, behavioral rules ---
-SYSTEM_PROMPT = """You are ONE Agent, an assistant for the ONE MP platform.
-You help users manage members, partners, contracts, and related operations.
+SYSTEM_PROMPT = """You are ONE Agent, an assistant for the ONE MP platform at the OECD.
+You help delegation editors and delegates manage delegate records, committee participations,
+document access rights, and meeting preparation.
 Always confirm write operations before executing them.
-When information is missing, ask the user — do not guess."""
+When information is missing, ask the user — do not guess.
+When creating a delegate, always determine the correct Document Access Rights based on
+the delegation's membership type (member or partner) and the delegate's committee participations.
+Member delegates get General + Restricted access; partner delegates get General only
+(unless a Framework Agreement covers the committee). Confidential and retroactive access
+require OECD secretariat approval."""
 
 
-# --- Tool definitions ---
+# --- Read tools (auto-approved) ---
 
 @tool(approval_mode="never_require")
-def lookup_partner_by_name(
-    name: Annotated[str, Field(description="Partner name to search for")],
+def get_delegation_info(
+    delegation_id: Annotated[str, Field(description="Delegation ID or country/organization name")],
     ctx: FunctionInvocationContext = None,
 ) -> str:
-    """Search for an existing partner by name in ONE MP."""
+    """Retrieve delegation details: country/organization, membership type (member/partner),
+    active delegate count, and any Framework Agreements in effect."""
     user = ctx.kwargs.get("user_identity")
     # ... call ONE MP API as authenticated user ...
-    return "No partner found matching 'Acme Corp'"
+    return '{"name": "France", "type": "member", "delegates": 42, "framework_agreements": []}'
+
+
+@tool(approval_mode="never_require")
+def lookup_delegate(
+    name: Annotated[str, Field(description="Delegate name to search for")],
+    delegation_id: Annotated[str, Field(description="Delegation to search within")] = "",
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Search for an existing delegate by name, optionally within a specific delegation."""
+    user = ctx.kwargs.get("user_identity")
+    # ... call ONE MP API as authenticated user ...
+    return "No delegate found matching 'Marie Laurent'"
+
+
+@tool(approval_mode="never_require")
+def get_upcoming_meetings(
+    delegate_id: Annotated[str, Field(description="Delegate ID to look up meetings for")],
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Retrieve upcoming committee meetings for a delegate based on their
+    committee participations. Returns meeting date, committee name, and agenda status."""
+    user = ctx.kwargs.get("user_identity")
+    # ... call ONE MP API as authenticated user ...
+    return '[{"committee": "Education Policy Committee", "date": "2026-04-18", "agenda_docs": 12, "new_since_last_login": 3}]'
+
+
+@tool(approval_mode="never_require")
+def get_agenda_documents(
+    meeting_id: Annotated[str, Field(description="Meeting ID to retrieve agenda documents for")],
+    since: Annotated[str, Field(description="ISO date — only return docs added/modified after this date")] = "",
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Retrieve documents on a committee meeting's agenda, optionally filtered
+    to only those added or modified since a given date."""
+    user = ctx.kwargs.get("user_identity")
+    # ... call ONE MP API as authenticated user ...
+    return '[{"title": "Education at a Glance 2026 — Draft", "classification": "Restricted", "modified": "2026-04-02"}]'
+
+
+# --- Write tools (require confirmation) ---
+
+@tool(approval_mode="always_require")
+def create_delegate(
+    full_name: Annotated[str, Field(description="Full name of the delegate")],
+    delegation_id: Annotated[str, Field(description="Delegation this delegate belongs to")],
+    function: Annotated[str, Field(description="Professional function, e.g. 'Education Policy Advisor'")],
+    email: Annotated[str, Field(description="Professional email address")],
+    committee_ids: Annotated[list[str], Field(description="Committees the delegate will participate in")],
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Create a new delegate within a delegation. Requires user confirmation."""
+    user = ctx.kwargs.get("user_identity")
+    # ... call ONE MP backend API ...
+    return "Delegate 'Marie Laurent' created (ID: DEL-2026-0891)"
 
 
 @tool(approval_mode="always_require")
-def create_partner(
-    legal_name: Annotated[str, Field(description="Legal name of the partner entity")],
-    vat_number: Annotated[str, Field(description="EU VAT number, e.g. FR12345678")],
-    contract_type: Annotated[str, Field(description="Standard, Framework, or Project")],
-    primary_contact_name: Annotated[str, Field(description="Full name of the primary contact")],
-    city: Annotated[str, Field(description="City where the partner is based")] = "",
+def create_document_access_rights(
+    delegate_id: Annotated[str, Field(description="Delegate to grant access to")],
+    committee_id: Annotated[str, Field(description="Committee scoping the document access")],
+    classification_level: Annotated[str, Field(description="Max classification: General, Restricted, or Confidential")],
+    retroactive: Annotated[bool, Field(description="Include documents published before accreditation date")] = False,
     ctx: FunctionInvocationContext = None,
 ) -> str:
-    """Create a new Service Partner in ONE MP. Requires user confirmation."""
+    """Create Document Access Rights for a delegate, scoped to a committee and classification level.
+    Requires user confirmation.
+    Rules: member delegates get up to 'Restricted'; partner delegates get 'General' only
+    (unless a Framework Agreement covers the committee). 'Confidential' and retroactive
+    access require OECD secretariat approval."""
     user = ctx.kwargs.get("user_identity")
     # ... call ONE MP backend API ...
-    return "Partner 'Acme Corp' created (ID: PART-12345)"
-
-
-@tool(approval_mode="always_require")
-def assign_contact(
-    partner_id: Annotated[str, Field(description="Partner ID to assign the contact to")],
-    contact_name: Annotated[str, Field(description="Full name of the contact")],
-    ctx: FunctionInvocationContext = None,
-) -> str:
-    """Assign a primary contact to a partner. Requires user confirmation."""
-    user = ctx.kwargs.get("user_identity")
-    # ... call ONE MP backend API ...
-    return f"Contact '{contact_name}' assigned to partner {partner_id}"
+    return f"Document Access Rights created: delegate={delegate_id}, committee={committee_id}, level={classification_level}"
 
 
 # --- Audit middleware ---
@@ -388,6 +490,11 @@ class AuditMiddleware:
 
 # --- Agent setup and execution ---
 
+ALL_TOOLS = [
+    get_delegation_info, lookup_delegate, get_upcoming_meetings,
+    get_agenda_documents, create_delegate, create_document_access_rights,
+]
+
 async def run_one_agent(user_message: str, session: AgentSession, user_identity: Any):
     """Run ONE Agent with a user message."""
     client = FoundryChatClient(model="gpt-4o-mini")  # swap for gpt-4.1-mini / gpt-4o as needed
@@ -396,7 +503,7 @@ async def run_one_agent(user_message: str, session: AgentSession, user_identity:
         client=client,
         name="ONEAgent",
         instructions=SYSTEM_PROMPT,
-        tools=[lookup_partner_by_name, create_partner, assign_contact],
+        tools=ALL_TOOLS,
         middleware=[AuditMiddleware()],
     ) as agent:
 
@@ -434,7 +541,7 @@ async def run_one_agent_streaming(user_message: str, session: AgentSession, user
         client=client,
         name="ONEAgent",
         instructions=SYSTEM_PROMPT,
-        tools=[lookup_partner_by_name, create_partner, assign_contact],
+        tools=ALL_TOOLS,
         middleware=[AuditMiddleware()],
     ) as agent:
         async for chunk in agent.run(
@@ -451,40 +558,35 @@ async def run_one_agent_streaming(user_message: str, session: AgentSession, user
 
 ---
 
-## Key Questions About ONE MP's Domain
+## Domain Context (Established)
 
-Answers to these questions will fundamentally shape every design decision:
+The following domain understanding shapes all design decisions. For the PoC, business rules are illustrative — designed to demonstrate the agent's reasoning capabilities rather than mirror the production system exactly.
 
-### Domain Model
-1. What are the core entities? (Members, Partners, Contracts, Plans, Invoices, Events?) What is the full entity graph?
-2. What distinguishes a "member" from a "partner"? Are there subtypes of each? What are the key state transitions?
-3. What are the most frequently performed workflows? (Rank by volume and strategic importance)
-4. What are the most **painful** workflows — the ones users most complain about? (Best PoC candidates)
+### Core Entities
+- **Delegation**: Represents a member country or partner organization at the OECD. One delegation per country/organization. Has a membership type: *member* or *partner*
+- **Delegate**: An individual belonging to exactly one delegation. Has a professional function (e.g., "Education Policy Advisor") that determines which OECD committees they participate in
+- **Committee**: An OECD body (e.g., Education Policy Committee, Trade Committee, Development Assistance Committee). Individual delegates participate in committees based on their professional function — delegations themselves are not linked to committees
+- **Document**: An official document in the OECD document management system. Has a classification level (Public, General, Restricted, Confidential) and belongs to one or more committees
+- **Document Access Rights (DAR)**: Drives what documents a delegate can see. Scoped to a specific committee and classification level. Created when a delegate is registered, based on business rules involving the delegation's membership type, the delegate's committee participations, and any Framework Agreements
 
-### Business Rules and Compliance
-5. Are there regulatory requirements governing data about members or partners? (GDPR, sector-specific regulations?)
-6. Are any workflows legally or contractually consequential?
-7. Who has access to do what? What is the permission/role model?
-8. What is the consequence of a mistake? How hard is it to correct wrong data?
+### Key Actors
+- **Delegate**: Uses ONE MP to access documents, view committee meeting schedules, and consult the delegate registry
+- **Delegation editor**: Administrative user who manages delegates within their delegation (creates, updates, deactivates). Some delegations require delegation head approval for certain operations; others allow the editor to act autonomously
+- **OECD secretariat**: Approves high-sensitivity operations (Confidential access, retroactive access)
 
-### Existing Architecture
-9. Does ONE MP have a documented API / OpenAPI spec?
-10. Is there an existing authentication system? (OAuth, SAML, session tokens?)
-11. Is there existing audit logging? Should the agent piggyback on it or create a parallel log?
-12. What data volumes are involved?
-
-### PoC Scope and Success
-13. Who is the primary user of this PoC — developer, power user, or business stakeholder?
-14. What would make this PoC a **success**? What would make it a **failure**?
-15. Is there a specific workflow that is notoriously complex or error-prone in the current app?
-16. What is the appetite for "the agent gets it slightly wrong sometimes"?
+### Remaining Open Questions (Post-PoC)
+- What is the full permission/role model beyond delegation editor and secretariat?
+- What existing APIs, authentication, and audit infrastructure exist? (Deferred — the PoC will use simulated backends)
+- What data volumes are involved in production?
+- What are the compliance/GDPR requirements for delegate personal data?
+- What is the full scope of document visibility rules beyond the three axes used in the PoC (classification, membership type, committee participation)?
 
 ---
 
 ## Adversarial Self-Challenge
 
 **"The agent is just a more complex form"**
-If every action requires confirmation, you've replaced "fill form, click submit" with "say thing, read plan, click confirm." The win is *compression*: one intent drives 15 steps. This only holds if workflows are genuinely multi-step. Validate this assumption early.
+If every action requires confirmation, you've replaced "fill form, click submit" with "say thing, read plan, click confirm." Two counters: (1) Use Case 1 (proactive meeting brief) is structurally impossible in a form — the agent adds a capability that didn't exist, not just a different skin on the same one. (2) Use Case 2 compresses a multi-screen form into a guided conversation where the agent reasons through Document Access Rights rules — the win is *compression* and *intelligence*, not just a different input modality.
 
 **"LLM reasoning is not reliable enough for consequential operations"**
 Legitimate concern. Claude Opus 4.6 is highly reliable but not infallible. The Agent Framework's `approval_mode` gates and function middleware mitigate this. If the domain requires 100% accuracy, the PoC must be honest about error rates and have clear correction workflows.
@@ -493,7 +595,7 @@ Legitimate concern. Claude Opus 4.6 is highly reliable but not infallible. The A
 True. Business logic that was in the UI now lives in the system prompt and tool descriptions. This is harder to test and maintain than a UI flowchart. Significant testing discipline required. The Agent Framework's middleware provides interception points for testing.
 
 **"Users don't want to talk to an agent, they want to click"**
-Some users will prefer the predictability of forms. Agentic is better for high-variability, multi-step, expert-knowledge-requiring tasks — not for simple, repetitive, standardized operations. Hybrid is probably the right long-term answer.
+Some delegates will prefer the predictability of forms. Agentic is better for high-variability, multi-step, expert-knowledge-requiring tasks (like navigating Document Access Rights rules) — not for simple, repetitive, standardized operations. The proactive meeting brief (UC1) sidesteps this objection entirely: no one "wants to click" through a form to get a summary of what's new. Hybrid is probably the right long-term answer.
 
 **"Why not use the Anthropic SDK directly?"**
 For a minimal PoC, the raw Anthropic SDK is ~20 lines for an agentic loop. But the Agent Framework adds built-in human-in-the-loop approval, session management, middleware for audit/security, native MCP support, agent composition, and a migration path to workflows — all without changing core agent logic. The abstraction cost is near-zero; the enterprise readiness gain is significant.

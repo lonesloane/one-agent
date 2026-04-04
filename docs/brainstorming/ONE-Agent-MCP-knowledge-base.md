@@ -49,28 +49,32 @@ The KB uses different representations for different content types because differ
 queried differently:
 
 ```yaml
-# Example KB entry: partner_create_service_001.md
+# Example KB entry: dar_member_delegate_001.md
 ---
-rule_id: "partner_create_service_001"
-entity_type: "partner"
+rule_id: "dar_member_delegate_001"
+entity_type: "document_access_rights"
 operation: "create"
-partner_type: "service"
+membership_type: "member"
 certainty_level: "authoritative"     # authoritative | verified | draft | deprecated
-source: "ONE MP v3.2 functional spec, §4.2"
+source: "ONE MP functional spec, §6.3 — Document Visibility Rules"
 last_validated: "2025-11-15"
-validated_by: "product-owner@company.com"
-scope_conditions: "applies when partner_category = 'SERVICE'"
+validated_by: "product-owner@oecd.org"
+scope_conditions: "applies when delegation.membership_type = 'member'"
 supersedes: []
-tags: ["create", "partner", "service", "eligibility"]
+tags: ["dar", "document-access", "member", "delegate", "creation"]
 ---
 
-A Service Partner is created when an external vendor provides billable services
-under contract. Required fields: legal_name, vat_number, contract_type,
-primary_contact_name, billing_email.
+When a delegate is created within a member country delegation, Document Access Rights
+are automatically scoped to the delegate's committee participations.
 
-Manager approval is required if contract_value > 50,000 EUR.
-The billing_email must be different from the primary_contact_email.
-VAT numbers must be validated against the EU VIES registry before submission.
+Default access level for member delegates: General + Restricted for each committee
+the delegate participates in. Public documents are always visible.
+
+Confidential access requires explicit OECD secretariat approval — it is never
+auto-granted regardless of membership type.
+
+Retroactive access (documents published before the delegate's accreditation date)
+requires secretariat approval. By default, access starts from the accreditation date.
 ```
 
 ### Granularity Principle
@@ -145,10 +149,10 @@ async with (
         client=FoundryChatClient(model="gpt-4o-mini"),  # swap for gpt-4.1-mini / gpt-4o as needed
         name="ONEAgent",
         instructions=SYSTEM_PROMPT,
-        tools=[kb_mcp, lookup_partner, create_partner, assign_contact],
+        tools=[kb_mcp, get_delegation_info, lookup_delegate, create_delegate, create_document_access_rights],
     ) as agent,
 ):
-    result = await agent.run("Register Acme Corp as a new partner")
+    result = await agent.run("Add Marie Laurent as a delegate, she's an education policy advisor")
 ```
 
 For production (HTTP-deployed KB server):
@@ -166,10 +170,10 @@ async with (
         client=FoundryChatClient(model="gpt-4o-mini"),  # swap for gpt-4.1-mini / gpt-4o as needed
         name="ONEAgent",
         instructions=SYSTEM_PROMPT,
-        tools=[kb_mcp, lookup_partner, create_partner, assign_contact],
+        tools=[kb_mcp, get_delegation_info, lookup_delegate, create_delegate, create_document_access_rights],
     ) as agent,
 ):
-    result = await agent.run("Register Acme Corp as a new partner")
+    result = await agent.run("Add Marie Laurent as a delegate, she's an education policy advisor")
 ```
 
 ### MCP KB Server Tool Interface Design
@@ -198,7 +202,7 @@ async def search_business_rules(
     """
     # Internally: embed query, search vector store, return top-k with scores
     return {
-        "results": [{"rule_id": "...", "content": "...", "score": 0.94}],
+        "results": [{"rule_id": "dar_member_delegate_001", "content": "...", "score": 0.94}],
         "confidence": "high",       # high (>0.90) | medium (0.75-0.90) | low (<0.75)
         "coverage": "complete",     # complete | partial | none
         "contradictions": [],       # any conflicting rules found
@@ -215,12 +219,28 @@ async def get_workflow_definition(
     Always call this before starting any create/update/delete operation.
     """
     return {
-        "workflow_id": "partner_create_service",
-        "steps": ["validate_eligibility", "collect_fields", "manager_approval_if_needed", "create"],
-        "required_fields": ["legal_name", "vat_number", "contract_type", "primary_contact_name"],
-        "optional_fields": ["billing_email", "phone"],
+        "workflow_id": "delegate_create_with_dar",
+        "steps": [
+            "lookup_existing_delegate",
+            "get_delegation_info",
+            "collect_delegate_fields",
+            "determine_committee_participations",
+            "compute_access_levels",
+            "approval_if_needed",
+            "create_delegate",
+            "create_document_access_rights",
+        ],
+        "required_fields": ["full_name", "delegation_id", "function", "email", "committee_ids"],
+        "optional_fields": ["phone", "title"],
         "conditional_branches": [
-            {"condition": "contract_value > 50000", "then": "require_manager_approval"}
+            {"condition": "delegation.type == 'partner' and no framework_agreement",
+             "then": "limit_access_to_general"},
+            {"condition": "classification_level == 'Confidential'",
+             "then": "require_secretariat_approval"},
+            {"condition": "retroactive == true",
+             "then": "require_secretariat_approval"},
+            {"condition": "classification_level == 'Restricted'",
+             "then": "require_delegation_head_approval"},
         ],
         "confidence": "high",
         "found": True,
@@ -238,11 +258,16 @@ async def check_eligibility(
     Use after collecting partial context to identify what's still missing.
     """
     return {
-        "eligible": "yes | no | unknown",
-        "missing_required_fields": ["contract_type"],
+        "eligible": "yes",
+        "missing_required_fields": ["email", "committee_ids"],
         "blocking_conditions": [],
         "confidence": "medium",
-        "next_question": "What type of contract will this partner operate under?",
+        "access_level_determination": {
+            "membership_type": "member",
+            "default_level": "Restricted",
+            "framework_agreement_applicable": False,
+        },
+        "next_question": "Which committees will this delegate participate in, and what is their email?",
     }
 
 @server.tool()
@@ -256,25 +281,24 @@ async def resolve_ambiguity(
     and a ready-to-use clarification question if confidence is insufficient.
     """
     return {
-        "best_match": "create_service_partner",
-        "confidence": 0.71,
-        "alternatives": ["create_reseller_partner", "create_affiliate_partner"],
-        "clarification_needed": True,
-        "clarification_question": (
-            "Is Acme Corp a Service Partner (provides billable services) "
-            "or a Reseller Partner (distributes your products)?"
-        ),
+        "best_match": "delegate_create_with_dar",
+        "confidence": 0.88,
+        "alternatives": ["delegate_update_committees", "delegate_reactivate"],
+        "clarification_needed": False,
+        "clarification_question": None,
     }
 
 # MCP Resources — static, always available as context
 @server.resource("kb://schemas/{entity_type}")
 async def get_entity_schema(entity_type: str) -> str:
-    """Full schema for a given entity type: fields, types, constraints, relationships."""
+    """Full schema for a given entity type: fields, types, constraints, relationships.
+    Available types: delegate, delegation, committee, document, document_access_rights."""
     # ... return schema as JSON string ...
 
 @server.resource("kb://workflows/index")
 async def get_workflow_index() -> str:
-    """Index of all available workflows by entity type and operation."""
+    """Index of all available workflows by entity type and operation.
+    Includes: delegate creation, delegate update, DAR creation, meeting lookup."""
     # ... return workflow index as JSON string ...
 
 
@@ -303,63 +327,79 @@ what to do next:
 ### Full Walk-Through
 
 ```
-User: "Register Acme Corp as a new partner — they're based in Lyon,
-       main contact is Claire Dupont"
+User (delegation editor for France): "I need to add a new delegate —
+  Marie Laurent, she's an advisor on education policy"
 
 ━━━ STEP 1: Intent Classification ━━━
-Agent queries KB (via MCPStdioTool): search_business_rules("register new partner")
-→ KB returns: "partner_create workflow family" with confidence: "medium"
-  (medium because "partner" is ambiguous — multiple types exist)
-→ Agent also calls: resolve_ambiguity("register new partner",
-    ["create_service_partner", "create_reseller_partner", "create_affiliate_partner"])
-→ KB returns: confidence: 0.68, clarification_needed: true
-→ Clarification question generated by KB:
-  "Is Acme Corp a Service Partner (provides services) or a Reseller Partner
-   (distributes your products)?"
+Agent queries KB (via MCPStdioTool): search_business_rules("add new delegate")
+→ KB returns: "delegate_create_with_dar workflow" with confidence: "high"
+  (high because "add delegate" maps unambiguously to delegate creation)
+→ Agent also calls: get_workflow_definition("delegate", "create")
+→ KB returns: steps=[lookup, get_delegation, collect_fields,
+    determine_committees, compute_access, approval, create, create_dar]
 
-━━━ STEP 2: Single Targeted Clarification ━━━
-Agent → User: "Is Acme Corp a Service Partner or a Reseller Partner?"
-User → "Service partner"
+━━━ STEP 2: Delegation Context ━━━
+Agent calls: get_delegation_info("France")
+→ Returns: type="member", delegates=42, framework_agreements=[]
+Agent calls: lookup_delegate("Marie Laurent", "France")
+→ Returns: no existing delegate found
 
-━━━ STEP 3: Workflow Retrieval ━━━
-Agent calls: get_workflow_definition("partner", "create_service")
-→ KB returns: required_fields=[legal_name, vat_number, contract_type,
-    primary_contact_name, billing_email], confidence: "high"
+━━━ STEP 3: Context Matching ━━━
+From user's message: full_name="Marie Laurent", function="education policy advisor"
+Agent infers from function: likely committee = "Education Policy Committee"
+Agent calls: check_eligibility("delegate", "create",
+    {name: "Marie Laurent", function: "education policy advisor",
+     delegation_type: "member"})
+→ KB returns: missing_required_fields=["email", "committee_ids"],
+  access_level_determination: {membership_type: "member", default_level: "Restricted"},
+  next_question: "Which committees will this delegate participate in,
+                  and what is their email?"
 
-━━━ STEP 4: Context Matching ━━━
-From user's message: legal_name="Acme Corp", city="Lyon", contact="Claire Dupont"
-Missing: vat_number, contract_type, billing_email
-Agent calls: check_eligibility("partner", "create_service",
-    {legal_name: "Acme Corp", contact: "Claire Dupont"})
-→ KB returns: missing_required_fields=["vat_number", "contract_type"],
-  next_question: "What is Acme Corp's VAT number and what contract type
-                  will they operate under? (Standard, Framework, or Project)"
+━━━ STEP 4: Batched Clarification ━━━
+Agent → User: "Marie Laurent's function suggests the Education Policy Committee.
+  Should I assign her there? Any other committees?
+  I also need her professional email address."
+User → "Yes Education Policy, and also the Skills and Employment committee.
+        Email is m.laurent@diplomatie.gouv.fr"
 
-━━━ STEP 5: Batched Clarification ━━━
-Agent → User: "To complete Acme Corp's registration I need:
-  - Their VAT number
-  - Contract type: Standard, Framework, or Project?"
-User → "VAT FR12345678, Standard contract"
+━━━ STEP 5: Access Level Reasoning ━━━
+Agent reasons (informed by KB rules):
+  - France is a member country → default access: General + Restricted
+  - Two committees: Education Policy + Skills and Employment
+  - No Confidential access requested → no secretariat approval needed
+  - No retroactive access requested → standard accreditation date applies
+  - Restricted access for member → requires delegation head approval
 
 ━━━ STEP 6: Execution with Confirmation ━━━
-Agent calls create_partner({...})
+Agent calls create_delegate({full_name: "Marie Laurent", delegation: "France",
+    function: "Education Policy Advisor", email: "m.laurent@diplomatie.gouv.fr",
+    committees: ["EDU", "SKILLS"]})
 → Tool has approval_mode="always_require"
-→ Agent Framework returns user_input_requests to the caller
 → UI shows: "Here's what I'm about to do:
-  Create Service Partner: Acme Corp
-  - Location: Lyon
-  - VAT: FR12345678
-  - Contract: Standard
-  - Primary contact: Claire Dupont
+  Create delegate: Marie Laurent
+  - Delegation: France (member)
+  - Function: Education Policy Advisor
+  - Committees: Education Policy, Skills and Employment
+  - Email: m.laurent@diplomatie.gouv.fr
   Shall I proceed?"
-User → approves → create_response(True)
-→ Tool executes → success
-Agent calls assign_contact → same approval flow → success
-Audit middleware logs: user identity, KB rules used, tool calls, user confirmation
+User → approves → tool executes → DEL-2026-0891
+
+Agent calls create_document_access_rights for each committee:
+  - DEL-2026-0891 × Education Policy → Restricted
+  - DEL-2026-0891 × Skills and Employment → Restricted
+→ UI shows: "I'll also create Document Access Rights:
+  - Education Policy Committee: General + Restricted access
+  - Skills and Employment Committee: General + Restricted access
+  (Restricted access for a member delegation requires delegation head approval.)
+  Shall I proceed?"
+User → approves → DARs created
+Audit middleware logs: user identity, KB rules used, tool calls, approvals
 
 ━━━ RESULT ━━━
-Total clarification questions: 2 (vs ~15 form fields in ONE MP)
-Both questions were necessary and could not be inferred from context.
+Total clarification questions: 1 (committees + email, batched)
+Agent reasoned through: membership type → access levels → approval routing
+The form-based equivalent would require ~8 screens across delegate creation
+and two separate DAR creation forms.
 ```
 
 ### How the Agent Framework Manages This Flow
@@ -372,7 +412,7 @@ and middleware; the framework manages the loop:
 from agent_framework import Agent, MCPStdioTool, AgentSession, Message
 from agent_framework.azure import FoundryChatClient  # primary: Azure OpenAI via VS Enterprise
 
-async def run_registration_flow(user_message: str, session: AgentSession, user_identity):
+async def run_delegate_flow(user_message: str, session: AgentSession, user_identity):
     async with (
         MCPStdioTool(
             name="one-mp-knowledge-base",
@@ -383,7 +423,7 @@ async def run_registration_flow(user_message: str, session: AgentSession, user_i
             client=FoundryChatClient(model="gpt-4o-mini"),  # swap for gpt-4.1-mini / gpt-4o as needed
             name="ONEAgent",
             instructions=SYSTEM_PROMPT,
-            tools=[kb_mcp, lookup_partner, create_partner, assign_contact],
+            tools=[kb_mcp, get_delegation_info, lookup_delegate, create_delegate, create_document_access_rights],
             middleware=[AuditMiddleware(), SecurityMiddleware()],
         ) as agent,
     ):
@@ -415,8 +455,8 @@ async def run_registration_flow(user_message: str, session: AgentSession, user_i
 
 - **Proactively on every new intent** — before considering any backend tools, the agent queries the KB (via MCP) to classify the operation and retrieve the applicable workflow. This happens once per new user goal, not per message
 - **Multi-hop when confidence is medium** — first query returns medium confidence → agent probes with a more specific query (e.g., narrow by entity type or operation)
-- **Never for pure reads** — simple lookups ("find partner Acme Corp") don't need KB consultation; the agent already knows the search tool and its schema
-- **On conditional branches** — mid-workflow, when the agent hits a conditional step (e.g., "if contract_value > 50k, require approval"), it re-queries the KB to confirm the condition and retrieve the approval sub-workflow
+- **Never for pure reads** — simple lookups ("find delegate Marie Laurent") don't need KB consultation; the agent already knows the search tool and its schema
+- **On conditional branches** — mid-workflow, when the agent hits a conditional step (e.g., "if delegation is partner type and no Framework Agreement, limit to General access"), it re-queries the KB to confirm the condition and retrieve the correct access level
 
 ### Handling Contradictory Rules
 
@@ -439,10 +479,10 @@ resource.
 
 | Scenario | Wrong | Right |
 |---|---|---|
-| Missing required field | "What is the VAT number?" | KB generates question with context: "What is Acme Corp's EU VAT number? (format: FR12345678)" |
-| Ambiguous operation type | "Which type of partner?" | KB generates multiple-choice with descriptions: "Service Partner (provides services) or Reseller Partner (distributes your products)?" |
-| Multiple missing fields | Ask one by one | KB's `check_eligibility` returns `next_question` — the single most blocking missing field. Batch non-blocking ones |
-| Low KB coverage | "I don't understand" | "I don't have a specific rule for this scenario. Based on similar cases, I'd proceed with [X]. Does that sound right?" |
+| Missing required field | "What is the delegate's email?" | KB generates question with context: "What is Marie Laurent's professional email address?" |
+| Ambiguous operation | "What do you want to do with this delegate?" | KB infers from context: function mentioned → likely creation. Confirms: "I'll create Marie Laurent as a delegate. Which committees should she participate in?" |
+| Multiple missing fields | Ask one by one | KB's `check_eligibility` returns `next_question` — batches related fields: "Which committees will this delegate participate in, and what is their email?" |
+| Low KB coverage | "I don't understand" | "I don't have a specific rule for this scenario. Based on similar cases for member delegations, I'd grant General + Restricted access. Does that sound right?" |
 
 ### Clarification → KB Learning Loop
 
@@ -454,10 +494,12 @@ User answers clarification question
 Agent logs: {original_request, KB_confidence, clarification_asked, user_answer}
     (captured by AuditMiddleware via FunctionInvocationContext)
     ↓
-Review queue: "3 users were asked the same clarification for 'register partner'"
+Review queue: "5 editors were asked about Framework Agreement applicability
+              when creating delegates for partner organizations"
     ↓
-KB maintainer creates new disambiguation rule:
-  "When user says 'register partner' without type, ask: Service or Reseller?"
+KB maintainer creates new rule:
+  "When creating a delegate for a partner org, check delegation.framework_agreements
+   and auto-suggest applicable committees with elevated access"
     ↓
 KB coverage improves → same question no longer asked next time
 ```
@@ -486,18 +528,18 @@ scores:
 
 ```yaml
 ---
-rule_id: "partner_create_service_001"
-entity_type: "partner"
+rule_id: "dar_member_delegate_001"
+entity_type: "document_access_rights"
 operation: "create"
-partner_type: "service"
+membership_type: "member"
 certainty_level: "authoritative"   # authoritative | verified | draft | deprecated
-source: "ONE MP v3.2 functional spec, §4.2"
+source: "ONE MP functional spec, §6.3 — Document Visibility Rules"
 last_validated: "2025-11-15"
-validated_by: "product-owner@company.com"
-scope_conditions: "applies when partner_category = 'SERVICE'"
+validated_by: "product-owner@oecd.org"
+scope_conditions: "applies when delegation.membership_type = 'member'"
 supersedes: []
 superseded_by: null
-tags: ["create", "partner", "service", "eligibility"]
+tags: ["dar", "document-access", "member", "delegate", "creation"]
 ---
 ```
 
@@ -531,7 +573,7 @@ class KBStalenessDetector(FunctionMiddleware):
 
         # Compare expectations with actual results
         if kb_expectations and context.result:
-            # e.g., KB said vat_number is required, but API accepted without it
+            # e.g., KB said Framework Agreement is required for partner Restricted access, but API accepted without it
             self._check_field_divergence(kb_expectations, context.result)
 
     def _check_field_divergence(self, expected, actual):
@@ -541,10 +583,11 @@ class KBStalenessDetector(FunctionMiddleware):
 
 Example flow:
 ```
-KB says: "vat_number is required for create_service_partner"
-Agent calls create_service_partner without vat_number → API accepts it
-→ KBStalenessDetector logs: "KB rule partner_create_service_001 may be outdated —
-   API accepted call without vat_number field"
+KB says: "Restricted access for partner delegates requires a Framework Agreement"
+Agent calls create_document_access_rights(level="Restricted") for a partner delegate
+  without a Framework Agreement → API accepts it
+→ KBStalenessDetector logs: "KB rule dar_partner_framework_002 may be outdated —
+   API accepted Restricted access for partner delegate without Framework Agreement"
 → Flag appears in KB health dashboard for review
 ```
 
@@ -630,7 +673,7 @@ business knowledge.
             ↕ queried on demand (MCP protocol)
 ┌─────────────────────────────────────────────────────┐
 │ MCP Backend Tools Server (or direct function tools) │
-│  Tools: create_partner, lookup_member, assign_contact│
+│  Tools: create_delegate, lookup_delegate, create_dar │
 │  Built with: @tool decorator + FunctionInvocationCtx│
 │  Connects to: ONE MP's existing API/database        │
 │  Approval: approval_mode per tool                   │
@@ -652,16 +695,15 @@ business knowledge.
 
 ### Minimal MCP KB Server
 
-For the PoC, the KB server covers only the chosen single workflow deeply rather than ALL of
-ONE MP shallowly.
+For the PoC, the KB server covers the two identified use cases (proactive meeting brief, delegate creation with DAR) deeply rather than ALL of ONE MP shallowly.
 
 **Phase 1 — Static KB (Week 1)**
-- 10-15 KB entries covering the PoC workflow
+- 10-15 KB entries covering delegate creation, Document Access Rights rules, and meeting/agenda lookups
 - 3 MCP tools: `search_business_rules`, `get_workflow_definition`, `check_eligibility`
-- 1 MCP resource: entity schema for the target entity
+- 2 MCP resources: entity schemas for `delegate` and `document_access_rights`
 - Storage: SQLite + ChromaDB (zero infrastructure, runs in-process)
 - MCP server: Python + `mcp` SDK, connected via `MCPStdioTool`
-- Agent: `Agent` with `AnthropicClient`, `@tool`-decorated backend functions, `AuditMiddleware`
+- Agent: `Agent` with `FoundryChatClient`, `@tool`-decorated backend functions, `AuditMiddleware`
 
 **Phase 2 — Dynamic KB (Week 3)**
 - Add `resolve_ambiguity` tool to MCP server
@@ -698,10 +740,10 @@ Frontend:          Next.js + Vercel AI SDK (streaming tool call display)
 
 ### Initial KB Population Strategy
 
-1. **Walk the app**: record a power user going through each step of the PoC workflow — every field, every validation error, every branch
-2. **Extract rules**: for each screen/field, write a KB entry: what is it, why is it required, what are valid values, what happens if wrong
-3. **Interview edge cases**: "tell me about the 3 most confusing situations you've seen with this workflow"
-4. **Write disambiguation entries**: for every term with multiple meanings in the domain, write a glossary entry with examples
+1. **Walk the app**: record a delegation editor going through delegate creation and DAR assignment — every field, every validation error, every conditional branch
+2. **Extract rules**: for each step, write a KB entry: what determines the access level, what triggers approval routing, what edge cases exist (Framework Agreements, retroactive access, Confidential requests)
+3. **Interview edge cases**: "tell me about the 3 most confusing situations you've seen when creating delegates for partner organizations"
+4. **Write disambiguation entries**: for every term with multiple meanings in the domain (e.g., "access" could mean document access, application access, or committee participation), write a glossary entry with examples
 
 ---
 
@@ -714,11 +756,13 @@ descriptions via `@tool(description=...)` + a detailed system prompt will get yo
 way there with far less infrastructure. The MCP KB earns its complexity when:
 - The rulebook is too large for the system prompt (> ~50 rules)
 - Rules change frequently (monthly or more)
-- Rules are highly conditional (eligibility depends on 5+ intersecting conditions)
+- Rules are highly conditional (Document Access Rights depend on membership type × committee × Framework Agreements × classification level × retroactive flag)
 - You need auditability of *which specific rule* the agent used
 
-For a PoC demonstrating one workflow: start with system prompt encoding. Switch to MCP KB
-when you hit the limits.
+For the PoC demonstrating delegate creation with DAR: the conditional branching in access
+level determination is rich enough to justify a KB even at PoC scale. Start with system
+prompt encoding for Phase 1 (read-only meeting brief). Switch to MCP KB for Phase 2 (write
+agent with DAR reasoning) when the rule set exceeds what fits cleanly in the system prompt.
 
 ### "KB becomes a latency bottleneck"
 
@@ -798,10 +842,10 @@ User Intent
 │  MCP KB Server   │  │  Backend Function Tools   │
 │  (mcp SDK)       │  │  (@tool decorator)        │
 │                  │  │                            │
-│  Resources:      │  │  create_partner            │
-│  - schemas       │  │  lookup_member             │
-│  - wf index      │  │  assign_contact            │
-│                  │  │  update_status             │
+│  Resources:      │  │  create_delegate           │
+│  - schemas       │  │  lookup_delegate           │
+│  - wf index      │  │  create_doc_access_rights  │
+│                  │  │  get_upcoming_meetings     │
 │  Tools:          │  │  ...                       │
 │  - search_rules  │  │                            │
 │  - get_workflow  │  │  approval_mode per tool    │
@@ -821,8 +865,8 @@ User Intent
 
 | Problem | Without KB | With MCP KB + Agent Framework |
 |---|---|---|
-| "Add a partner" → which workflow? | Agent guesses or asks user | KB classifies with confidence score |
-| Missing required fields | Agent asks field-by-field | KB's `check_eligibility` generates one batched question |
+| "Add a delegate" → what access? | Agent guesses or asks user | KB classifies membership type, computes access levels with confidence score |
+| Missing required fields | Agent asks field-by-field | KB's `check_eligibility` generates one batched question (committees + email) |
 | Business rule changes | Requires redeployment | Update a markdown file, re-embed |
 | Agent made a wrong call | Hard to diagnose | AuditMiddleware + KB rule ID in logs |
 | Write operations need confirmation | Custom confirmation code | `approval_mode="always_require"` built-in |
