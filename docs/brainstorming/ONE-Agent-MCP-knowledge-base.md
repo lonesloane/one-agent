@@ -3,6 +3,8 @@
 > How to combine the ONE Agent agentic application with a business knowledge base
 > exposed as an MCP server, enabling the agent to reason over user requests with
 > high confidence and ask for clarification only when the KB cannot provide a clear answer.
+>
+> **Agent technology: [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/?pivots=programming-language-python)** (Python) — with native MCP support via `MCPStdioTool` and `MCPStreamableHTTPTool`.
 
 ---
 
@@ -73,7 +75,7 @@ VAT numbers must be validated against the EU VIES registry before submission.
 
 - Too coarse (one big document per workflow) → retrieval picks up irrelevant content
 - Too fine (one sentence per document) → retrieval misses connections between related rules
-- **Sweet spot**: topic-sized chunks (~200–500 words) with rich, structured front matter metadata
+- **Sweet spot**: topic-sized chunks (~200-500 words) with rich, structured front matter metadata
 
 ### Authoring and Maintenance
 
@@ -112,17 +114,80 @@ Why not RAG-only (without MCP)?
 **The optimal design: an MCP server that internally uses RAG** for semantic search, but also
 exposes structured lookup tools for exact queries.
 
-### MCP Tool Interface Design
+### Microsoft Agent Framework MCP Integration
+
+The Agent Framework provides **native MCP support** through three connection types, eliminating
+the need for custom MCP client code:
+
+| Connection Type | Class | Use Case |
+|---|---|---|
+| Local process (stdio) | `MCPStdioTool` | KB server running as a local Python process |
+| HTTP / SSE | `MCPStreamableHTTPTool` | KB server deployed as an HTTP service |
+| WebSocket | `MCPWebsocketTool` | Real-time streaming connections |
+
+For the ONE Agent KB, `MCPStdioTool` is ideal for development (zero infrastructure), with
+`MCPStreamableHTTPTool` for production deployment.
 
 ```python
-# MCP KB Server — Tool Definitions
+from agent_framework import Agent, MCPStdioTool
+from agent_framework.anthropic import AnthropicClient
 
-@mcp_server.tool()
-def search_business_rules(
+# Connect to the KB MCP server running as a local process
+async with (
+    MCPStdioTool(
+        name="one-mp-knowledge-base",
+        command="python",
+        args=["-m", "one_agent.kb_server"],
+    ) as kb_mcp,
+    Agent(
+        client=AnthropicClient(model="claude-sonnet-4-6"),
+        name="ONEAgent",
+        instructions=SYSTEM_PROMPT,
+        tools=[kb_mcp, lookup_partner, create_partner, assign_contact],
+    ) as agent,
+):
+    result = await agent.run("Register Acme Corp as a new partner")
+```
+
+For production (HTTP-deployed KB server):
+
+```python
+from agent_framework import Agent, MCPStreamableHTTPTool
+from agent_framework.anthropic import AnthropicClient
+
+async with (
+    MCPStreamableHTTPTool(
+        name="one-mp-knowledge-base",
+        url="https://kb.onemp.internal/mcp",
+    ) as kb_mcp,
+    Agent(
+        client=AnthropicClient(model="claude-sonnet-4-6"),
+        name="ONEAgent",
+        instructions=SYSTEM_PROMPT,
+        tools=[kb_mcp, lookup_partner, create_partner, assign_contact],
+    ) as agent,
+):
+    result = await agent.run("Register Acme Corp as a new partner")
+```
+
+### MCP KB Server Tool Interface Design
+
+The KB server is built using the standard MCP Python SDK (`mcp`) and exposes tools that the
+Agent Framework automatically discovers and makes available to the agent:
+
+```python
+# MCP KB Server — Tool Definitions (runs as a separate process / HTTP service)
+from mcp.server import Server
+from mcp.server.stdio import stdio_server
+
+server = Server("one-mp-knowledge-base")
+
+@server.tool()
+async def search_business_rules(
     query: str,
     entity_type: str | None = None,
-    operation: str | None = None
-) -> SearchResult:
+    operation: str | None = None,
+) -> dict:
     """
     Semantic search over the business rule KB.
     Returns matching rules ranked by relevance, with confidence metadata.
@@ -134,11 +199,14 @@ def search_business_rules(
         "results": [{"rule_id": "...", "content": "...", "score": 0.94}],
         "confidence": "high",       # high (>0.90) | medium (0.75-0.90) | low (<0.75)
         "coverage": "complete",     # complete | partial | none
-        "contradictions": []        # any conflicting rules found
+        "contradictions": [],       # any conflicting rules found
     }
 
-@mcp_server.tool()
-def get_workflow_definition(entity_type: str, operation: str) -> WorkflowDefinition:
+@server.tool()
+async def get_workflow_definition(
+    entity_type: str,
+    operation: str,
+) -> dict:
     """
     Retrieve the exact workflow definition for a given entity type and operation.
     Returns required steps, required/optional fields, and conditional branches.
@@ -153,15 +221,15 @@ def get_workflow_definition(entity_type: str, operation: str) -> WorkflowDefinit
             {"condition": "contract_value > 50000", "then": "require_manager_approval"}
         ],
         "confidence": "high",
-        "found": True
+        "found": True,
     }
 
-@mcp_server.tool()
-def check_eligibility(
+@server.tool()
+async def check_eligibility(
     entity_type: str,
     operation: str,
-    context: dict
-) -> EligibilityResult:
+    context: dict,
+) -> dict:
     """
     Given what we know about the entity/request so far, determine if the
     operation is eligible and what additional information is needed.
@@ -172,14 +240,14 @@ def check_eligibility(
         "missing_required_fields": ["contract_type"],
         "blocking_conditions": [],
         "confidence": "medium",
-        "next_question": "What type of contract will this partner operate under?"
+        "next_question": "What type of contract will this partner operate under?",
     }
 
-@mcp_server.tool()
-def resolve_ambiguity(
+@server.tool()
+async def resolve_ambiguity(
     user_request: str,
-    candidates: list[str]
-) -> AmbiguityResolution:
+    candidates: list[str],
+) -> dict:
     """
     Given an ambiguous user request and a list of possible interpretations
     identified from the KB, return the most likely match with confidence,
@@ -190,17 +258,28 @@ def resolve_ambiguity(
         "confidence": 0.71,
         "alternatives": ["create_reseller_partner", "create_affiliate_partner"],
         "clarification_needed": True,
-        "clarification_question": "Is Acme Corp a Service Partner (provides billable services) or a Reseller Partner (distributes your products)?"
+        "clarification_question": (
+            "Is Acme Corp a Service Partner (provides billable services) "
+            "or a Reseller Partner (distributes your products)?"
+        ),
     }
 
 # MCP Resources — static, always available as context
-@mcp_server.resource("kb://schemas/{entity_type}")
-def get_entity_schema(entity_type: str) -> EntitySchema:
+@server.resource("kb://schemas/{entity_type}")
+async def get_entity_schema(entity_type: str) -> str:
     """Full schema for a given entity type: fields, types, constraints, relationships."""
+    # ... return schema as JSON string ...
 
-@mcp_server.resource("kb://workflows/index")
-def get_workflow_index() -> WorkflowIndex:
+@server.resource("kb://workflows/index")
+async def get_workflow_index() -> str:
     """Index of all available workflows by entity type and operation."""
+    # ... return workflow index as JSON string ...
+
+
+# Run the server
+async def main():
+    async with stdio_server() as (read_stream, write_stream):
+        await server.run(read_stream, write_stream, server.create_initialization_options())
 ```
 
 ### What "Confident" vs "Ambiguous" Looks Like
@@ -211,7 +290,7 @@ what to do next:
 | Confidence | Signal | Agent behavior |
 |---|---|---|
 | `high` (score > 0.90, coverage: complete) | Exact rule found, unambiguous | Act directly, no clarification needed |
-| `medium` (0.75–0.90, coverage: partial) | Rules found but conditions don't fully match | Propose action, ask user to confirm |
+| `medium` (0.75-0.90, coverage: partial) | Rules found but conditions don't fully match | Propose action, ask user to confirm |
 | `low` (< 0.75, coverage: none) | No applicable rule found, or rules contradict | Ask targeted clarification question |
 | `contradictions` present | Two rules conflict | Surface the conflict explicitly, ask user to resolve |
 
@@ -226,7 +305,7 @@ User: "Register Acme Corp as a new partner — they're based in Lyon,
        main contact is Claire Dupont"
 
 ━━━ STEP 1: Intent Classification ━━━
-Agent queries KB: search_business_rules("register new partner")
+Agent queries KB (via MCPStdioTool): search_business_rules("register new partner")
 → KB returns: "partner_create workflow family" with confidence: "medium"
   (medium because "partner" is ambiguous — multiple types exist)
 → Agent also calls: resolve_ambiguity("register new partner",
@@ -261,26 +340,78 @@ Agent → User: "To complete Acme Corp's registration I need:
 User → "VAT FR12345678, Standard contract"
 
 ━━━ STEP 6: Execution with Confirmation ━━━
-Agent: "Here's what I'm about to do:
+Agent calls create_partner({...})
+→ Tool has approval_mode="always_require"
+→ Agent Framework returns user_input_requests to the caller
+→ UI shows: "Here's what I'm about to do:
   Create Service Partner: Acme Corp
   - Location: Lyon
   - VAT: FR12345678
   - Contract: Standard
   - Primary contact: Claire Dupont
   Shall I proceed?"
-User → "Yes"
-Agent calls: create_partner({...}) → success
-Agent calls: assign_contact({partner_id, "Claire Dupont"}) → success
-Audit log: records intent, KB rules used, tool calls, user confirmation
+User → approves → create_response(True)
+→ Tool executes → success
+Agent calls assign_contact → same approval flow → success
+Audit middleware logs: user identity, KB rules used, tool calls, user confirmation
 
 ━━━ RESULT ━━━
 Total clarification questions: 2 (vs ~15 form fields in ONE MP)
 Both questions were necessary and could not be inferred from context.
 ```
 
+### How the Agent Framework Manages This Flow
+
+The key difference from a hand-rolled agentic loop: the Agent Framework's runtime handles the
+LLM inference → tool call → result synthesis cycle automatically. The developer defines tools
+and middleware; the framework manages the loop:
+
+```python
+from agent_framework import Agent, MCPStdioTool, AgentSession, Message
+from agent_framework.anthropic import AnthropicClient
+
+async def run_registration_flow(user_message: str, session: AgentSession, user_identity):
+    async with (
+        MCPStdioTool(
+            name="one-mp-knowledge-base",
+            command="python",
+            args=["-m", "one_agent.kb_server"],
+        ) as kb_mcp,
+        Agent(
+            client=AnthropicClient(model="claude-sonnet-4-6"),
+            name="ONEAgent",
+            instructions=SYSTEM_PROMPT,
+            tools=[kb_mcp, lookup_partner, create_partner, assign_contact],
+            middleware=[AuditMiddleware(), SecurityMiddleware()],
+        ) as agent,
+    ):
+        result = await agent.run(
+            user_message,
+            session=session,
+            function_invocation_kwargs={"user_identity": user_identity},
+        )
+
+        # Handle approval requests (human-in-the-loop)
+        while result.user_input_requests:
+            for req in result.user_input_requests:
+                # Present to user via UI
+                print(f"Approve {req.function_call.name}({req.function_call.arguments})?")
+
+            # Collect user decisions and continue
+            approved = await get_user_approval_from_ui(result.user_input_requests)
+            messages = build_approval_messages(user_message, result.user_input_requests, approved)
+            result = await agent.run(
+                messages,
+                session=session,
+                function_invocation_kwargs={"user_identity": user_identity},
+            )
+
+        return result.text
+```
+
 ### When Does the Agent Query the KB?
 
-- **Proactively on every new intent** — before considering any tools, the agent queries the KB to classify the operation and retrieve the applicable workflow. This happens once per new user goal, not per message
+- **Proactively on every new intent** — before considering any backend tools, the agent queries the KB (via MCP) to classify the operation and retrieve the applicable workflow. This happens once per new user goal, not per message
 - **Multi-hop when confidence is medium** — first query returns medium confidence → agent probes with a more specific query (e.g., narrow by entity type or operation)
 - **Never for pure reads** — simple lookups ("find partner Acme Corp") don't need KB consultation; the agent already knows the search tool and its schema
 - **On conditional branches** — mid-workflow, when the agent hits a conditional step (e.g., "if contract_value > 50k, require approval"), it re-queries the KB to confirm the condition and retrieve the approval sub-workflow
@@ -319,6 +450,7 @@ User clarifications are high-signal data about KB gaps. The pipeline:
 User answers clarification question
     ↓
 Agent logs: {original_request, KB_confidence, clarification_asked, user_answer}
+    (captured by AuditMiddleware via FunctionInvocationContext)
     ↓
 Review queue: "3 users were asked the same clarification for 'register partner'"
     ↓
@@ -380,12 +512,36 @@ Confidence is computed from multiple signals:
 ### Staleness Detection — Closing the Feedback Loop
 
 The agent can flag KB entries as potentially outdated based on what it observes when calling
-backend tools:
+backend tools. This is captured by **function middleware** that compares KB expectations with
+actual API behavior:
 
+```python
+from agent_framework import FunctionMiddleware, FunctionInvocationContext
+
+class KBStalenessDetector(FunctionMiddleware):
+    """Detects when KB rules diverge from actual API behavior."""
+
+    async def process(self, context: FunctionInvocationContext, call_next):
+        # Record pre-call expectations from KB
+        kb_expectations = context.kwargs.get("kb_expectations", {})
+
+        await call_next()
+
+        # Compare expectations with actual results
+        if kb_expectations and context.result:
+            # e.g., KB said vat_number is required, but API accepted without it
+            self._check_field_divergence(kb_expectations, context.result)
+
+    def _check_field_divergence(self, expected, actual):
+        # ... log to KB health dashboard for review ...
+        pass
+```
+
+Example flow:
 ```
 KB says: "vat_number is required for create_service_partner"
 Agent calls create_service_partner without vat_number → API accepts it
-→ Agent logs: "KB rule partner_create_service_001 may be outdated —
+→ KBStalenessDetector logs: "KB rule partner_create_service_001 may be outdated —
    API accepted call without vat_number field"
 → Flag appears in KB health dashboard for review
 ```
@@ -433,7 +589,8 @@ agent-accessible service.
 **Pros:** Agent-driven retrieval at runtime with full conversational context; structured query
 interface with explicit confidence signals; multi-hop capable; updateable without redeployment;
 standardized protocol; exposes both static resources and dynamic query tools; audit trail of
-which rules the agent used
+which rules the agent used; **natively supported by the Microsoft Agent Framework** via
+`MCPStdioTool` / `MCPStreamableHTTPTool` — no custom client code needed
 
 **Cons:** Adds latency per request (one KB round-trip — mitigated by caching); more complex
 to build than pure RAG; requires MCP server maintenance
@@ -454,24 +611,36 @@ business knowledge.
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ System Prompt                                        │
-│  • Core behavioral rules (tone, safety, fallback)   │
-│  • Top 5-10 most stable, most-used workflows        │
-│  • Agent persona and authorization boundaries       │
+│ Agent Instructions (system prompt)                   │
+│  - Core behavioral rules (tone, safety, fallback)   │
+│  - Top 5-10 most stable, most-used workflows        │
+│  - Agent persona and authorization boundaries       │
 └─────────────────────────────────────────────────────┘
-            ↕ always loaded
+            ↕ always loaded (via Agent instructions=)
 ┌─────────────────────────────────────────────────────┐
-│ MCP KB Server                                        │
+│ MCP KB Server (via MCPStdioTool / MCPStreamableHTTP)│
 │  Resources: entity schemas, workflow index          │
 │  Tools: search_rules, get_workflow, check_eligibility│
 │  Internal engine: RAG (vector store + embeddings)   │
 │  Storage: git-backed markdown + ChromaDB            │
+│  Built with: mcp Python SDK                         │
 └─────────────────────────────────────────────────────┘
-            ↕ queried on demand
+            ↕ queried on demand (MCP protocol)
 ┌─────────────────────────────────────────────────────┐
-│ MCP Backend Tools Server                             │
+│ MCP Backend Tools Server (or direct function tools) │
 │  Tools: create_partner, lookup_member, assign_contact│
+│  Built with: @tool decorator + FunctionInvocationCtx│
 │  Connects to: ONE MP's existing API/database        │
+│  Approval: approval_mode per tool                   │
+└─────────────────────────────────────────────────────┘
+            ↕ managed by Agent Framework runtime
+┌─────────────────────────────────────────────────────┐
+│ Microsoft Agent Framework                            │
+│  Agent: AnthropicClient (Claude) / FoundryChatClient│
+│  Session: AgentSession (state, serialization)       │
+│  Middleware: AuditMiddleware, SecurityMiddleware,    │
+│             KBStalenessDetector                     │
+│  Streaming: agent.run(stream=True)                  │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -485,17 +654,18 @@ For the PoC, the KB server covers only the chosen single workflow deeply rather 
 ONE MP shallowly.
 
 **Phase 1 — Static KB (Week 1)**
-- 10–15 KB entries covering the PoC workflow
+- 10-15 KB entries covering the PoC workflow
 - 3 MCP tools: `search_business_rules`, `get_workflow_definition`, `check_eligibility`
 - 1 MCP resource: entity schema for the target entity
 - Storage: SQLite + ChromaDB (zero infrastructure, runs in-process)
-- MCP server: Python + `mcp` SDK
+- MCP server: Python + `mcp` SDK, connected via `MCPStdioTool`
+- Agent: `Agent` with `AnthropicClient`, `@tool`-decorated backend functions, `AuditMiddleware`
 
 **Phase 2 — Dynamic KB (Week 3)**
-- Add `resolve_ambiguity` tool
+- Add `resolve_ambiguity` tool to MCP server
 - Add contradiction detection on ingestion
-- Add staleness flagging from tool call observations
-- Add clarification logging → review queue
+- Add `KBStalenessDetector` middleware for observing KB/API divergence
+- Add clarification logging → review queue (via `AuditMiddleware`)
 
 **Phase 3 — Coverage Measurement (Week 5)**
 - Batch test against 50 real historical user requests
@@ -505,13 +675,19 @@ ONE MP shallowly.
 ### Tech Stack
 
 ```
-KB Storage:     Git-backed markdown files (human-editable, version-controlled)
-Vector Store:   ChromaDB (PoC) → Weaviate or Qdrant (production)
-Embeddings:     Voyage AI voyage-3-lite (best quality/cost for domain text)
-MCP Server:     Python + anthropic/mcp SDK
-Agent Runtime:  Python + Anthropic SDK (direct, no framework)
-Model:          Claude Sonnet 4.6 (most tasks) / Opus 4.6 (complex disambiguation)
-Frontend:       Next.js + Vercel AI SDK (streaming tool call display)
+KB Storage:       Git-backed markdown files (human-editable, version-controlled)
+Vector Store:     ChromaDB (PoC) → Weaviate or Qdrant (production)
+Embeddings:       Voyage AI voyage-3-lite (best quality/cost for domain text)
+MCP Server:       Python + mcp SDK (standard MCP protocol)
+MCP Connection:   MCPStdioTool (dev) / MCPStreamableHTTPTool (production)
+Agent Runtime:    Python + Microsoft Agent Framework (pip install agent-framework)
+Model (primary):  Claude Sonnet 4.6 via AnthropicClient (most tasks)
+Model (complex):  Claude Opus 4.6 via AnthropicClient (complex disambiguation)
+Model (alt):      GPT-4.1 via FoundryChatClient (if Azure-hosted preferred)
+Tool Layer:       @tool decorator + Pydantic Field schemas + approval_mode
+Middleware:       AuditMiddleware, SecurityMiddleware, KBStalenessDetector
+Session:          AgentSession (serializable to Redis/SQLite)
+Frontend:         Next.js + Vercel AI SDK (streaming tool call display)
 ```
 
 ### Initial KB Population Strategy
@@ -527,9 +703,9 @@ Frontend:       Next.js + Vercel AI SDK (streaming tool call display)
 
 ### "Is a KB-guided agent actually better than a well-prompted agent with rich tool descriptions?"
 
-For a **small, stable workflow** (5–10 rules, rarely changing): probably not. Rich tool
-descriptions + a detailed system prompt will get you 80% of the way there with far less
-infrastructure. The MCP KB earns its complexity when:
+For a **small, stable workflow** (5-10 rules, rarely changing): probably not. Rich tool
+descriptions via `@tool(description=...)` + a detailed system prompt will get you 80% of the
+way there with far less infrastructure. The MCP KB earns its complexity when:
 - The rulebook is too large for the system prompt (> ~50 rules)
 - Rules change frequently (monthly or more)
 - Rules are highly conditional (eligibility depends on 5+ intersecting conditions)
@@ -541,9 +717,9 @@ when you hit the limits.
 ### "KB becomes a latency bottleneck"
 
 Every request adds a KB round-trip. Mitigations:
-- **Cache entity schemas and workflow definitions** per session — they don't change mid-conversation
+- **Cache entity schemas and workflow definitions** per session (store in `AgentSession.state`)
 - **Pre-warm**: on session start, load the workflow index as an MCP resource (always in context)
-- **Async parallel queries**: fire KB query and read tool calls simultaneously
+- **Async parallel queries**: the Agent Framework's runtime can fire KB query and read tool calls simultaneously
 - **Typical latency**: a ChromaDB semantic search over 1,000 entries takes < 50ms — not a concern at PoC scale
 
 ### "Agent becomes KB-dependent and fails on gaps"
@@ -558,16 +734,29 @@ The most likely real-world failure mode. Mitigations:
 The most likely *silent* failure mode. Poor KB entries produce confident-but-wrong agent
 behavior — worse than uncertainty. Mitigations:
 - `certainty_level: "draft"` for any entry not yet validated — agent treats draft entries as medium confidence maximum
-- Agent outputs which KB rule it used — reviewers can verify and improve
+- Agent outputs which KB rule it used — reviewers can verify and improve (captured by `AuditMiddleware`)
 - Contradiction detection on ingestion prevents mutually exclusive rules from reaching the agent
+- `KBStalenessDetector` middleware flags KB/API divergence in production
 
 ### "This is just RAG with extra steps"
 
 The MCP layer adds genuine value beyond RAG alone:
 1. **Agent-driven queries**: the agent decides *what* to retrieve based on current conversational context, not pre-retrieval before reasoning starts
 2. **Structured tool interface**: `check_eligibility` and `resolve_ambiguity` are reasoning operations over the KB that return structured, actionable results — not just document retrieval
-3. **Protocol standardization**: the KB server works with any MCP client — future agents, other tools, and IDE integrations all benefit
+3. **Protocol standardization**: the KB server works with any MCP client — the Agent Framework's `MCPStdioTool`/`MCPStreamableHTTPTool`, Claude Desktop, VS Code Copilot, and future agents all benefit
 4. **Multi-hop**: the agent can chain KB queries mid-reasoning, which pure RAG cannot do
+
+### "Why not use the Anthropic SDK directly to build the agentic loop?"
+
+For a minimal PoC, the raw Anthropic SDK's agentic loop is ~20 lines. But the Agent Framework adds:
+1. **Built-in human-in-the-loop** via `approval_mode` — no custom confirmation code needed
+2. **Session management** via `AgentSession` — serializable, resumable conversations
+3. **Middleware pipeline** — audit trails, security checks, KB staleness detection without modifying core logic
+4. **Native MCP support** — `MCPStdioTool`/`MCPStreamableHTTPTool` connect to the KB server with zero custom client code
+5. **Model portability** — switch between Claude (AnthropicClient), GPT (FoundryChatClient), or local models (Ollama) without changing agent logic
+6. **Agent composition** — `agent.as_tool()` enables hierarchical architectures; `agent.as_mcp_server()` exposes the agent itself as an MCP tool for other systems
+
+The abstraction cost is near-zero (same ~20 lines for basic setup). The enterprise readiness gain is significant.
 
 ---
 
@@ -577,55 +766,66 @@ The MCP layer adds genuine value beyond RAG alone:
 User Intent
     │
     ▼
-┌───────────────────────────────────────────┐
-│  ONE Agent (Claude Sonnet/Opus 4.6)       │
-│                                           │
-│  1. Receive user message                  │
-│  2. Query MCP KB → classify intent        │
-│  3. Retrieve workflow definition          │
-│  4. Match context → identify gaps         │
-│  5. KB confidence HIGH?  → proceed        │
-│     KB confidence LOW?   → clarify        │
-│  6. Collect missing inputs (minimal)      │
-│  7. Propose action → user confirms        │
-│  8. Call MCP Backend Tools                │
-│  9. Log to audit trail                    │
-│ 10. Report outcome                        │
-└───────────────────────────────────────────┘
-         │ KB queries        │ Tool calls
-         ▼                   ▼
-┌─────────────────┐  ┌──────────────────────┐
-│  MCP KB Server  │  │  MCP Backend Server  │
-│                 │  │                      │
-│  Resources:     │  │  create_partner      │
-│  • schemas      │  │  lookup_member       │
-│  • wf index     │  │  assign_contact      │
-│                 │  │  update_status       │
-│  Tools:         │  │  ...                 │
-│  • search_rules │  │                      │
-│  • get_workflow │  │  ↕ calls             │
-│  • check_eligib │  │                      │
-│  • resolve_amb  │  │  ONE MP API /        │
-│                 │  │  Database            │
-│  ↕ stores       │  └──────────────────────┘
-│                 │
-│  ChromaDB +     │
-│  Git markdown   │
-└─────────────────┘
+┌───────────────────────────────────────────────┐
+│  Microsoft Agent Framework                     │
+│  Agent(client=AnthropicClient, tools=[...])   │
+│                                               │
+│  1. Receive user message                      │
+│  2. Query MCP KB → classify intent            │
+│  3. Retrieve workflow definition              │
+│  4. Match context → identify gaps             │
+│  5. KB confidence HIGH?  → proceed            │
+│     KB confidence LOW?   → clarify            │
+│  6. Collect missing inputs (minimal)          │
+│  7. Propose action → approval_mode gates      │
+│  8. user_input_requests → UI confirmation     │
+│  9. Call backend tools                        │
+│ 10. AuditMiddleware logs every step           │
+│ 11. Report outcome via streaming              │
+│                                               │
+│  Session: AgentSession (serializable)         │
+│  Middleware: [Audit, Security, KBStaleness]   │
+└───────────────────────────────────────────────┘
+       │ MCP (stdio/HTTP)     │ Function tools
+       ▼                      ▼
+┌──────────────────┐  ┌──────────────────────────┐
+│  MCP KB Server   │  │  Backend Function Tools   │
+│  (mcp SDK)       │  │  (@tool decorator)        │
+│                  │  │                            │
+│  Resources:      │  │  create_partner            │
+│  - schemas       │  │  lookup_member             │
+│  - wf index      │  │  assign_contact            │
+│                  │  │  update_status             │
+│  Tools:          │  │  ...                       │
+│  - search_rules  │  │                            │
+│  - get_workflow  │  │  approval_mode per tool    │
+│  - check_eligib  │  │  FunctionInvocationContext │
+│  - resolve_amb   │  │  for user identity         │
+│                  │  │                            │
+│  ↕ stores        │  │  ↕ calls                   │
+│                  │  │                            │
+│  ChromaDB +      │  │  ONE MP API /              │
+│  Git markdown    │  │  Database                  │
+└──────────────────┘  └──────────────────────────┘
 ```
 
 ---
 
 ## Summary: What This Buys You
 
-| Problem | Without KB | With MCP KB |
+| Problem | Without KB | With MCP KB + Agent Framework |
 |---|---|---|
 | "Add a partner" → which workflow? | Agent guesses or asks user | KB classifies with confidence score |
 | Missing required fields | Agent asks field-by-field | KB's `check_eligibility` generates one batched question |
 | Business rule changes | Requires redeployment | Update a markdown file, re-embed |
-| Agent made a wrong call | Hard to diagnose | Audit trail includes which KB rule was used |
-| New agent/tool needs the rules | Rewrite the integration | Reuse the same MCP server |
+| Agent made a wrong call | Hard to diagnose | AuditMiddleware + KB rule ID in logs |
+| Write operations need confirmation | Custom confirmation code | `approval_mode="always_require"` built-in |
+| New agent/tool needs the rules | Rewrite the integration | Reuse the same MCP server (protocol-standard) |
 | Power user knowledge is siloed | Lost when they leave | Externalized in the KB |
+| Need to switch models | Rewrite the agentic loop | Change `AnthropicClient` → `FoundryChatClient` |
+| KB rules diverge from reality | Silent failures | `KBStalenessDetector` middleware flags divergence |
 
 The MCP KB transforms the agent from a *prompt-engineered approximation* of ONE MP's logic
-into a *reasoning system grounded in explicit, auditable, maintainable business knowledge*.
+into a *reasoning system grounded in explicit, auditable, maintainable business knowledge* —
+built on a framework that provides enterprise-grade session management, middleware, and
+model-agnostic execution out of the box.

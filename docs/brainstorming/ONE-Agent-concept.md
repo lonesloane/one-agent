@@ -1,6 +1,8 @@
 # ONE Agent: Concept Analysis and Architecture
 
 > Replacing the "ONE MP" (ONE for Members and Partners) form-based web application with an agentic application — "ONE Agent".
+>
+> **Agent technology: [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/?pivots=programming-language-python)** (Python) — the unified successor to Semantic Kernel and AutoGen.
 
 ---
 
@@ -30,10 +32,16 @@ Entry point where users express goals in natural language. Must:
 - Maintain conversational context across a session (and across sessions for long-running tasks)
 - Stream intermediate results — the user needs to see the agent working, not just get a final answer
 
+The Microsoft Agent Framework provides native streaming via `agent.run(query, stream=True)`, returning an async generator of `AgentResponseUpdate` chunks that can be relayed to the UI in real time.
+
 ### 2. Agent Orchestration Layer
 The reasoning core. Recommended pattern: **orchestrator-worker** model.
-- An orchestrator agent receives user intent, decomposes it into sub-tasks, and directs workers
-- For a PoC: a single agent with a rich tool set is sufficient — multi-agent adds complexity not justified at this stage
+
+The Agent Framework offers two levels of orchestration:
+
+- **Single agent with tools** — an `Agent` instance with a rich tool set. The agent's built-in runtime loop handles LLM inference → tool calls → result synthesis automatically. Ideal for the PoC.
+- **Workflow-based orchestration** — graph-based `Workflow` with typed executors and edges for multi-agent coordination, conditional routing, checkpointing, and human-in-the-loop gates. Use when scaling beyond a single agent.
+- **Agent composition** — any agent can be exposed as a tool for another agent via `agent.as_tool()`, enabling hierarchical agent architectures without a separate orchestration framework.
 
 Example agentic loop:
 ```
@@ -50,57 +58,130 @@ Agent reasoning:
 ```
 
 ### 3. Tool / Action Layer
-Every form submission becomes a typed tool with:
-- A precise JSON schema for inputs
+Every form submission becomes a typed function tool with:
+- A precise schema for inputs (Pydantic `Field` annotations or explicit JSON schema via `@tool(schema=...)`)
 - Execution logic that calls the existing backend/API
 - Return values shaped for agent consumption (high-signal, not raw API responses)
 - Error semantics that give the agent enough context to recover or escalate
 
 **Tool design principles:**
+- Use the `@tool` decorator with `Annotated` type hints and `Field(description=...)` for self-documenting schemas
 - Consolidate related operations (one `create_member` with optional params, not multiple variants)
 - Return semantic identifiers, not opaque IDs
 - Include validation logic in the tool, not the prompt — the tool is the authority
 - Tool descriptions act as contracts: if it can't do X, say so explicitly
+- Use `approval_mode="always_require"` on write tools for human-in-the-loop confirmation
+- Use `FunctionInvocationContext` to inject per-request context (user identity, tenant, permissions) without exposing it to the model
+
+```python
+from typing import Annotated
+from pydantic import Field
+from agent_framework import tool, FunctionInvocationContext
+
+@tool(approval_mode="always_require")
+def create_partner(
+    legal_name: Annotated[str, Field(description="Legal name of the partner entity")],
+    vat_number: Annotated[str, Field(description="EU VAT number, e.g. FR12345678")],
+    contract_type: Annotated[str, Field(description="Standard, Framework, or Project")],
+    primary_contact_name: Annotated[str, Field(description="Full name of the primary contact")],
+    city: Annotated[str, Field(description="City where the partner is based")] = "",
+    billing_email: Annotated[str, Field(description="Billing email address")] = "",
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Create a new Service Partner in ONE MP. Requires confirmation."""
+    user = ctx.kwargs.get("user_identity")
+    # ... call ONE MP backend API as the authenticated user ...
+    return f"Partner '{legal_name}' created successfully (ID: PART-12345)"
+```
 
 ### 4. State Management
 Three kinds of state:
 
-- **Conversational state**: The dialogue history (Claude messages array, per session)
-- **Task state**: Where is the agent in a multi-step process? Persist intent + gathered inputs + completed steps so conversations can resume
-- **Domain state**: The actual data in ONE MP's backend. Agent must be idempotent-aware: check before creating
+- **Conversational state**: Managed by `AgentSession` — the Agent Framework's built-in session container. Supports `session_id`, `service_session_id` (for server-managed history), and a mutable `state` dictionary. Sessions are serializable (`to_dict()` / `from_dict()`) for persistence and resumption.
+- **Task state**: Where is the agent in a multi-step process? Persist intent + gathered inputs + completed steps in the session's `state` dict so conversations can resume. For complex processes, use Workflow checkpointing.
+- **Domain state**: The actual data in ONE MP's backend. Agent must be idempotent-aware: check before creating.
+
+```python
+# Session creation and multi-turn conversation
+session = agent.create_session()
+first = await agent.run("Register Acme Corp as a partner", session=session)
+# ... user provides clarification ...
+second = await agent.run("Service partner, VAT is FR12345678", session=session)
+
+# Session persistence for resumption
+serialized = session.to_dict()   # store in Redis/DB
+resumed = AgentSession.from_dict(serialized)
+```
 
 ### 5. Authorization and Trust Layer
-A permission model for agent actions:
+A permission model for agent actions, implemented via the Agent Framework's **tool approval** mechanism:
 
-| Level | Operations | Behavior |
+| Level | Operations | Agent Framework Implementation |
 |---|---|---|
-| Auto-approve | Reads, lookups, searches | Agent executes without asking |
-| Confirm before execute | Mutations that can be undone | Agent proposes, user confirms |
-| Hard approval gate | Irreversible / high-consequence actions | Explicit confirmation with visible preview |
-| Prohibited | Defined forbidden actions | Agent refuses regardless of instruction |
+| Auto-approve | Reads, lookups, searches | `@tool(approval_mode="never_require")` |
+| Confirm before execute | Mutations that can be undone | `@tool(approval_mode="always_require")` — agent returns `user_input_requests` |
+| Hard approval gate | Irreversible / high-consequence actions | `@tool(approval_mode="always_require")` + custom middleware validation |
+| Prohibited | Defined forbidden actions | Agent middleware that blocks and raises `MiddlewareTermination` |
 
-For a PoC: simple confirm-before-write is sufficient.
+The human-in-the-loop pattern works as follows:
+1. Agent proposes a tool call requiring approval
+2. `agent.run()` returns a result with `user_input_requests` instead of a final answer
+3. The caller presents the proposed action to the user
+4. User approves or rejects → `user_input_needed.create_response(True/False)`
+5. The response is passed back via a new `agent.run()` call with the approval message
+
+For a PoC: simple `approval_mode="always_require"` on all write tools is sufficient.
 
 ### 6. Audit Trail
-Richer than what form-based apps produce:
-- Who initiated the action (user identity)
-- What the agent was asked to do (the original intent)
+Richer than what form-based apps produce. Implemented via **function middleware** that intercepts every tool call:
+
+```python
+from agent_framework import FunctionMiddleware, FunctionInvocationContext
+import time
+
+class AuditTrailMiddleware(FunctionMiddleware):
+    """Logs every tool invocation with full context."""
+
+    async def process(self, context: FunctionInvocationContext, call_next):
+        start = time.time()
+        user = context.kwargs.get("user_identity", "unknown")
+        print(f"[AUDIT] User={user} Tool={context.function.name} Args={context.arguments}")
+
+        await call_next()
+
+        duration = time.time() - start
+        print(f"[AUDIT] Tool={context.function.name} Result={context.result} Duration={duration:.3f}s")
+        # ... persist to audit log store ...
+```
+
+This captures:
+- Who initiated the action (user identity from `FunctionInvocationContext.kwargs`)
 - What tools were called, in what order, with what arguments
-- What the final state change was
-- Timestamp of each step
+- What the result of each call was
+- Timing of each step
 
 The *why* is captured alongside the *what* — a significant improvement over form submission logs.
 
 ### 7. Identity and Auth Integration
-- User's identity/session token must be threaded through every tool call
-- Tools must enforce the same RBAC/permissions as the existing app
+- User's identity/session token must be threaded through every tool call via `function_invocation_kwargs`
+- Tools receive the identity through `FunctionInvocationContext` and enforce the same RBAC/permissions as the existing app
 - The agent should NOT have super-user access — it acts as the authenticated user
+
+```python
+# Pass user identity at runtime — invisible to the model
+result = await agent.run(
+    "Register Acme Corp as a partner",
+    session=session,
+    function_invocation_kwargs={"user_identity": current_user},
+)
+```
 
 ### 8. Interruption and Recovery
 - Tool errors return structured messages the agent can reason about and relay
 - Users can cancel at any point ("stop", "cancel")
-- No irreversible actions without explicit confirmation
-- Partial task state is persisted — nothing is silently lost
+- No irreversible actions without explicit confirmation (enforced by `approval_mode`)
+- Partial task state is persisted via `AgentSession` — nothing is silently lost
+- Middleware can raise `MiddlewareTermination` to halt execution with a custom response
 
 ---
 
@@ -109,22 +190,22 @@ The *why* is captured alongside the *what* — a significant improvement over fo
 ### Problem 1: The Confirmation UX Trap
 If every write requires confirmation, you risk recreating the click-through tedium of the form app — but worse, because the interaction is unpredictable.
 
-**Solution**: Progressive trust. Auto-approve low-risk operations; only confirm consequential, irreversible, or high-value mutations.
+**Solution**: Progressive trust. Use `approval_mode="never_require"` for low-risk operations; `approval_mode="always_require"` only for consequential, irreversible, or high-value mutations. The Agent Framework's per-tool approval granularity makes this straightforward.
 
 ### Problem 2: Partial Completion and Data Integrity
 A form is a transaction boundary. An agent workflow spanning 5 tool calls is not. If the 4th call fails, what state is the system in?
 
-**Solutions**: Transactional tooling (all-or-nothing), compensating actions (the agent knows how to undo), or explicit partial state with a "resume" capability.
+**Solutions**: Transactional tooling (all-or-nothing), compensating actions (the agent knows how to undo), or explicit partial state with a "resume" capability via `AgentSession` serialization and Workflow checkpointing.
 
 ### Problem 3: Intent Ambiguity in High-Stakes Domain
 "Add the new partner" might mean 15 different things depending on ONE MP's domain model.
 
-**Solution**: Encode domain specificity in tool names and descriptions — `create_service_partner`, `create_reseller_partner` is clearer than one `create_partner` with a `type` field. The tools themselves encode the domain.
+**Solution**: Encode domain specificity in tool names and descriptions — `create_service_partner`, `create_reseller_partner` is clearer than one `create_partner` with a `type` field. The `@tool` decorator's `name` and `description` parameters encode the domain contract explicitly.
 
 ### Problem 4: The "What Did the Agent Do?" UX Problem
 Users in a form app always know what happened. In an agentic app, the agent might execute 7 tool calls and produce a 3-sentence summary.
 
-**Solution**: A transparency layer — real-time streaming of tool calls as they happen ("Looking up Acme Corp... Not found. Creating new partner record..."). Streaming solves both transparency and the "nothing is happening" UX problem simultaneously.
+**Solution**: A transparency layer — real-time streaming of tool calls as they happen ("Looking up Acme Corp... Not found. Creating new partner record..."). The Agent Framework's streaming mode (`stream=True`) combined with function middleware for tool-call events solves both transparency and the "nothing is happening" UX problem simultaneously.
 
 ### Problem 5: Regulatory and Compliance Constraints
 "Members and Partners" implies regulated data, fiduciary relationships, and potentially real financial or legal consequences:
@@ -133,38 +214,38 @@ Users in a form app always know what happened. In an agentic app, the agent migh
 - Financial regulations (if ONE MP handles payments or financial instruments)
 - Mandatory audit requirements
 
-The audit trail is not optional in a regulated context — it is a compliance requirement.
+The audit trail is not optional in a regulated context — it is a compliance requirement. The Agent Framework's middleware pipeline (function middleware + agent middleware) provides the interception points needed.
 
 ### Problem 6: Model Reliability and Hallucination in Tool Calls
 The agent will occasionally call a tool with an incorrect argument or misinterpret intent.
 
 **Mitigations**:
-- Strict tool schemas (use `strict: true` for schema enforcement)
-- Tool call validation at the execution layer before any side effects
+- Strict tool schemas via Pydantic `Field` annotations or explicit `schema=` on `@tool`
+- Tool call validation via function middleware before any side effects
 - Test harness running representative scenarios
-- Confirmation before writes (solves most "wrong action" cases)
-- Claude Opus 4.6 for complex tool selection
+- Confirmation before writes via `approval_mode="always_require"` (solves most "wrong action" cases)
+- Claude Opus 4.6 (via `AnthropicClient`) or GPT-4.1 (via `FoundryChatClient`) for complex tool selection — the Agent Framework is model-agnostic
 
 ---
 
 ## PoC Strategy: The Minimal Compelling Slice
 
 **Do not replicate all of ONE MP.** Pick ONE workflow that:
-- Has 3–7 form screens in the current app (so the compression is visible)
+- Has 3-7 form screens in the current app (so the compression is visible)
 - Has conditional logic (so agent reasoning is genuinely valuable)
 - Is frequently performed (so stakeholders recognize the value)
 - Is commonly the most *painful* workflow (best candidate for demonstrating improvement)
 
 ### Three Phases, Each a Standalone Demo
 
-**Phase 1 — "The Read Agent" (Weeks 1–2)**
+**Phase 1 — "The Read Agent" (Weeks 1-2)**
 The agent can look up, search, and summarize information from ONE MP's data. No writes. Proves: conversational interface works, tools integrate with the backend, agent can reason over domain data. Zero risk of data corruption.
 
-**Phase 2 — "The Write Agent with Full Confirmation" (Weeks 3–4)**
-Add write tools with mandatory confirmation before every mutation. Proves: full workflow works end-to-end, confirmation UX is usable, audit trail is correct.
+**Phase 2 — "The Write Agent with Full Confirmation" (Weeks 3-4)**
+Add write tools with `approval_mode="always_require"` on every mutation. Proves: full workflow works end-to-end, confirmation UX is usable, audit trail (via function middleware) is correct.
 
-**Phase 3 — "The Trust-Calibrated Agent" (Weeks 5–6)**
-Tune the confirmation policy: auto-approve low-risk operations, confirm only high-risk ones. Demonstrates the production-ready UX. This is the stakeholder demo.
+**Phase 3 — "The Trust-Calibrated Agent" (Weeks 5-6)**
+Tune the approval policy: `approval_mode="never_require"` on low-risk operations, `"always_require"` only on high-risk ones. Demonstrates the production-ready UX. This is the stakeholder demo.
 
 Each phase is a shippable, demonstrable artifact. Stakeholders can engage at each phase.
 
@@ -176,54 +257,158 @@ Each phase is a shippable, demonstrable artifact. Stakeholders can engage at eac
 
 | Layer | Technology |
 |---|---|
-| Backend / Agent Runtime | Python + Anthropic SDK (direct — no framework needed at PoC scale) |
-| Model | Claude Sonnet 4.6 (most tasks); Claude Opus 4.6 (complex tool selection) |
+| Agent Runtime | Python + [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/?pivots=programming-language-python) (`pip install agent-framework`) |
+| Model (primary) | Claude Sonnet 4.6 via `AnthropicClient` (most tasks) |
+| Model (complex reasoning) | Claude Opus 4.6 via `AnthropicClient` (complex tool selection, disambiguation) |
+| Model (alternative) | GPT-4.1 via `FoundryChatClient` or `OpenAIChatClient` (if Azure-hosted preferred) |
 | Frontend | Next.js + Vercel AI SDK (streaming, tool call display, conversation state) |
-| Session state / Audit log | Redis or SQLite |
-| Tool execution | Typed Python functions with Pydantic schemas |
+| Session state / Audit log | Redis or SQLite (via `AgentSession.to_dict()` serialization) |
+| Tool execution | Typed Python functions with `@tool` decorator and Pydantic `Field` schemas |
+| Cross-cutting concerns | Agent Framework middleware (audit, security, logging) |
+| MCP integration | `MCPStdioTool` / `MCPStreamableHTTPTool` (native Agent Framework support) |
+| Multi-agent orchestration | Agent Framework Workflows (when needed beyond PoC) |
 
-**No LangChain / LangGraph / CrewAI at PoC scale.** The Anthropic SDK's agentic loop is ~20 lines of code. Add a framework only when you have multiple agents with complex state transitions — i.e., after the PoC succeeds.
+**Why Microsoft Agent Framework?**
 
-**MCP (Model Context Protocol)**: Relevant when scaling to many integrations. Hand-crafted tools are simpler for a PoC.
+The Agent Framework combines AutoGen's simple agent abstractions with Semantic Kernel's enterprise features — session-based state management, type safety, middleware, telemetry — and adds graph-based workflows for multi-agent orchestration. Key advantages for ONE Agent:
+
+1. **Model-agnostic**: Switch between Claude (via `AnthropicClient`), GPT (via `FoundryChatClient`), or local models (via Ollama) without changing agent logic
+2. **Built-in human-in-the-loop**: `approval_mode` on `@tool` + `user_input_requests` pattern — no custom confirmation code needed
+3. **Native MCP support**: Both local (`MCPStdioTool`) and hosted (`MCPStreamableHTTPTool`) MCP servers as first-class tools
+4. **Enterprise middleware pipeline**: Agent, function, and chat middleware for audit trails, security checks, and telemetry without modifying core logic
+5. **Session management**: `AgentSession` with serialization handles conversational state, resumption, and multi-turn flows out of the box
+6. **Agent composition**: `agent.as_tool()` and `agent.as_mcp_server()` enable hierarchical and interoperable agent architectures
+7. **Workflow engine**: When the PoC succeeds and complexity grows, graph-based workflows with checkpointing and conditional routing are available without a framework migration
+
+**No LangChain / LangGraph / CrewAI.** The Agent Framework provides everything needed at PoC scale and beyond. Its `Agent` + `@tool` + middleware is ~20 lines of code for a basic agent. Workflows add explicit multi-agent orchestration when needed.
 
 ### Core Agentic Loop (Sketch)
 
 ```python
-async def run_agent(user_message: str, session: Session) -> AsyncGenerator:
-    session.messages.append({"role": "user", "content": user_message})
+import asyncio
+from typing import Annotated, Any
+from pydantic import Field
+from agent_framework import Agent, tool, FunctionInvocationContext, AgentSession, Message
+from agent_framework.anthropic import AnthropicClient
 
-    while True:
-        response = await client.messages.create(
-            model="claude-sonnet-4-6",
-            system=SYSTEM_PROMPT,       # encodes ONE MP domain, user permissions, behavioral rules
-            messages=session.messages,
-            tools=ALL_TOOLS,            # typed tool definitions
-            max_tokens=4096,
+# --- System prompt encodes ONE MP domain, user permissions, behavioral rules ---
+SYSTEM_PROMPT = """You are ONE Agent, an assistant for the ONE MP platform.
+You help users manage members, partners, contracts, and related operations.
+Always confirm write operations before executing them.
+When information is missing, ask the user — do not guess."""
+
+
+# --- Tool definitions ---
+
+@tool(approval_mode="never_require")
+def lookup_partner_by_name(
+    name: Annotated[str, Field(description="Partner name to search for")],
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Search for an existing partner by name in ONE MP."""
+    user = ctx.kwargs.get("user_identity")
+    # ... call ONE MP API as authenticated user ...
+    return "No partner found matching 'Acme Corp'"
+
+
+@tool(approval_mode="always_require")
+def create_partner(
+    legal_name: Annotated[str, Field(description="Legal name of the partner entity")],
+    vat_number: Annotated[str, Field(description="EU VAT number, e.g. FR12345678")],
+    contract_type: Annotated[str, Field(description="Standard, Framework, or Project")],
+    primary_contact_name: Annotated[str, Field(description="Full name of the primary contact")],
+    city: Annotated[str, Field(description="City where the partner is based")] = "",
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Create a new Service Partner in ONE MP. Requires user confirmation."""
+    user = ctx.kwargs.get("user_identity")
+    # ... call ONE MP backend API ...
+    return "Partner 'Acme Corp' created (ID: PART-12345)"
+
+
+@tool(approval_mode="always_require")
+def assign_contact(
+    partner_id: Annotated[str, Field(description="Partner ID to assign the contact to")],
+    contact_name: Annotated[str, Field(description="Full name of the contact")],
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Assign a primary contact to a partner. Requires user confirmation."""
+    user = ctx.kwargs.get("user_identity")
+    # ... call ONE MP backend API ...
+    return f"Contact '{contact_name}' assigned to partner {partner_id}"
+
+
+# --- Audit middleware ---
+
+class AuditMiddleware:
+    async def process(self, context: FunctionInvocationContext, call_next):
+        user = context.kwargs.get("user_identity", "unknown")
+        print(f"[AUDIT] user={user} tool={context.function.name} args={context.arguments}")
+        await call_next()
+        print(f"[AUDIT] tool={context.function.name} result={context.result}")
+
+
+# --- Agent setup and execution ---
+
+async def run_one_agent(user_message: str, session: AgentSession, user_identity: Any):
+    """Run ONE Agent with a user message."""
+    client = AnthropicClient(model="claude-sonnet-4-6")
+
+    async with Agent(
+        client=client,
+        name="ONEAgent",
+        instructions=SYSTEM_PROMPT,
+        tools=[lookup_partner_by_name, create_partner, assign_contact],
+        middleware=[AuditMiddleware()],
+    ) as agent:
+
+        result = await agent.run(
+            user_message,
+            session=session,
+            function_invocation_kwargs={"user_identity": user_identity},
         )
 
-        session.messages.append({"role": "assistant", "content": response.content})
+        # Handle approval requests (human-in-the-loop)
+        while result.user_input_requests:
+            for request in result.user_input_requests:
+                print(f"Agent proposes: {request.function_call.name}({request.function_call.arguments})")
+                # In production: present to user via UI, await their decision
+                approved = True  # placeholder — real UI interaction here
 
-        if response.stop_reason == "end_turn":
-            yield response.content      # final answer
-            break
+            messages = [user_message]
+            for request in result.user_input_requests:
+                messages.append(Message("assistant", [request]))
+                messages.append(Message("user", [request.create_response(approved)]))
 
-        if response.stop_reason == "tool_use":
-            tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    yield ToolCallEvent(block.name, block.input)   # stream to UI
+            result = await agent.run(messages, session=session,
+                                     function_invocation_kwargs={"user_identity": user_identity})
 
-                    if is_write_operation(block.name):
-                        confirmed = await request_user_confirmation(block)
-                        if not confirmed:
-                            tool_results.append(tool_result(block.id, "User declined"))
-                            continue
+        return result.text
 
-                    result = await execute_tool(block.name, block.input, session.user)
-                    audit_log.record(session.user, block.name, block.input, result)
-                    tool_results.append(tool_result(block.id, result))
 
-            session.messages.append({"role": "user", "content": tool_results})
+# --- Streaming variant for the frontend ---
+
+async def run_one_agent_streaming(user_message: str, session: AgentSession, user_identity: Any):
+    """Run ONE Agent with streaming for real-time UI updates."""
+    client = AnthropicClient(model="claude-sonnet-4-6")
+
+    async with Agent(
+        client=client,
+        name="ONEAgent",
+        instructions=SYSTEM_PROMPT,
+        tools=[lookup_partner_by_name, create_partner, assign_contact],
+        middleware=[AuditMiddleware()],
+    ) as agent:
+        async for chunk in agent.run(
+            user_message,
+            session=session,
+            stream=True,
+            function_invocation_kwargs={"user_identity": user_identity},
+        ):
+            if chunk.text:
+                yield chunk.text  # stream to UI
+            if chunk.user_input_requests:
+                yield chunk.user_input_requests  # signal UI to show confirmation dialog
 ```
 
 ---
@@ -264,18 +449,23 @@ Answers to these questions will fundamentally shape every design decision:
 If every action requires confirmation, you've replaced "fill form, click submit" with "say thing, read plan, click confirm." The win is *compression*: one intent drives 15 steps. This only holds if workflows are genuinely multi-step. Validate this assumption early.
 
 **"LLM reasoning is not reliable enough for consequential operations"**
-Legitimate concern. Claude Opus 4.6 is highly reliable but not infallible. Confirmation gates and strict schemas mitigate this. If the domain requires 100% accuracy, the PoC must be honest about error rates and have clear correction workflows.
+Legitimate concern. Claude Opus 4.6 is highly reliable but not infallible. The Agent Framework's `approval_mode` gates and function middleware mitigate this. If the domain requires 100% accuracy, the PoC must be honest about error rates and have clear correction workflows.
 
 **"This just moves the complexity into the system prompt"**
-True. Business logic that was in the UI now lives in the system prompt and tool descriptions. This is harder to test and maintain than a UI flowchart. Significant testing discipline required.
+True. Business logic that was in the UI now lives in the system prompt and tool descriptions. This is harder to test and maintain than a UI flowchart. Significant testing discipline required. The Agent Framework's middleware provides interception points for testing.
 
 **"Users don't want to talk to an agent, they want to click"**
 Some users will prefer the predictability of forms. Agentic is better for high-variability, multi-step, expert-knowledge-requiring tasks — not for simple, repetitive, standardized operations. Hybrid is probably the right long-term answer.
+
+**"Why not use the Anthropic SDK directly?"**
+For a minimal PoC, the raw Anthropic SDK is ~20 lines for an agentic loop. But the Agent Framework adds built-in human-in-the-loop approval, session management, middleware for audit/security, native MCP support, agent composition, and a migration path to workflows — all without changing core agent logic. The abstraction cost is near-zero; the enterprise readiness gain is significant.
 
 ---
 
 ## Bottom Line
 
 The technology exists today to build this convincingly. The hard problems are not the AI — they are the **trust architecture, confirmation UX, audit trail, and domain encoding in the tool layer**.
+
+The Microsoft Agent Framework provides the right level of abstraction: simple enough for a PoC (Agent + @tool + middleware), powerful enough for production (workflows, checkpointing, model-agnostic routing, A2A protocol support).
 
 The most valuable next step is understanding ONE MP's domain model and identifying the single most painful multi-step workflow to use as the PoC target.
