@@ -3,6 +3,8 @@
 > Replacing the "ONE MP" (ONE for Members and Partners) form-based web application with an agentic application — "ONE Agent".
 >
 > **Agent technology: [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/?pivots=programming-language-python)** (Python) — the unified successor to Semantic Kernel and AutoGen.
+>
+> **PoC Model Constraint**: Development runs on a Visual Studio Enterprise subscription with limited Azure credits. Claude Sonnet and Opus are not viable for the PoC budget. The primary model path is Azure OpenAI via `FoundryChatClient` (gpt-4o-mini / gpt-4.1-mini as starting points), with local Ollama models for zero-cost iteration during development. A short **Model Exploration Phase** (see PoC Strategy below) is needed to validate which model provides the minimum reasoning quality required for reliable tool selection in the ONE MP domain.
 
 ---
 
@@ -224,7 +226,7 @@ The agent will occasionally call a tool with an incorrect argument or misinterpr
 - Tool call validation via function middleware before any side effects
 - Test harness running representative scenarios
 - Confirmation before writes via `approval_mode="always_require"` (solves most "wrong action" cases)
-- Claude Opus 4.6 (via `AnthropicClient`) or GPT-4.1 (via `FoundryChatClient`) for complex tool selection — the Agent Framework is model-agnostic
+- `gpt-4o` or `gpt-4.1` (via `FoundryChatClient`) as fallback if `gpt-4o-mini` / `gpt-4.1-mini` show unreliable tool selection — the Agent Framework is model-agnostic, switching is one line
 
 ---
 
@@ -237,6 +239,41 @@ The agent will occasionally call a tool with an incorrect argument or misinterpr
 - Is commonly the most *painful* workflow (best candidate for demonstrating improvement)
 
 ### Three Phases, Each a Standalone Demo
+
+**Phase 0 — Model Exploration (Week 0, parallel to domain discovery)**
+
+Before committing to a model, run a small benchmark on ONE MP's actual domain vocabulary and tool-selection patterns. This takes 1-2 days and prevents wasted PoC effort on a model that can't reliably pick the right tool.
+
+Candidates to evaluate (all accessible via Azure OpenAI with VS Enterprise credits):
+
+| Model | Client | Cost tier | Known strengths |
+|---|---|---|---|
+| `gpt-4o-mini` | `FoundryChatClient` | Very cheap | Fast, good instruction following |
+| `gpt-4.1-mini` | `FoundryChatClient` | Very cheap | Newer, improved tool use vs 4o-mini |
+| `gpt-4.1-nano` | `FoundryChatClient` | Cheapest | Minimal reasoning — probably insufficient |
+| `gpt-4o` | `FoundryChatClient` | Medium | Strong tool selection, higher cost |
+| `phi-4-mini` (Ollama) | `OllamaChatClient` | Free (local) | Microsoft model, reasonable tool use |
+| `mistral-small` (Ollama) | `OllamaChatClient` | Free (local) | Good agentic behavior for size |
+
+**Evaluation criteria** (run 10-15 representative ONE MP intent prompts):
+1. Correct tool selected (no hallucinated tool names or parameters)?
+2. Structured tool arguments match schema without coercion?
+3. Multi-step reasoning: does it call lookup before create?
+4. Does it ask for missing required fields rather than inventing them?
+
+**Decision rule**: use the cheapest model that passes criteria 1-4 on ≥ 85% of test prompts. If `gpt-4o-mini` or `gpt-4.1-mini` passes → use it throughout the PoC. If not → step up to `gpt-4o` / `gpt-4.1` and flag the cost implication.
+
+The Agent Framework's model-agnostic design means switching is a one-line change:
+```python
+# Development iteration (zero cost)
+client = OllamaChatClient(model="phi-4-mini")
+
+# PoC target (affordable, Azure credits)
+client = FoundryChatClient(model="gpt-4o-mini")    # or gpt-4.1-mini
+
+# Fallback if mini-tier fails (higher cost)
+client = FoundryChatClient(model="gpt-4o")         # or gpt-4.1
+```
 
 **Phase 1 — "The Read Agent" (Weeks 1-2)**
 The agent can look up, search, and summarize information from ONE MP's data. No writes. Proves: conversational interface works, tools integrate with the backend, agent can reason over domain data. Zero risk of data corruption.
@@ -258,9 +295,10 @@ Each phase is a shippable, demonstrable artifact. Stakeholders can engage at eac
 | Layer | Technology |
 |---|---|
 | Agent Runtime | Python + [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/?pivots=programming-language-python) (`pip install agent-framework`) |
-| Model (primary) | Claude Sonnet 4.6 via `AnthropicClient` (most tasks) |
-| Model (complex reasoning) | Claude Opus 4.6 via `AnthropicClient` (complex tool selection, disambiguation) |
-| Model (alternative) | GPT-4.1 via `FoundryChatClient` or `OpenAIChatClient` (if Azure-hosted preferred) |
+| Model (PoC — affordable) | `gpt-4o-mini` or `gpt-4.1-mini` via `FoundryChatClient` (Azure OpenAI, VS Enterprise credits) — starting point, subject to exploration |
+| Model (PoC — fallback) | `gpt-4o` or `gpt-4.1` via `FoundryChatClient` if mini-tier reasoning proves insufficient for tool selection |
+| Model (dev / zero-cost) | Local Ollama model (`phi-4-mini`, `mistral-small`) via `OllamaChatClient` for iteration without consuming credits |
+| Model (future / if budget allows) | Claude Sonnet 4.6 via `AnthropicClient` or Claude Opus 4.6 for complex disambiguation — deferred post-PoC |
 | Frontend | Next.js + Vercel AI SDK (streaming, tool call display, conversation state) |
 | Session state / Audit log | Redis or SQLite (via `AgentSession.to_dict()` serialization) |
 | Tool execution | Typed Python functions with `@tool` decorator and Pydantic `Field` schemas |
@@ -289,7 +327,7 @@ import asyncio
 from typing import Annotated, Any
 from pydantic import Field
 from agent_framework import Agent, tool, FunctionInvocationContext, AgentSession, Message
-from agent_framework.anthropic import AnthropicClient
+from agent_framework.azure import FoundryChatClient  # primary: Azure OpenAI via VS Enterprise
 
 # --- System prompt encodes ONE MP domain, user permissions, behavioral rules ---
 SYSTEM_PROMPT = """You are ONE Agent, an assistant for the ONE MP platform.
@@ -352,7 +390,7 @@ class AuditMiddleware:
 
 async def run_one_agent(user_message: str, session: AgentSession, user_identity: Any):
     """Run ONE Agent with a user message."""
-    client = AnthropicClient(model="claude-sonnet-4-6")
+    client = FoundryChatClient(model="gpt-4o-mini")  # swap for gpt-4.1-mini / gpt-4o as needed
 
     async with Agent(
         client=client,
@@ -390,7 +428,7 @@ async def run_one_agent(user_message: str, session: AgentSession, user_identity:
 
 async def run_one_agent_streaming(user_message: str, session: AgentSession, user_identity: Any):
     """Run ONE Agent with streaming for real-time UI updates."""
-    client = AnthropicClient(model="claude-sonnet-4-6")
+    client = FoundryChatClient(model="gpt-4o-mini")  # swap for gpt-4.1-mini / gpt-4o as needed
 
     async with Agent(
         client=client,

@@ -5,6 +5,8 @@
 > high confidence and ask for clarification only when the KB cannot provide a clear answer.
 >
 > **Agent technology: [Microsoft Agent Framework](https://learn.microsoft.com/en-us/agent-framework/overview/?pivots=programming-language-python)** (Python) — with native MCP support via `MCPStdioTool` and `MCPStreamableHTTPTool`.
+>
+> **PoC Model Constraint**: Visual Studio Enterprise subscription with limited Azure credits. Claude Sonnet / Opus are not viable for the PoC. Primary model path: Azure OpenAI via `FoundryChatClient` (`gpt-4o-mini` / `gpt-4.1-mini`). Local Ollama models (`phi-4-mini`, `mistral-small`) for zero-cost dev iteration. See the Model Exploration Phase in `ONE-Agent-concept.md` for the evaluation approach. Note: adding a MCP KB round-trip increases the pressure on model quality — mini-tier models must be validated on KB-guided tool selection specifically, not just plain tool use.
 
 ---
 
@@ -130,7 +132,7 @@ For the ONE Agent KB, `MCPStdioTool` is ideal for development (zero infrastructu
 
 ```python
 from agent_framework import Agent, MCPStdioTool
-from agent_framework.anthropic import AnthropicClient
+from agent_framework.azure import FoundryChatClient  # primary: Azure OpenAI via VS Enterprise
 
 # Connect to the KB MCP server running as a local process
 async with (
@@ -140,7 +142,7 @@ async with (
         args=["-m", "one_agent.kb_server"],
     ) as kb_mcp,
     Agent(
-        client=AnthropicClient(model="claude-sonnet-4-6"),
+        client=FoundryChatClient(model="gpt-4o-mini"),  # swap for gpt-4.1-mini / gpt-4o as needed
         name="ONEAgent",
         instructions=SYSTEM_PROMPT,
         tools=[kb_mcp, lookup_partner, create_partner, assign_contact],
@@ -153,7 +155,7 @@ For production (HTTP-deployed KB server):
 
 ```python
 from agent_framework import Agent, MCPStreamableHTTPTool
-from agent_framework.anthropic import AnthropicClient
+from agent_framework.azure import FoundryChatClient  # primary: Azure OpenAI via VS Enterprise
 
 async with (
     MCPStreamableHTTPTool(
@@ -161,7 +163,7 @@ async with (
         url="https://kb.onemp.internal/mcp",
     ) as kb_mcp,
     Agent(
-        client=AnthropicClient(model="claude-sonnet-4-6"),
+        client=FoundryChatClient(model="gpt-4o-mini"),  # swap for gpt-4.1-mini / gpt-4o as needed
         name="ONEAgent",
         instructions=SYSTEM_PROMPT,
         tools=[kb_mcp, lookup_partner, create_partner, assign_contact],
@@ -368,7 +370,7 @@ and middleware; the framework manages the loop:
 
 ```python
 from agent_framework import Agent, MCPStdioTool, AgentSession, Message
-from agent_framework.anthropic import AnthropicClient
+from agent_framework.azure import FoundryChatClient  # primary: Azure OpenAI via VS Enterprise
 
 async def run_registration_flow(user_message: str, session: AgentSession, user_identity):
     async with (
@@ -378,7 +380,7 @@ async def run_registration_flow(user_message: str, session: AgentSession, user_i
             args=["-m", "one_agent.kb_server"],
         ) as kb_mcp,
         Agent(
-            client=AnthropicClient(model="claude-sonnet-4-6"),
+            client=FoundryChatClient(model="gpt-4o-mini"),  # swap for gpt-4.1-mini / gpt-4o as needed
             name="ONEAgent",
             instructions=SYSTEM_PROMPT,
             tools=[kb_mcp, lookup_partner, create_partner, assign_contact],
@@ -636,7 +638,7 @@ business knowledge.
             ↕ managed by Agent Framework runtime
 ┌─────────────────────────────────────────────────────┐
 │ Microsoft Agent Framework                            │
-│  Agent: AnthropicClient (Claude) / FoundryChatClient│
+│  Agent: FoundryChatClient (gpt-4o-mini / gpt-4.1-mini) │
 │  Session: AgentSession (state, serialization)       │
 │  Middleware: AuditMiddleware, SecurityMiddleware,    │
 │             KBStalenessDetector                     │
@@ -675,19 +677,23 @@ ONE MP shallowly.
 ### Tech Stack
 
 ```
-KB Storage:       Git-backed markdown files (human-editable, version-controlled)
-Vector Store:     ChromaDB (PoC) → Weaviate or Qdrant (production)
-Embeddings:       Voyage AI voyage-3-lite (best quality/cost for domain text)
-MCP Server:       Python + mcp SDK (standard MCP protocol)
-MCP Connection:   MCPStdioTool (dev) / MCPStreamableHTTPTool (production)
-Agent Runtime:    Python + Microsoft Agent Framework (pip install agent-framework)
-Model (primary):  Claude Sonnet 4.6 via AnthropicClient (most tasks)
-Model (complex):  Claude Opus 4.6 via AnthropicClient (complex disambiguation)
-Model (alt):      GPT-4.1 via FoundryChatClient (if Azure-hosted preferred)
-Tool Layer:       @tool decorator + Pydantic Field schemas + approval_mode
-Middleware:       AuditMiddleware, SecurityMiddleware, KBStalenessDetector
-Session:          AgentSession (serializable to Redis/SQLite)
-Frontend:         Next.js + Vercel AI SDK (streaming tool call display)
+KB Storage:        Git-backed markdown files (human-editable, version-controlled)
+Vector Store:      ChromaDB (PoC) → Weaviate or Qdrant (production)
+Embeddings:        text-embedding-3-small via Azure OpenAI (affordable, good quality)
+                   or nomic-embed-text via Ollama (free, local, acceptable quality)
+MCP Server:        Python + mcp SDK (standard MCP protocol)
+MCP Connection:    MCPStdioTool (dev) / MCPStreamableHTTPTool (production)
+Agent Runtime:     Python + Microsoft Agent Framework (pip install agent-framework)
+Model (PoC):       gpt-4o-mini or gpt-4.1-mini via FoundryChatClient — validated in
+                   Phase 0 exploration (see ONE-Agent-concept.md)
+Model (dev):       phi-4-mini or mistral-small via OllamaChatClient — zero cost for
+                   iteration; must be re-validated on KB-guided tool selection
+Model (fallback):  gpt-4o or gpt-4.1 via FoundryChatClient if mini-tier insufficient
+Model (future):    Claude Sonnet 4.6 via AnthropicClient — deferred post-PoC if budget allows
+Tool Layer:        @tool decorator + Pydantic Field schemas + approval_mode
+Middleware:        AuditMiddleware, SecurityMiddleware, KBStalenessDetector
+Session:           AgentSession (serializable to Redis/SQLite)
+Frontend:          Next.js + Vercel AI SDK (streaming tool call display)
 ```
 
 ### Initial KB Population Strategy
@@ -768,7 +774,7 @@ User Intent
     ▼
 ┌───────────────────────────────────────────────┐
 │  Microsoft Agent Framework                     │
-│  Agent(client=AnthropicClient, tools=[...])   │
+│  Agent(client=FoundryChatClient, tools=[...]) │
 │                                               │
 │  1. Receive user message                      │
 │  2. Query MCP KB → classify intent            │
@@ -822,7 +828,7 @@ User Intent
 | Write operations need confirmation | Custom confirmation code | `approval_mode="always_require"` built-in |
 | New agent/tool needs the rules | Rewrite the integration | Reuse the same MCP server (protocol-standard) |
 | Power user knowledge is siloed | Lost when they leave | Externalized in the KB |
-| Need to switch models | Rewrite the agentic loop | Change `AnthropicClient` → `FoundryChatClient` |
+| Need to switch models | Rewrite the agentic loop | Change `OllamaChatClient` → `FoundryChatClient` → one line |
 | KB rules diverge from reality | Silent failures | `KBStalenessDetector` middleware flags divergence |
 
 The MCP KB transforms the agent from a *prompt-engineered approximation* of ONE MP's logic
