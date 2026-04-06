@@ -2,5 +2,7 @@
 .worktrees/
 .env
 .venv/
+__pycache__/
+*.egg-info/
 eval/results/*
 !eval/results/.gitkeep
