@@ -14,7 +14,7 @@ tags:
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-green)
 
 Build the evaluation harness infrastructure for Phase 0 model exploration
 and validate it end-to-end with 3 representative scenarios on 1 model.
@@ -135,7 +135,7 @@ traces with scores for scenarios A1, B1, C1 on `gpt-4.1-mini`.
 | TASK-023 | Implement `async def evaluate_scenario(model: str, scenario: dict) -> dict`. Logic: (1) clear and update `SCENARIO_DATA` from scenario; (2) build instructions = SYSTEM_PROMPT + optional system_context; (3) create `RecorderMiddleware`; (4) create `FoundryChatClient(project_endpoint=..., model=model, credential=AzureCliCredential())`; (5) create `Agent(client=client, name="ONEAgent-Eval", instructions=instructions, tools=ALL_TOOLS, middleware=[recorder])`; (6) `result = await agent.run(scenario["user_message"])`; (7) return dict with model, scenario_id, tool_calls from recorder, agent_response text, and scores from `score_scenario`. Use `async with` for both credential and agent. | ✓ | 2026-04-06 |
 | TASK-024 | Implement `async def run_all() -> list[dict]`. Load scenarios from `eval/scenarios/scenarios.json`. Loop over scenarios, call `evaluate_scenario("gpt-4.1-mini", scenario)` for each. Collect and return results. | ✓ | 2026-04-06 |
 | TASK-025 | Implement `__main__` block: call `asyncio.run(main())` where `main()` calls `run_all()`, then prints each result's scenario_id, tool_calls summary, and scores to stdout using loguru. | ✓ | 2026-04-06 |
-| TASK-026 | End-to-end validation: run `python -m eval.harness`. Verify: (1) Azure credential works (requires prior `az login`), (2) model responds, (3) tool calls are captured by RecorderMiddleware, (4) C1 score is computed for each scenario. Fix any framework API mismatches discovered during this step. | ⏳ | Pending |
+| TASK-026 | End-to-end validation: run `python -m eval.harness`. Verify: (1) Azure credential works (requires prior `az login`), (2) model responds, (3) tool calls are captured by RecorderMiddleware, (4) C1 score is computed for each scenario. Fix any framework API mismatches discovered during this step. | ✓ | 2026-04-06 |
 
 ## 3. Alternatives
 

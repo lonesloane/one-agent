@@ -148,7 +148,7 @@ def _print_results(results: list[dict]) -> None:
 
     for result in results:
         logger.info(
-            "\nScenario: {} (model: {})",
+            "Scenario: {} (model: {})",
             result["scenario_id"],
             result["model"],
         )
