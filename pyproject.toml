@@ -1,0 +1,23 @@
+[project]
+name = "one-agent-poc"
+version = "0.1.0"
+description = "ONE-MP Agent evaluation harness for model exploration"
+requires-python = ">=3.11"
+dependencies = [
+    "agent-framework>=1.0.0",
+    "agent-framework-foundry>=1.0.0",
+    "azure-identity>=1.19.0",
+    "loguru>=0.7.0",
+    "pydantic>=2.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+]
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"

@@ -1,0 +1,66 @@
+[
+  {
+    "id": "A1",
+    "category": "single_tool_read",
+    "description": "Simple delegation lookup",
+    "system_context": "",
+    "user_message": "What type of delegation does Brazil have?",
+    "synthetic_results": {
+      "get_delegation_info": "{\"name\": \"Brazil\", \"type\": \"partner\", \"delegates\": 18, \"framework_agreements\": [\"Trade\"]}"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "get_delegation_info",
+          "args_must_contain": {
+            "delegation_id": "Brazil"
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2"]
+    }
+  },
+  {
+    "id": "B1",
+    "category": "multi_step_sequencing",
+    "description": "Delegate creation - full info provided",
+    "system_context": "User is editor for France delegation (FRA).",
+    "user_message": "Add Marie Laurent to our delegation. She's an education policy advisor, email marie.laurent@diplomatie.gouv.fr, assign her to the Education Policy Committee.",
+    "synthetic_results": {
+      "lookup_delegate": "No delegate found matching the search criteria.",
+      "get_delegation_info": "{\"id\": \"FRA\", \"name\": \"France\", \"type\": \"member\", \"delegates\": 45}",
+      "create_delegate": "Delegate 'Marie Laurent' created (ID: DEL-2026-0891)",
+      "create_document_access_rights": "Access rights granted: delegate=DEL-2026-0891, committee=EDU-POL, level=General"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {"name": "lookup_delegate", "args_must_contain": {"name": "Marie Laurent"}},
+        {"name": "get_delegation_info", "args_must_contain": {}},
+        {"name": "create_delegate", "args_must_contain": {"full_name": "Marie Laurent", "email": "marie.laurent@diplomatie.gouv.fr"}},
+        {"name": "create_document_access_rights", "args_must_contain": {"delegate_id": "DEL-2026-0891"}}
+      ],
+      "must_not_hallucinate": ["email", "committee_ids"],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2", "C3", "C4"]
+    }
+  },
+  {
+    "id": "C1",
+    "category": "missing_information",
+    "description": "Delegate creation - missing email",
+    "system_context": "User is editor for France delegation (FRA).",
+    "user_message": "Add Jean Dupont as a trade analyst for France, he'll be on the Trade Committee.",
+    "synthetic_results": {
+      "lookup_delegate": "No delegate found matching the search criteria.",
+      "get_delegation_info": "{\"id\": \"FRA\", \"name\": \"France\", \"type\": \"member\", \"delegates\": 45}"
+    },
+    "expected": {
+      "tool_calls_ordered": [],
+      "must_not_hallucinate": ["email"],
+      "should_ask_user": true,
+      "applicable_criteria": ["C1", "C4"]
+    }
+  }
+]
