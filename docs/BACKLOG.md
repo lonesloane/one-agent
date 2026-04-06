@@ -9,7 +9,7 @@
 - [x] Implement `RecorderMiddleware` capturing tool name, args, result
 - [x] Define 3 representative scenarios (A1 single-tool, B1 multi-step, C1 missing-info)
 - [x] Implement C1 evaluator; C2-C4 stubbed for Phase 0b
-- [ ] **TASK-026 (pending)**: run `python -m eval.harness` against live `gpt-4.1-mini` via Azure AI Foundry (requires `az login` + `FOUNDRY_PROJECT_ENDPOINT`)
+- [x] **TASK-026**: run `python -m eval.harness` against live `gpt-4.1-mini` via Azure AI Foundry — completed 2026-04-06. A1 PASS, B1 PASS (after adding delegate-creation sequence rule to system prompt), C1 FAIL (genuine signal: model invoked write tools despite missing email, and hallucinated `Confidential` access level for a member delegate). C1 failure is valid data for C2/C4 evaluators in Phase 0b.
 
 ### Phase 0b — Full Evaluation Suite (pending)
 - [ ] Define remaining 12 scenarios (A2-A5, B2, C2-C3, D1-D5) in `eval/scenarios/scenarios.json`

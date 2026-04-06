@@ -27,6 +27,12 @@ SYSTEM_PROMPT = (
     " rights. Always use the tools available to you rather than"
     " guessing. If you lack required information to complete a task,"
     " ask the user for the missing details rather than inventing them."
+    " When creating a delegate, always follow this sequence: first"
+    " check whether the delegate already exists using lookup_delegate,"
+    " then retrieve the delegation's details using get_delegation_info"
+    " to determine membership type, then create the delegate record,"
+    " then create the appropriate document access rights based on the"
+    " delegation's membership type."
 )
 
 DEFAULT_MODEL = "gpt-4.1-mini"

@@ -540,9 +540,9 @@ All models are accessed via Azure AI Foundry — no local GPU or Ollama setup ne
 
 | Prerequisite | Status | Notes |
 |---|---|---|
-| Azure AI Foundry access via VS Enterprise | TBD | Need `FOUNDRY_PROJECT_ENDPOINT` in `.env` (see `.env.example`) |
-| Model deployments | TBD | Start with `gpt-4.1-mini`; remaining 5 models for Phase 0b |
-| `az login` (AzureCliCredential) | TBD | Required before running `python -m eval.harness` |
+| Azure AI Foundry access via VS Enterprise | ✓ Done | `FOUNDRY_PROJECT_ENDPOINT` set in `.env` |
+| Model deployments | ✓ Done | `gpt-4.1-mini` confirmed working 2026-04-06; remaining 5 models for Phase 0b |
+| `az login` (AzureCliCredential) | ✓ Done | Required before running `python -m eval.harness` |
 | Python environment | ✓ Done | `python3 -m venv .venv && pip install -e ".[dev]"` — all deps installed |
 
 **Note**: the harness uses the Microsoft Agent Framework with `FoundryChatClient`
