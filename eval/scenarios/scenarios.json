@@ -36,7 +36,8 @@
         {
           "name": "lookup_delegate",
           "args_must_contain": {
-            "name": "Marie Laurent"
+            "name": "Marie Laurent",
+            "delegation_id": "FRA"
           }
         }
       ],
@@ -230,6 +231,7 @@
           "name": "create_document_access_rights",
           "args_must_contain": {
             "delegate_id": "DEL-2026-0891",
+            "committee_id": "EDU-POL",
             "classification_level": "Restricted"
           }
         }
@@ -254,6 +256,7 @@
           "name": "create_document_access_rights",
           "args_must_contain": {
             "delegate_id": "DEL-2026-0500",
+            "committee_id": "TRADE",
             "classification_level": "General"
           }
         }
@@ -278,6 +281,7 @@
           "name": "create_document_access_rights",
           "args_must_contain": {
             "delegate_id": "DEL-2026-0500",
+            "committee_id": "TRADE",
             "classification_level": "Restricted"
           }
         }
@@ -315,7 +319,7 @@
     "id": "D5",
     "category": "business_rule",
     "description": "Retroactive DAR - includes pre-accreditation documents",
-    "system_context": "",
+    "system_context": "User is editor for France delegation (FRA), a member country.",
     "user_message": "Grant delegate DEL-2026-0891 access to Education Policy Committee documents, including documents from before their accreditation.",
     "synthetic_results": {
       "create_document_access_rights": "Access rights granted: delegate=DEL-2026-0891, committee=EDU-POL, retroactive=true"
@@ -326,6 +330,7 @@
           "name": "create_document_access_rights",
           "args_must_contain": {
             "delegate_id": "DEL-2026-0891",
+            "classification_level": "Restricted",
             "retroactive": true
           }
         }
