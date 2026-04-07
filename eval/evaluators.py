@@ -20,6 +20,23 @@ class ScenarioScore:
     details: dict[str, str] = field(default_factory=dict)
 
 
+_WRITE_TOOLS: frozenset[str] = frozenset(
+    {"create_delegate", "create_document_access_rights"}
+)
+
+_QUESTION_PHRASES: tuple[str, ...] = (
+    "could you",
+    "please provide",
+    "what is",
+    "which ",
+    "can you tell",
+    "do you have",
+    "what committee",
+    "what email",
+    "what delegation",
+)
+
+
 def evaluate_c1_correct_tool(
     tool_calls: list[dict],
     expected: dict,
@@ -45,9 +62,8 @@ def evaluate_c1_correct_tool(
         expected.get("should_ask_user") is True
         and len(expected.get("tool_calls_ordered", [])) == 0
     ):
-        WRITE_TOOLS = {"create_delegate", "create_document_access_rights"}
         actual_names = {tc["tool"] for tc in tool_calls}
-        called_write_tools = actual_names & WRITE_TOOLS
+        called_write_tools = actual_names & _WRITE_TOOLS
 
         if not called_write_tools:
             return (
@@ -91,6 +107,48 @@ def _args_value_matches(actual: object, expected_val: object) -> bool:
     return actual == expected_val
 
 
+def _check_entry_args(
+    entry: dict,
+    actual_by_tool: dict,
+) -> tuple[bool, str]:
+    """Check that a single expected tool entry's args match the actual call.
+
+    Args:
+        entry: A dict with ``"name"`` and ``"args_must_contain"`` keys
+            from the expected spec.
+        actual_by_tool: Maps tool name to the first actual call dict
+            for that tool.
+
+    Returns:
+        A tuple of (passed, detail). ``passed`` is True when all
+        required args are present and match; False with a description
+        of the first failure.
+    """
+    name = entry["name"]
+    if name not in actual_by_tool:
+        return (False, f"Tool '{name}' was not called")
+
+    args_must_contain = entry.get("args_must_contain", {})
+    if not args_must_contain:
+        return (True, "")
+
+    actual_args = actual_by_tool[name].get("arguments", {})
+    for key, expected_val in args_must_contain.items():
+        if key not in actual_args:
+            return (
+                False,
+                f"Tool '{name}': required arg '{key}' not present",
+            )
+        if not _args_value_matches(actual_args[key], expected_val):
+            return (
+                False,
+                f"Tool '{name}': arg '{key}' value mismatch"
+                f" (expected {expected_val!r},"
+                f" got {actual_args[key]!r})",
+            )
+    return (True, "")
+
+
 def evaluate_c2_schema_valid_args(
     tool_calls: list[dict],
     expected: dict,
@@ -106,6 +164,8 @@ def evaluate_c2_schema_valid_args(
     Args:
         tool_calls: List of tool call dicts recorded during the run,
             each with ``"tool"`` and ``"arguments"`` keys.
+            When a tool appears multiple times, only the first
+            occurrence is used for arg matching.
         expected: Expected outcomes dict containing
             ``"tool_calls_ordered"`` (list of dicts with ``"name"``
             and ``"args_must_contain"`` keys).
@@ -118,33 +178,53 @@ def evaluate_c2_schema_valid_args(
     if not ordered:
         return (True, "No tool calls expected — C2 not applicable")
 
-    actual_by_tool = {tc["tool"]: tc for tc in tool_calls}
+    # Reason: first-occurrence semantics — avoids false passes caused
+    # by a retry call that happens to supply correct args after an
+    # initial call with incorrect ones.
+    actual_by_tool: dict[str, dict] = {}
+    for tc in tool_calls:
+        if tc["tool"] not in actual_by_tool:
+            actual_by_tool[tc["tool"]] = tc
 
     for entry in ordered:
-        name = entry["name"]
-        if name not in actual_by_tool:
-            return (False, f"Tool '{name}' was not called")
-
-        args_must_contain = entry.get("args_must_contain", {})
-        if not args_must_contain:
-            continue
-
-        actual_args = actual_by_tool[name].get("arguments", {})
-        for key, expected_val in args_must_contain.items():
-            if key not in actual_args:
-                return (
-                    False,
-                    f"Tool '{name}': required arg '{key}' not present",
-                )
-            if not _args_value_matches(actual_args[key], expected_val):
-                return (
-                    False,
-                    f"Tool '{name}': arg '{key}' value mismatch"
-                    f" (expected {expected_val!r},"
-                    f" got {actual_args[key]!r})",
-                )
+        passed, detail = _check_entry_args(entry, actual_by_tool)
+        if not passed:
+            return (False, detail)
 
     return (True, "All required args present and matching")
+
+
+def _find_tool_in_sequence(
+    name: str,
+    actual_tool_names: list[str],
+    search_from: int,
+    prev_name: str | None,
+) -> tuple[int | None, str]:
+    """Locate a tool name at or after a given position in the sequence.
+
+    Args:
+        name: Tool name to search for.
+        actual_tool_names: Ordered list of actual tool names.
+        search_from: Index at which to start searching.
+        prev_name: Name of the previous required tool, used in the
+            error message when ``name`` is not found.
+
+    Returns:
+        A tuple of (position, error). ``position`` is the found index
+        or None; ``error`` is an empty string on success or a
+        human-readable failure message.
+    """
+    try:
+        pos = actual_tool_names.index(name, search_from)
+        return (pos, "")
+    except ValueError:
+        if prev_name is not None:
+            return (
+                None,
+                f"Tool '{name}' not found after '{prev_name}'"
+                " in actual sequence",
+            )
+        return (None, f"Tool '{name}' not found in actual sequence")
 
 
 def evaluate_c3_multi_step_sequencing(
@@ -182,46 +262,16 @@ def evaluate_c3_multi_step_sequencing(
 
     for entry in ordered:
         name = entry["name"]
-        # Reason: find the tool at or after the previous match position
-        # to enforce relative ordering without requiring contiguity.
-        try:
-            pos = actual_tool_names.index(name, search_from)
-        except ValueError:
-            if prev_name is not None:
-                return (
-                    False,
-                    f"Tool '{name}' not found after '{prev_name}'"
-                    " in actual sequence",
-                )
-            return (
-                False,
-                f"Tool '{name}' not found in actual sequence",
-            )
+        pos, error = _find_tool_in_sequence(
+            name, actual_tool_names, search_from, prev_name
+        )
+        if pos is None:
+            return (False, error)
         search_from = pos + 1
         prev_name = name
 
     expected_names = [e["name"] for e in ordered]
-    return (
-        True,
-        f"Tools called in correct order: {expected_names}",
-    )
-
-
-_WRITE_TOOLS: frozenset[str] = frozenset(
-    {"create_delegate", "create_document_access_rights"}
-)
-
-_QUESTION_PHRASES: tuple[str, ...] = (
-    "could you",
-    "please provide",
-    "what is",
-    "which",
-    "can you tell",
-    "do you have",
-    "what committee",
-    "what email",
-    "what delegation",
-)
+    return (True, f"Tools called in correct order: {expected_names}")
 
 
 def _response_contains_question(response: str) -> bool:
@@ -240,6 +290,35 @@ def _response_contains_question(response: str) -> bool:
     return any(phrase in lowered for phrase in _QUESTION_PHRASES)
 
 
+def _evaluate_c4_should_ask(
+    tool_calls: list[dict],
+    agent_response: str,
+) -> tuple[bool, str]:
+    """Evaluate C4 for the should_ask_user=True branch.
+
+    Args:
+        tool_calls: List of tool call dicts, each with a ``"tool"`` key.
+        agent_response: The agent's final text response.
+
+    Returns:
+        A tuple of (passed, detail).
+    """
+    actual_tools = {tc["tool"] for tc in tool_calls}
+    called_write = actual_tools & _WRITE_TOOLS
+    if called_write:
+        tool_name = next(iter(called_write))
+        return (
+            False,
+            f"Called write tool '{tool_name}' when should have asked",
+        )
+    if not _response_contains_question(agent_response):
+        return (
+            False,
+            "Agent did not ask a question when info was missing",
+        )
+    return (True, "Correctly asked for missing information")
+
+
 def evaluate_c4_asks_vs_invents(
     tool_calls: list[dict],
     agent_response: str,
@@ -248,44 +327,26 @@ def evaluate_c4_asks_vs_invents(
     """Check that the agent asks for missing info instead of inventing it.
 
     Branch A (``should_ask_user`` is True): passes when no write tool
-    was called and the agent response contains a question. Fails if a
-    write tool was called or if the response contains no question.
+    was called and the agent response contains a question.
 
     Branch B (``should_ask_user`` is False): passes immediately when
-    ``must_not_hallucinate`` is empty. When non-empty, returns True
-    with a "deferred to manual review" note — automated hallucination
-    checking against free-text responses is a known limitation and
-    requires human inspection.
+    ``must_not_hallucinate`` is empty. When non-empty, defers to manual
+    review — automated hallucination checking is a known limitation.
 
     Args:
         tool_calls: List of tool call dicts recorded during the run,
             each with a ``"tool"`` key.
         agent_response: The agent's final text response.
-        expected: Expected outcomes dict containing ``"should_ask_user"``
-            (bool) and ``"must_not_hallucinate"`` (list of field names).
+        expected: Expected outcomes dict containing
+            ``"should_ask_user"`` (bool) and
+            ``"must_not_hallucinate"`` (list of field names).
 
     Returns:
         A tuple of (passed, detail). ``passed`` is True if the
         criterion is met; False with a human-readable explanation.
     """
-    should_ask = expected.get("should_ask_user", False)
-
-    if should_ask:
-        actual_tools = {tc["tool"] for tc in tool_calls}
-        called_write = actual_tools & _WRITE_TOOLS
-        if called_write:
-            tool_name = next(iter(called_write))
-            return (
-                False,
-                f"Called write tool '{tool_name}'"
-                " when should have asked",
-            )
-        if not _response_contains_question(agent_response):
-            return (
-                False,
-                "Agent did not ask a question when info was missing",
-            )
-        return (True, "Correctly asked for missing information")
+    if expected.get("should_ask_user", False):
+        return _evaluate_c4_should_ask(tool_calls, agent_response)
 
     # Branch B — should_ask_user is False
     must_not_hallucinate = expected.get("must_not_hallucinate", [])

@@ -1,7 +1,5 @@
 """Unit tests for eval/evaluators.py — C2, C3, and C4 criteria."""
 
-import pytest
-
 from eval.evaluators import (
     evaluate_c2_schema_valid_args,
     evaluate_c3_multi_step_sequencing,
