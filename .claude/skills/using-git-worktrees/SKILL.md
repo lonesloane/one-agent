@@ -74,6 +74,32 @@ No .gitignore verification needed - outside project entirely.
 
 ## Creation Steps
 
+### 0. Verify You Are on the Base Branch
+
+```bash
+git rev-parse --abbrev-ref HEAD
+```
+
+**If the result is `main` or `master` (or the project's configured base branch):**
+proceed to step 1.
+
+**If the result is anything else (a feature branch, detached HEAD, etc.):**
+⛔ STOP. Report to the user:
+
+```
+Cannot create worktree: working directory is already on branch '<name>',
+not on the base branch. The correct sequence is:
+  1. Be on main/master
+  2. Invoke using-git-worktrees → it creates the feature branch inside the worktree
+  3. All implementation work happens in the worktree, not here
+
+Please switch to main first, or confirm you want a secondary worktree
+branching off '<name>' instead.
+```
+
+Do not create a detached-HEAD worktree as a workaround. A detached HEAD
+worktree provides no isolation benefit and will confuse future commands.
+
 ### 1. Detect Project Name
 
 ```bash

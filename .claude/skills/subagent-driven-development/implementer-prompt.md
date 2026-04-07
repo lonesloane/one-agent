@@ -36,7 +36,10 @@ Agent tool (subagent_type: "python-coder"):
     5. Self-review (see below)
     6. Report back
 
-    Work from: [directory]
+    Work from: [WORKTREE_PATH]
+    ⚠️  This is the isolated git worktree, NOT the main project directory.
+    Never work from the main project root — all reads, edits, and commits
+    must happen inside the worktree path above.
 
     **While you work:** If you encounter something unexpected or unclear, **ask questions**.
     It's always OK to pause and clarify. Don't guess or make assumptions.

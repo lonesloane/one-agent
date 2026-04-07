@@ -39,6 +39,15 @@ digraph when_to_use {
 
 ## The Process
 
+> ⛔ **STOP — before reading the plan or creating any tasks:**
+> 1. Invoke `using-git-worktrees` to create an isolated workspace
+> 2. Note the exact worktree path it returns (e.g. `.worktrees/phase-0b`)
+> 3. Every implementer subagent prompt you write MUST use that path in the
+>    "Work from:" field — never the main project directory
+>
+> If the worktree is not set up first, you will pollute the main working
+> directory and lose the isolation guarantee.
+
 ```dot
 digraph process {
     rankdir=TB;
@@ -127,6 +136,9 @@ Implementer subagents report one of four statuses. Handle each appropriately:
 
 ```
 You: I'm using Subagent-Driven Development to execute this plan.
+
+[Invoke using-git-worktrees → worktree ready at .worktrees/my-feature]
+WORKTREE_PATH = .worktrees/my-feature   ← carry this through every prompt
 
 [Read plan file once: plan/feature-plan.md]
 [Extract all 5 tasks with full text and context]
