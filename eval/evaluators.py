@@ -1,23 +1,18 @@
-"""Evaluation scoring for scenario tool call traces."""
+"""Evaluation scoring for scenario tool call traces.
 
-from dataclasses import dataclass, field
+Aggregation utilities (ModelScore, compute_prompt_score,
+compute_criterion_pass_rate, aggregate_model_scores) live in
+``eval.aggregators`` and are re-exported here for convenience.
+ScenarioScore is defined in ``eval.types`` and re-exported here.
+"""
 
-
-@dataclass
-class ScenarioScore:
-    """Score results for a single scenario evaluation.
-
-    Attributes:
-        scenario_id: Unique identifier for the evaluated scenario.
-        criteria: Maps criterion name (e.g. "C1") to True/False/None,
-            where None means the criterion is not applicable.
-        details: Maps criterion name to a human-readable explanation
-            of the evaluation result.
-    """
-
-    scenario_id: str
-    criteria: dict[str, bool | None] = field(default_factory=dict)
-    details: dict[str, str] = field(default_factory=dict)
+from eval.aggregators import (  # noqa: F401  (re-export)
+    ModelScore,
+    aggregate_model_scores,
+    compute_criterion_pass_rate,
+    compute_prompt_score,
+)
+from eval.types import ScenarioScore  # noqa: F401  (re-export)
 
 
 _WRITE_TOOLS: frozenset[str] = frozenset(

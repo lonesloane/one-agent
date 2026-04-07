@@ -1,6 +1,10 @@
 """Unit tests for eval/evaluators.py — C2, C3, and C4 criteria."""
 
 from eval.evaluators import (
+    ScenarioScore,
+    aggregate_model_scores,
+    compute_criterion_pass_rate,
+    compute_prompt_score,
     evaluate_c2_schema_valid_args,
     evaluate_c3_multi_step_sequencing,
     evaluate_c4_asks_vs_invents,
@@ -343,3 +347,142 @@ class TestC4AsksVsInvents:
         )
         assert passed is True
         assert "deferred" in detail.lower()
+
+
+# ---------------------------------------------------------------------------
+# TEST-004: compute_prompt_score, compute_criterion_pass_rate,
+#           aggregate_model_scores
+# ---------------------------------------------------------------------------
+
+
+class TestAggregateModelScores:
+    """Tests for compute_prompt_score, compute_criterion_pass_rate,
+    and aggregate_model_scores."""
+
+    def _all_pass_score(self, scenario_id: str) -> ScenarioScore:
+        """Build a ScenarioScore with all four criteria passing."""
+        return ScenarioScore(
+            scenario_id=scenario_id,
+            criteria={"C1": True, "C2": True, "C3": True, "C4": True},
+            details={},
+        )
+
+    # --- compute_prompt_score ---
+
+    def test_prompt_score_two_of_three_applicable(self):
+        """2 passing / 3 applicable criteria → score ≈ 0.667."""
+        score = ScenarioScore(
+            scenario_id="s1",
+            criteria={
+                "C1": True,
+                "C2": False,
+                "C3": True,
+                "C4": None,
+            },
+            details={},
+        )
+        result = compute_prompt_score(score)
+        assert abs(result - 2 / 3) < 1e-9
+
+    def test_prompt_score_no_applicable_criteria(self):
+        """0 applicable criteria → score is 0.0."""
+        score = ScenarioScore(
+            scenario_id="s2",
+            criteria={"C1": None, "C2": None, "C3": None, "C4": None},
+            details={},
+        )
+        result = compute_prompt_score(score)
+        assert result == 0.0
+
+    # --- compute_criterion_pass_rate ---
+
+    def test_criterion_pass_rate_all_passing(self):
+        """All scenarios pass C1 → rate is 1.0."""
+        scores = [self._all_pass_score(f"s{i}") for i in range(5)]
+        rate = compute_criterion_pass_rate(scores, "C1")
+        assert rate == 1.0
+
+    def test_criterion_pass_rate_none_applicable(self):
+        """No scenario has C1 applicable → vacuously 1.0."""
+        scores = [
+            ScenarioScore(
+                scenario_id=f"s{i}",
+                criteria={"C1": None, "C2": True},
+                details={},
+            )
+            for i in range(3)
+        ]
+        rate = compute_criterion_pass_rate(scores, "C1")
+        assert rate == 1.0
+
+    def test_criterion_pass_rate_partial(self):
+        """3 of 4 applicable scenarios pass C2 → rate is 0.75."""
+        criteria_values = [True, True, True, False]
+        scores = [
+            ScenarioScore(
+                scenario_id=f"s{i}",
+                criteria={"C2": val},
+                details={},
+            )
+            for i, val in enumerate(criteria_values)
+        ]
+        rate = compute_criterion_pass_rate(scores, "C2")
+        assert rate == 0.75
+
+    # --- aggregate_model_scores ---
+
+    def test_aggregate_all_pass(self):
+        """15 scenarios all passing → aggregate_score 1.0, overall_pass."""
+        scores = [self._all_pass_score(f"s{i}") for i in range(15)]
+        result = aggregate_model_scores("gpt-4o", scores)
+
+        assert result.model == "gpt-4o"
+        assert result.aggregate_score == 1.0
+        assert result.passes_aggregate is True
+        assert result.passes_all_criteria is True
+        assert result.overall_pass is True
+        assert len(result.per_prompt_scores) == 15
+
+    def test_aggregate_below_threshold(self):
+        """Low-scoring scenarios → passes_aggregate=False, overall_pass=F."""
+        # 4 criteria, 1 passing → prompt score 0.25 each
+        scores = [
+            ScenarioScore(
+                scenario_id=f"s{i}",
+                criteria={
+                    "C1": True,
+                    "C2": False,
+                    "C3": False,
+                    "C4": False,
+                },
+                details={},
+            )
+            for i in range(10)
+        ]
+        result = aggregate_model_scores("gpt-4o-mini", scores)
+
+        assert result.aggregate_score == 0.25
+        assert result.passes_aggregate is False
+        assert result.overall_pass is False
+
+    def test_aggregate_criterion_below_threshold(self):
+        """One criterion passes < 75% → passes_all_criteria=False."""
+        # C2 fails on 3 of 4 scenarios (25% pass rate)
+        scores = [
+            ScenarioScore(
+                scenario_id=f"s{i}",
+                criteria={
+                    "C1": True,
+                    "C2": True if i == 0 else False,
+                    "C3": True,
+                    "C4": True,
+                },
+                details={},
+            )
+            for i in range(4)
+        ]
+        result = aggregate_model_scores("some-model", scores)
+
+        assert result.criterion_pass_rates["C2"] == 0.25
+        assert result.passes_all_criteria is False
+        assert result.overall_pass is False
