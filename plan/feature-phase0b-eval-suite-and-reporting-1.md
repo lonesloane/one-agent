@@ -2,9 +2,9 @@
 goal: "Phase 0b: Complete Evaluation Suite, Scoring & Reporting"
 version: 1.0
 date_created: 2026-04-06
-last_updated: 2026-04-06
+last_updated: 2026-04-07
 owner: Stephane
-status: Planned
+status: In Progress
 tags:
   - feature
   - evaluation
@@ -13,7 +13,7 @@ tags:
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: In Progress](https://img.shields.io/badge/status-In%20Progress-yellow)
 
 Complete the Phase 0 evaluation harness with the full 15-scenario test
 catalog, all 4 scoring criteria (C1-C4), CLI interface, and reporting.
@@ -68,18 +68,18 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Add scenario A2 (Delegate search): user = "Is there a delegate named Marie Laurent in our delegation?", system_context = "User is from France delegation (FRA), delegate DEL-2026-0042.", expected: `lookup_delegate` with name="Marie Laurent" and delegation_id referencing France. Applicable: C1, C2. | | |
-| TASK-002 | Add scenario A3 (Meeting schedule): user = "What meetings do I have coming up?", system_context = "User is delegate DEL-2026-0042.", expected: `get_upcoming_meetings` with delegate_id="DEL-2026-0042". Applicable: C1, C2. | | |
-| TASK-003 | Add scenario A4 (Agenda documents): user = "Show me the agenda documents for the next Education Policy Committee meeting", system_context = "Meeting ID MTG-EDU-2026-04 is known from prior context.", expected: `get_agenda_documents` with meeting_id="MTG-EDU-2026-04". Applicable: C1, C2. | | |
-| TASK-004 | Add scenario A5 (New documents since last visit): user = "Any new documents since my last login?", system_context = "Meeting ID MTG-EDU-2026-04, last login 2026-03-15.", expected: `get_agenda_documents` with meeting_id and since="2026-03-15". Applicable: C1, C2. | | |
-| TASK-005 | Add scenario B2 (Meeting brief - proactive flow): user = "Hi, I just logged in.", system_context = "User is delegate DEL-2026-0042, last login 2026-03-15.", expected sequence: (1) `get_upcoming_meetings(delegate_id="DEL-2026-0042")`, (2) `get_agenda_documents(meeting_id=..., since="2026-03-15")`. Applicable: C1, C2, C3. synthetic_results must include meetings data that triggers the second call. | | |
-| TASK-006 | Add scenario C2 (Delegate creation - missing committee): user = "I need to add a new delegate, Sophie Martin, she's an economist.", expected: should_ask_user=true, model should ask for committee and email. Applicable: C4. | | |
-| TASK-007 | Add scenario C3 (Ambiguous delegation): user = "Add a delegate to our delegation - Pierre Blanc, he works on development aid.", system_context = "" (no delegation established), expected: should_ask_user=true, model should ask which delegation. Applicable: C4. | | |
-| TASK-008 | Add scenario D1 (Member delegate - correct access level): user = "Create DAR for delegate DEL-2026-0891, Education Policy Committee. Our delegation is a member country.", expected: `create_document_access_rights` with classification_level="Restricted". Applicable: C1, C2. | | |
-| TASK-009 | Add scenario D2 (Partner delegate - correct access level): user = "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner organization, no framework agreement for this committee.", expected: `create_document_access_rights` with classification_level="General". Applicable: C1, C2. | | |
-| TASK-010 | Add scenario D3 (Partner with Framework Agreement): user = "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner but we have a Framework Agreement covering Trade.", expected: `create_document_access_rights` with classification_level="Restricted". Applicable: C1, C2. | | |
-| TASK-011 | Add scenario D4 (Confidential access - flags approval): user = "I need Confidential access for delegate DEL-2026-0891 on the Education Policy Committee.", expected: `create_document_access_rights` with classification_level="Confidential", model should communicate secretariat approval requirement. Applicable: C1, C2, C4. | | |
-| TASK-012 | Add scenario D5 (Retroactive access - flags approval): user = "Grant delegate DEL-2026-0891 access to Education Policy Committee documents, including documents from before their accreditation.", expected: `create_document_access_rights` with retroactive=True. Applicable: C1, C2. | | |
+| TASK-001 | Add scenario A2 (Delegate search): user = "Is there a delegate named Marie Laurent in our delegation?", system_context = "User is from France delegation (FRA), delegate DEL-2026-0042.", expected: `lookup_delegate` with name="Marie Laurent" and delegation_id referencing France. Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-002 | Add scenario A3 (Meeting schedule): user = "What meetings do I have coming up?", system_context = "User is delegate DEL-2026-0042.", expected: `get_upcoming_meetings` with delegate_id="DEL-2026-0042". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-003 | Add scenario A4 (Agenda documents): user = "Show me the agenda documents for the next Education Policy Committee meeting", system_context = "Meeting ID MTG-EDU-2026-04 is known from prior context.", expected: `get_agenda_documents` with meeting_id="MTG-EDU-2026-04". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-004 | Add scenario A5 (New documents since last visit): user = "Any new documents since my last login?", system_context = "Meeting ID MTG-EDU-2026-04, last login 2026-03-15.", expected: `get_agenda_documents` with meeting_id and since="2026-03-15". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-005 | Add scenario B2 (Meeting brief - proactive flow): user = "Hi, I just logged in.", system_context = "User is delegate DEL-2026-0042, last login 2026-03-15.", expected sequence: (1) `get_upcoming_meetings(delegate_id="DEL-2026-0042")`, (2) `get_agenda_documents(meeting_id=..., since="2026-03-15")`. Applicable: C1, C2, C3. synthetic_results must include meetings data that triggers the second call. | ✅ | 2026-04-07 |
+| TASK-006 | Add scenario C2 (Delegate creation - missing committee): user = "I need to add a new delegate, Sophie Martin, she's an economist.", expected: should_ask_user=true, model should ask for committee and email. Applicable: C4. | ✅ | 2026-04-07 |
+| TASK-007 | Add scenario C3 (Ambiguous delegation): user = "Add a delegate to our delegation - Pierre Blanc, he works on development aid.", system_context = "" (no delegation established), expected: should_ask_user=true, model should ask which delegation. Applicable: C4. | ✅ | 2026-04-07 |
+| TASK-008 | Add scenario D1 (Member delegate - correct access level): user = "Create DAR for delegate DEL-2026-0891, Education Policy Committee. Our delegation is a member country.", expected: `create_document_access_rights` with classification_level="Restricted". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-009 | Add scenario D2 (Partner delegate - correct access level): user = "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner organization, no framework agreement for this committee.", expected: `create_document_access_rights` with classification_level="General". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-010 | Add scenario D3 (Partner with Framework Agreement): user = "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner but we have a Framework Agreement covering Trade.", expected: `create_document_access_rights` with classification_level="Restricted". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-011 | Add scenario D4 (Confidential access - flags approval): user = "I need Confidential access for delegate DEL-2026-0891 on the Education Policy Committee.", expected: `create_document_access_rights` with classification_level="Confidential", model should communicate secretariat approval requirement. Applicable: C1, C2, C4. | ✅ | 2026-04-07 |
+| TASK-012 | Add scenario D5 (Retroactive access - flags approval): user = "Grant delegate DEL-2026-0891 access to Education Policy Committee documents, including documents from before their accreditation.", expected: `create_document_access_rights` with retroactive=True. Applicable: C1, C2. | ✅ | 2026-04-07 |
 
 ### Phase 2: Full Evaluator Implementations
 
@@ -88,10 +88,10 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-013 | Implement `evaluate_c2_schema_valid_args(tool_calls: list[dict], expected: dict) -> tuple[bool, str]`. Logic: for each expected tool call in `tool_calls_ordered`, find the matching actual call and verify (a) all `args_must_contain` keys are present with matching values (case-insensitive string match for strings, exact match for booleans/numbers), (b) no required parameters are missing (based on tool schema), (c) values in `must_not_hallucinate` fields were not invented (cross-reference with scenario user_message — if a value like email appears in args but not in user_message and not in synthetic_results, flag as hallucinated). Return explanation listing each check. | | |
-| TASK-014 | Implement `evaluate_c3_multi_step_sequencing(tool_calls: list[dict], expected: dict) -> tuple[bool, str]`. Logic: extract the ordered list of expected tool names from `tool_calls_ordered`; verify that the actual tool calls appear in the same relative order (not necessarily contiguous — other calls may be interleaved). Specifically: lookup before create, get_delegation_info before create_document_access_rights. Return explanation showing expected vs actual order. | | |
-| TASK-015 | Implement `evaluate_c4_asks_vs_invents(tool_calls: list[dict], agent_response: str, expected: dict) -> tuple[bool, str]`. Logic: if `should_ask_user` is True, pass if no write tool (`create_delegate`, `create_document_access_rights`) was called AND the agent_response contains a question (heuristic: ends with "?" or contains "could you", "please provide", "what is", etc.). If `should_ask_user` is False, check `must_not_hallucinate` fields — for each listed field, verify the value in the actual tool call matches a value present in the user_message or synthetic_results (not invented). Return explanation. | | |
-| TASK-016 | Update `score_scenario` to call all 4 real evaluators instead of stubs. Verify backward compatibility: A1, B1, C1 scenarios still score correctly. | | |
+| TASK-013 | Implement `evaluate_c2_schema_valid_args(tool_calls: list[dict], expected: dict) -> tuple[bool, str]`. Logic: for each expected tool call in `tool_calls_ordered`, find the matching actual call and verify (a) all `args_must_contain` keys are present with matching values (case-insensitive string match for strings, exact match for booleans/numbers), (b) no required parameters are missing (based on tool schema), (c) values in `must_not_hallucinate` fields were not invented (cross-reference with scenario user_message — if a value like email appears in args but not in user_message and not in synthetic_results, flag as hallucinated). Return explanation listing each check. | ✅ | 2026-04-07 |
+| TASK-014 | Implement `evaluate_c3_multi_step_sequencing(tool_calls: list[dict], expected: dict) -> tuple[bool, str]`. Logic: extract the ordered list of expected tool names from `tool_calls_ordered`; verify that the actual tool calls appear in the same relative order (not necessarily contiguous — other calls may be interleaved). Specifically: lookup before create, get_delegation_info before create_document_access_rights. Return explanation showing expected vs actual order. | ✅ | 2026-04-07 |
+| TASK-015 | Implement `evaluate_c4_asks_vs_invents(tool_calls: list[dict], agent_response: str, expected: dict) -> tuple[bool, str]`. Logic: if `should_ask_user` is True, pass if no write tool (`create_delegate`, `create_document_access_rights`) was called AND the agent_response contains a question (heuristic: ends with "?" or contains "could you", "please provide", "what is", etc.). If `should_ask_user` is False, check `must_not_hallucinate` fields — for each listed field, verify the value in the actual tool call matches a value present in the user_message or synthetic_results (not invented). Return explanation. | ✅ | 2026-04-07 |
+| TASK-016 | Update `score_scenario` to call all 4 real evaluators instead of stubs. Verify backward compatibility: A1, B1, C1 scenarios still score correctly. | ✅ | 2026-04-07 |
 
 ### Phase 3: Score Aggregation
 
