@@ -113,7 +113,10 @@ async def _run_agent(
             middleware=[recorder],
         ) as agent,
     ):
-        result = await agent.run(scenario["user_message"])
+        result = await asyncio.wait_for(
+            agent.run(scenario["user_message"]),
+            timeout=90,
+        )
 
     if verbose:
         logger.debug("Tool calls: {}", recorder.calls)
@@ -185,7 +188,26 @@ async def run_model(
             scenario["id"],
             scenario["description"],
         )
-        result = await evaluate_scenario(model, scenario, verbose=verbose)
+        try:
+            result = await evaluate_scenario(
+                model, scenario, verbose=verbose
+            )
+        except asyncio.TimeoutError:
+            logger.warning(
+                "Scenario {} [{}]: TIMEOUT (>90s), skipping",
+                scenario["id"],
+                model,
+            )
+            continue
+        except Exception as exc:
+            logger.warning(
+                "Scenario {} [{}]: ERROR — {}, skipping",
+                scenario["id"],
+                model,
+                exc,
+            )
+            continue
+
         results.append(result)
 
         criteria = result["scores"]["criteria"]
