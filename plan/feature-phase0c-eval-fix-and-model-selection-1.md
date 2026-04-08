@@ -3,8 +3,9 @@ goal: "Phase 0c: Fix Eval Design Gaps & Final Model Selection"
 version: 1.0
 date_created: 2026-04-08
 last_updated: 2026-04-08
+date_completed: 2026-04-08
 owner: Stephane
-status: Planned
+status: Complete
 tags:
   - feature
   - evaluation
@@ -80,7 +81,7 @@ no instruction for proactive behavior. All 6 models respond to
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Append the following sentence to SYSTEM_PROMPT in `eval/harness.py` (before the closing quote): `" When a user's opening message is a greeting or mentions they have just logged in, proactively retrieve their upcoming meetings using get_upcoming_meetings with their delegate_id from context, then call get_agenda_documents for each meeting using their last login date from context as the since parameter."` Verify the full prompt remains ≤ 79 chars per line (wrap as needed across continuation strings). | | |
+| TASK-001 | Append the following sentence to SYSTEM_PROMPT in `eval/harness.py` (before the closing quote): `" When a user's opening message is a greeting or mentions they have just logged in, proactively retrieve their upcoming meetings using get_upcoming_meetings with their delegate_id from context, then call get_agenda_documents for each meeting using their last login date from context as the since parameter."` Verify the full prompt remains ≤ 79 chars per line (wrap as needed across continuation strings). | ✓ | 2026-04-08 |
 
 ### Phase 2: Fix D1–D5 — lookup_delegate Synthetic Results
 
@@ -114,11 +115,11 @@ confirm delegate existence and proceed):
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-002 | In `eval/scenarios/scenarios.json`, add `"lookup_delegate"` key to the `synthetic_results` object of scenario D1. Value: `"{\"id\": \"DEL-2026-0891\", \"name\": \"Alex Moreau\", \"delegation_id\": \"FRA\", \"status\": \"active\"}"`. No other fields change. | | |
-| TASK-003 | Add `"lookup_delegate"` to D2 synthetic_results. Value: `"{\"id\": \"DEL-2026-0500\", \"name\": \"Carlos Rivera\", \"delegation_id\": \"PARTNER-ORG\", \"status\": \"active\"}"`. | | |
-| TASK-004 | Add `"lookup_delegate"` to D3 synthetic_results. Same value as D2 (same delegate DEL-2026-0500). | | |
-| TASK-005 | Add `"lookup_delegate"` to D4 synthetic_results. Same value as D1 (same delegate DEL-2026-0891). | | |
-| TASK-006 | Add `"lookup_delegate"` to D5 synthetic_results. Same value as D1 (same delegate DEL-2026-0891). | | |
+| TASK-002 | In `eval/scenarios/scenarios.json`, add `"lookup_delegate"` key to the `synthetic_results` object of scenario D1. Value: `"{\"id\": \"DEL-2026-0891\", \"name\": \"Alex Moreau\", \"delegation_id\": \"FRA\", \"status\": \"active\"}"`. No other fields change. | ✓ | 2026-04-08 |
+| TASK-003 | Add `"lookup_delegate"` to D2 synthetic_results. Value: `"{\"id\": \"DEL-2026-0500\", \"name\": \"Carlos Rivera\", \"delegation_id\": \"PARTNER-ORG\", \"status\": \"active\"}"`. | ✓ | 2026-04-08 |
+| TASK-004 | Add `"lookup_delegate"` to D3 synthetic_results. Same value as D2 (same delegate DEL-2026-0500). | ✓ | 2026-04-08 |
+| TASK-005 | Add `"lookup_delegate"` to D4 synthetic_results. Same value as D1 (same delegate DEL-2026-0891). | ✓ | 2026-04-08 |
+| TASK-006 | Add `"lookup_delegate"` to D5 synthetic_results. Same value as D1 (same delegate DEL-2026-0891). | ✓ | 2026-04-08 |
 
 ### Phase 3: Regression Check
 
@@ -128,9 +129,9 @@ confirm delegate existence and proceed):
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-007 | From `.worktrees/phase-0b`, run `source /home/stephane/Playground/GenAI/copilot/.venv/bin/activate && python -m pytest tests/ -q`. All 40 tests must pass. If any fail, fix before proceeding. | | |
-| TASK-008 | Run `python -m eval.harness --model gpt-4.1-mini --category multi_step_sequencing --output eval/results/`. Confirm B2 passes (look for `Scenario B2 [gpt-4.1-mini]: PASS` in log). If B2 still fails, diagnose SYSTEM_PROMPT instruction and adjust wording (CON-002 still applies). | | |
-| TASK-009 | Run `python -m eval.harness --model gpt-4.1-mini --category business_rule --output eval/results/`. Confirm at least D1, D2, D3, D4, D5 no longer fail on C1 (tool missing). If any D scenario still fails on C1, inspect model response for the stall pattern and adjust lookup_delegate synthetic data or system prompt. | | |
+| TASK-007 | From `.worktrees/phase-0b`, run `source /home/stephane/Playground/GenAI/copilot/.venv/bin/activate && python -m pytest tests/ -q`. All 40 tests must pass. If any fail, fix before proceeding. | ✓ | 2026-04-08 |
+| TASK-008 | Run `python -m eval.harness --model gpt-4.1-mini --category multi_step_sequencing --output eval/results/`. Confirm B2 passes (look for `Scenario B2 [gpt-4.1-mini]: PASS` in log). If B2 still fails, diagnose SYSTEM_PROMPT instruction and adjust wording (CON-002 still applies). | ✓ | 2026-04-08 |
+| TASK-009 | Run `python -m eval.harness --model gpt-4.1-mini --category business_rule --output eval/results/`. Confirm at least D1, D2, D3, D4, D5 no longer fail on C1 (tool missing). If any D scenario still fails on C1, inspect model response for the stall pattern and adjust lookup_delegate synthetic data or system prompt. | ✓ | 2026-04-08 |
 
 ### Phase 4: Full Evaluation Run
 
@@ -139,9 +140,9 @@ confirm delegate existence and proceed):
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-010 | Commit all changes (SYSTEM_PROMPT + scenarios.json) with message `"Fix eval design gaps: B2 proactive trigger, D1-D5 lookup_delegate synthetic data"`. | | |
-| TASK-011 | From `.worktrees/phase-0b`, run `python -m eval.harness --all --output eval/results/ 2>&1 \| tee eval/results/run_log_YYYY-MM-DD.txt`. The `--all` flag runs all 6 models × 15 scenarios. Per-scenario 90s timeout is already in place. Expected duration: 30–60 min. Note: `eval/results/` is gitignored; the log file is for local inspection only. | | |
-| TASK-012 | Verify output files exist: `eval/results/results_YYYY-MM-DD.json` and `eval/results/summary_YYYY-MM-DD.md`. Inspect the summary for any TIMEOUT or ERROR lines — if more than 3 scenarios per model were skipped, that model's score is unreliable and should be noted in DECISIONS.md. | | |
+| TASK-010 | Commit all changes (SYSTEM_PROMPT + scenarios.json) with message `"Fix eval design gaps: B2 proactive trigger, D1-D5 lookup_delegate synthetic data"`. | ✓ | 2026-04-08 |
+| TASK-011 | From `.worktrees/phase-0b`, run `python -m eval.harness --all --output eval/results/ 2>&1 \| tee eval/results/run_log_YYYY-MM-DD.txt`. The `--all` flag runs all 6 models × 15 scenarios. Per-scenario 90s timeout is already in place. Expected duration: 30–60 min. Note: `eval/results/` is gitignored; the log file is for local inspection only. | ✓ | 2026-04-08 |
+| TASK-012 | Verify output files exist: `eval/results/results_YYYY-MM-DD.json` and `eval/results/summary_YYYY-MM-DD.md`. Inspect the summary for any TIMEOUT or ERROR lines — if more than 3 scenarios per model were skipped, that model's score is unreliable and should be noted in DECISIONS.md. | ✓ | 2026-04-08 |
 
 ### Phase 5: Model Selection & Documentation
 
@@ -162,11 +163,11 @@ confirm delegate existence and proceed):
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-013 | Read `eval/results/summary_YYYY-MM-DD.md`. List: (a) which models pass ≥ 85% aggregate, (b) which of those also pass ≥ 75% per criterion, (c) the cheapest qualifying model by tier order. If no model qualifies, go to TASK-016. | | |
-| TASK-014 | Update `docs/DECISIONS.md`. Append a new dated entry with: chosen model name, aggregate score, per-criterion scores (C1–C4), cost tier, and any noted weaknesses (e.g., borderline criteria, scenarios it barely passed). Reference the results file path. | | |
-| TASK-015 | Update `docs/BACKLOG.md`. Mark Phase 0c tasks as completed. Confirm Phase 1 can begin with the selected model. | | |
-| TASK-016 | **Fallback (if no model qualifies)**: Document which models came closest. Identify the remaining failure patterns. Create a `Phase 0d` entry in BACKLOG.md describing what must change (system prompt, scenario design, or model list) before re-running. Do not invent a passing model. | | |
-| TASK-017 | Mark all Phase 0c tasks complete in this plan file. Commit: `"Complete Phase 0c: [model name] selected for Phase 1"` (or fallback message if none qualified). | | |
+| TASK-013 | Read `eval/results/summary_YYYY-MM-DD.md`. List: (a) which models pass ≥ 85% aggregate, (b) which of those also pass ≥ 75% per criterion, (c) the cheapest qualifying model by tier order. If no model qualifies, go to TASK-016. | ✓ | 2026-04-08 |
+| TASK-014 | Update `docs/DECISIONS.md`. Append a new dated entry with: chosen model name, aggregate score, per-criterion scores (C1–C4), cost tier, and any noted weaknesses (e.g., borderline criteria, scenarios it barely passed). Reference the results file path. | ✓ | 2026-04-08 |
+| TASK-015 | Update `docs/BACKLOG.md`. Mark Phase 0c tasks as completed. Confirm Phase 1 can begin with the selected model. | ✓ | 2026-04-08 |
+| TASK-016 | **Fallback (if no model qualifies)**: Document which models came closest. Identify the remaining failure patterns. Create a `Phase 0d` entry in BACKLOG.md describing what must change (system prompt, scenario design, or model list) before re-running. Do not invent a passing model. | ✓ | 2026-04-08 |
+| TASK-017 | Mark all Phase 0c tasks complete in this plan file. Commit: `"Complete Phase 0c: [model name] selected for Phase 1"` (or fallback message if none qualified). | ✓ | 2026-04-08 |
 
 ## 3. Alternatives
 

@@ -18,12 +18,33 @@
 - [x] Run full evaluation: all 6 models × 15 scenarios (2026-04-08)
 - [x] **Finding**: No model passed. Two eval design gaps identified (B2 proactive trigger missing; D1-D5 lack `lookup_delegate` synthetic data). Excluding gaps: gpt-5.4-nano and gpt-4.1-mini both score 89%. See `docs/DECISIONS.md`.
 
-### Phase 0c — Eval Design Fix & Final Model Selection (pending)
-- [ ] Fix B2 scenario: add proactive-brief instruction to system prompt or system_context
-- [ ] Fix D1-D5 scenarios: add `lookup_delegate` synthetic results so agent can verify delegate before creating DAR
-- [ ] Re-run `python -m eval.harness --all --output eval/results/` with fixed scenarios
-- [ ] Apply decision rule: select cheapest model passing >= 85% aggregate and >= 75% per criterion
-- [ ] Update `docs/DECISIONS.md` with final model selection
+### Phase 0c — Eval Design Fix & Final Model Selection ✓ (2026-04-08)
+- [x] Fix B2: add proactive login instruction to SYSTEM_PROMPT in `eval/harness.py`
+- [x] Fix D1-D5: add `lookup_delegate` synthetic results; discovered secondary gap
+  (`get_delegation_info` also missing for D1-D3) and fixed that too
+- [x] Re-run `python -m eval.harness --all --output eval/results/`
+- [x] Apply decision rule — no model passed (closest: gpt-4.1-nano at 77%)
+- [x] Update `docs/DECISIONS.md` — three new design gaps documented (Phase 0d)
+
+### Phase 0d — Remaining Eval Design Gaps (planned)
+> Three additional design gaps prevent any model from clearing 85%. These are
+> scenario data/prompt deficiencies, not model capability limits.
+
+- [ ] **Fix committee_id mapping (D1–D3)**: Add committee code info to
+  `get_delegation_info` synthetic results in D1, D2, D3 so models can resolve
+  "Education Policy Committee" → "EDU-POL" and "Trade Committee" → "TRADE".
+  Example addition to D1 `get_delegation_info`:
+  `{"id": "FRA", "type": "member", "committees": [{"name": "Education Policy Committee", "id": "EDU-POL"}]}`
+- [ ] **Fix A5 stale context**: Replace `system_context` "Meeting ID known from
+  prior context" with a `get_upcoming_meetings` synthetic result. A5 becomes a
+  two-step scenario (get_upcoming_meetings → get_agenda_documents). Update
+  `expected.tool_calls_ordered` and `applicable_criteria` accordingly.
+- [ ] **Fix C4 write-before-asking**: Add an explicit guard to SYSTEM_PROMPT:
+  "Never call create_delegate or create_document_access_rights until you have
+  confirmed all required fields with the user." Verify this does not break B1
+  (which legitimately calls write tools when all info is present).
+- [ ] Re-run `python -m eval.harness --all` with fixes
+- [ ] Apply decision rule and update `docs/DECISIONS.md` with final model selection
 
 ## Phase 1 — Shared Data Layer + Classical App (Read Flows)
 > Foundation: database, business rules, seed data, classical app read screens
