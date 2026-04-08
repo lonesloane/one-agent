@@ -36,6 +36,11 @@ SYSTEM_PROMPT = (
     " to determine membership type, then create the delegate record,"
     " then create the appropriate document access rights based on the"
     " delegation's membership type."
+    " When a user's opening message is a greeting or mentions they"
+    " have just logged in, proactively retrieve their upcoming"
+    " meetings using get_upcoming_meetings with their delegate_id"
+    " from context, then call get_agenda_documents for each meeting"
+    " using their last login date from context as the since parameter."
 )
 
 DEFAULT_MODEL = "gpt-4.1-mini"
