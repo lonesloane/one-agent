@@ -100,9 +100,9 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-017 | Implement `aggregate_model_scores(scenario_scores: list[ScenarioScore]) -> ModelScore` dataclass. `ModelScore` fields: `model: str`, `aggregate_score: float`, `criterion_pass_rates: dict[str, float]` (C1-C4), `per_prompt_scores: dict[str, float]`, `passes_aggregate: bool` (>= 0.85), `passes_all_criteria: bool` (each >= 0.75), `overall_pass: bool` (both True). | | |
-| TASK-018 | Implement `compute_prompt_score(scenario_score: ScenarioScore) -> float`. Logic: count passing criteria / applicable criteria for that prompt. | | |
-| TASK-019 | Implement `compute_criterion_pass_rate(scenario_scores: list[ScenarioScore], criterion: str) -> float`. Logic: count scenarios where criterion passes / scenarios where criterion is applicable. | | |
+| TASK-017 | Implement `aggregate_model_scores(scenario_scores: list[ScenarioScore]) -> ModelScore` dataclass. `ModelScore` fields: `model: str`, `aggregate_score: float`, `criterion_pass_rates: dict[str, float]` (C1-C4), `per_prompt_scores: dict[str, float]`, `passes_aggregate: bool` (>= 0.85), `passes_all_criteria: bool` (each >= 0.75), `overall_pass: bool` (both True). | ✅ | 2026-04-07 |
+| TASK-018 | Implement `compute_prompt_score(scenario_score: ScenarioScore) -> float`. Logic: count passing criteria / applicable criteria for that prompt. | ✅ | 2026-04-07 |
+| TASK-019 | Implement `compute_criterion_pass_rate(scenario_scores: list[ScenarioScore], criterion: str) -> float`. Logic: count scenarios where criterion passes / scenarios where criterion is applicable. | ✅ | 2026-04-07 |
 
 ### Phase 4: CLI Interface
 
@@ -111,10 +111,10 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-020 | Add `argparse` to `eval/harness.py`. Arguments: `--all` (run all models x all scenarios), `--model <name>` (run one model, all scenarios), `--category <name>` (filter scenarios by category: single_tool_read, multi_step, missing_info, business_rule), `--output <path>` (write results to file instead of stdout), `--verbose` (print full tool call traces). | | |
-| TASK-021 | Define `MODELS` list: `["gpt-5.4-nano", "gpt-4.1-nano", "gpt-5.4-mini", "gpt-4.1-mini", "o4-mini", "grok-3-mini"]`. When `--model` is specified, validate it's in the list. | | |
-| TASK-022 | Implement scenario filtering by category. Categories derived from scenario `"category"` field. | | |
-| TASK-023 | Add progress logging with loguru: print model name, scenario ID, and pass/fail as each scenario completes. On `--verbose`, also print the full tool call trace. | | |
+| TASK-020 | Add `argparse` to `eval/harness.py`. Arguments: `--all` (run all models x all scenarios), `--model <name>` (run one model, all scenarios), `--category <name>` (filter scenarios by category: single_tool_read, multi_step, missing_info, business_rule), `--output <path>` (write results to file instead of stdout), `--verbose` (print full tool call traces). | ✅ | 2026-04-07 |
+| TASK-021 | Define `MODELS` list: `["gpt-5.4-nano", "gpt-4.1-nano", "gpt-5.4-mini", "gpt-4.1-mini", "o4-mini", "grok-3-mini"]`. When `--model` is specified, validate it's in the list. | ✅ | 2026-04-07 |
+| TASK-022 | Implement scenario filtering by category. Categories derived from scenario `"category"` field. | ✅ | 2026-04-07 |
+| TASK-023 | Add progress logging with loguru: print model name, scenario ID, and pass/fail as each scenario completes. On `--verbose`, also print the full tool call trace. | ✅ | 2026-04-07 |
 
 ### Phase 5: Results Output
 
@@ -123,9 +123,9 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-024 | Implement `write_json_results(results: list[dict], path: str)`. Output format: `{"run_date": "YYYY-MM-DD", "models": [...], "scenarios": [...], "results": [...]}`. Each result entry includes model, scenario_id, tool_calls (full trace), agent_response, scores (per-criterion pass/fail + explanation). Default path: `eval/results/results_YYYY-MM-DD.json`. | | |
-| TASK-025 | Implement `write_markdown_summary(model_scores: list[ModelScore], path: str)`. Generate markdown with: (1) header with run date, (2) decision matrix table (model, C1%, C2%, C3%, C4%, aggregate%, cost tier, pass/fail), (3) per-model detail sections showing failing scenarios, (4) recommendation paragraph identifying the cheapest passing model. Default path: `eval/results/summary_YYYY-MM-DD.md`. | | |
-| TASK-026 | Add `eval/results/` to `.gitignore` (keep `.gitkeep` but ignore all other contents). | | |
+| TASK-024 | Implement `write_json_results(results: list[dict], path: str)`. Output format: `{"run_date": "YYYY-MM-DD", "models": [...], "scenarios": [...], "results": [...]}`. Each result entry includes model, scenario_id, tool_calls (full trace), agent_response, scores (per-criterion pass/fail + explanation). Default path: `eval/results/results_YYYY-MM-DD.json`. | ✅ | 2026-04-08 |
+| TASK-025 | Implement `write_markdown_summary(model_scores: list[ModelScore], path: str)`. Generate markdown with: (1) header with run date, (2) decision matrix table (model, C1%, C2%, C3%, C4%, aggregate%, cost tier, pass/fail), (3) per-model detail sections showing failing scenarios, (4) recommendation paragraph identifying the cheapest passing model. Default path: `eval/results/summary_YYYY-MM-DD.md`. | ✅ | 2026-04-08 |
+| TASK-026 | Add `eval/results/` to `.gitignore` (keep `.gitkeep` but ignore all other contents). | ✅ | 2026-04-07 |
 
 ### Phase 6: Full Evaluation Run & Analysis
 
