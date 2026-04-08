@@ -68,24 +68,25 @@ def filter_scenarios(
     return [s for s in scenarios if s.get("category") == category]
 
 
-async def evaluate_scenario(
+async def _run_agent(
     model: str,
     scenario: dict,
     verbose: bool = False,
-) -> dict:
-    """Run a single scenario and return scored results.
+) -> tuple[list[dict], str]:
+    """Set up and run the agent for one scenario.
 
     Args:
         model: Model identifier deployed in Azure AI Foundry.
         scenario: Scenario dict loaded from scenarios.json.
-        verbose: When True, log the full tool call trace at DEBUG level.
+        verbose: When True, log tool call trace at DEBUG level.
 
     Returns:
-        Dict with model, scenario_id, tool_calls, agent_response,
-        and scores.
+        Tuple of (tool_calls, agent_response_text).
     """
     endpoint = os.environ["FOUNDRY_PROJECT_ENDPOINT"]
 
+    # Reason: SCENARIO_DATA is a module-level singleton;
+    # do not call concurrently.
     SCENARIO_DATA.clear()
     SCENARIO_DATA.update(scenario.get("synthetic_results", {}))
 
@@ -111,28 +112,46 @@ async def evaluate_scenario(
     ):
         result = await agent.run(scenario["user_message"])
 
+    if verbose:
+        logger.debug("Tool calls: {}", recorder.calls)
+    return recorder.calls, result.text
+
+
+async def evaluate_scenario(
+    model: str,
+    scenario: dict,
+    verbose: bool = False,
+) -> dict:
+    """Run a single scenario and return scored results.
+
+    Args:
+        model: Model identifier deployed in Azure AI Foundry.
+        scenario: Scenario dict loaded from scenarios.json.
+        verbose: When True, log full tool call trace at DEBUG level.
+
+    Returns:
+        Dict with model, scenario_id, tool_calls, agent_response,
+        and scores.
+    """
+    tool_calls, agent_response = await _run_agent(
+        model, scenario, verbose
+    )
     scores = score_scenario(
         scenario_id=scenario["id"],
-        tool_calls=recorder.calls,
-        agent_response=result.text,
+        tool_calls=tool_calls,
+        agent_response=agent_response,
         expected=scenario["expected"],
     )
-
-    outcome = {
+    return {
         "model": model,
         "scenario_id": scenario["id"],
-        "tool_calls": recorder.calls,
-        "agent_response": result.text,
+        "tool_calls": tool_calls,
+        "agent_response": agent_response,
         "scores": {
             "criteria": scores.criteria,
             "details": scores.details,
         },
     }
-
-    if verbose:
-        logger.debug("Tool calls: {}", outcome["tool_calls"])
-
-    return outcome
 
 
 async def run_model(
@@ -284,6 +303,12 @@ async def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
+    if "FOUNDRY_PROJECT_ENDPOINT" not in os.environ:
+        parser.error(
+            "FOUNDRY_PROJECT_ENDPOINT is not set."
+            " Check your .env file."
+        )
+
     if args.model and args.model not in MODELS:
         parser.error(
             f"Unknown model '{args.model}'. "
@@ -308,7 +333,10 @@ async def main() -> None:
     )
 
     if args.output:
-        logger.info("Output path: {}", args.output)
+        logger.warning(
+            "--output is not yet implemented; results will"
+            " not be saved. Coming in TASK-024/025."
+        )
 
     all_results: list[dict] = []
     for model in models_to_run:
