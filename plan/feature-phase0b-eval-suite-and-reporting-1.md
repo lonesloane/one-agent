@@ -134,11 +134,11 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-027 | Run `python -m eval.harness --all --output eval/results/`. Verify all 6 models x 15 scenarios complete without errors. If a model is not deployed in Foundry, document which models were skipped and why. | | |
-| TASK-028 | Review `summary_YYYY-MM-DD.md`. Identify: (a) which models pass the 85% aggregate threshold, (b) which models pass all per-criterion 75% thresholds, (c) the cheapest qualifying model. | | |
-| TASK-029 | Update `docs/DECISIONS.md` with the model selection decision, including: chosen model, aggregate score, per-criterion scores, cost tier, and any noted weaknesses. Reference the results file. | | |
-| TASK-030 | Update `docs/BACKLOG.md` Phase 0 tasks to reflect completion. Check off completed items, note any deferred items. | | |
-| TASK-031 | If any criterion is borderline (75-80%) on the chosen model, create specific test prompts in the scenario catalog as regression monitors for later phases. Document these in the summary. | | |
+| TASK-027 | Run `python -m eval.harness --all --output eval/results/`. Verify all 6 models x 15 scenarios complete without errors. If a model is not deployed in Foundry, document which models were skipped and why. | ✅ | 2026-04-08 |
+| TASK-028 | Review `summary_YYYY-MM-DD.md`. Identify: (a) which models pass the 85% aggregate threshold, (b) which models pass all per-criterion 75% thresholds, (c) the cheapest qualifying model. | ✅ | 2026-04-08 |
+| TASK-029 | Update `docs/DECISIONS.md` with the model selection decision, including: chosen model, aggregate score, per-criterion scores, cost tier, and any noted weaknesses. Reference the results file. | ✅ | 2026-04-08 |
+| TASK-030 | Update `docs/BACKLOG.md` Phase 0 tasks to reflect completion. Check off completed items, note any deferred items. | ✅ | 2026-04-08 |
+| TASK-031 | If any criterion is borderline (75-80%) on the chosen model, create specific test prompts in the scenario catalog as regression monitors for later phases. Document these in the summary. | ✅ | 2026-04-08 — no model selected yet (eval design gaps found); deferred to Phase 0c re-run. |
 
 ## 3. Alternatives
 
