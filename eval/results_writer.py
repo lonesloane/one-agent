@@ -3,8 +3,20 @@
 import datetime
 import json
 from pathlib import Path
+from typing import Any
 
 from eval.aggregators import ModelScore
+
+
+class _SafeEncoder(json.JSONEncoder):
+    """JSON encoder that converts unknown objects to dicts or strings."""
+
+    def default(self, o: Any) -> Any:
+        if hasattr(o, "to_dict"):
+            return o.to_dict()
+        if hasattr(o, "__dict__"):
+            return o.__dict__
+        return str(o)
 
 _COST_TIER: dict[str, str] = {
     "gpt-5.4-nano": "nano",
@@ -22,6 +34,7 @@ def write_json_results(
     results: list[dict],
     path: str,
     models: list[str] | None = None,
+    skipped_models: list[tuple[str, str]] | None = None,
 ) -> str:
     """Write evaluation results to a JSON file.
 
@@ -31,6 +44,8 @@ def write_json_results(
             with '/', outputs to {path}/results_{today}.json.
         models: Optional list of model names. If None, extracted from
             results in order of first appearance.
+        skipped_models: Optional list of (model_name, reason) tuples
+            for models that were skipped due to deployment errors.
 
     Returns:
         Absolute path to the written JSON file as a string.
@@ -64,19 +79,23 @@ def write_json_results(
             seen.add(scenario_id)
 
     # Build output structure
-    output = {
+    output: dict = {
         "run_date": today,
         "models": models,
         "scenarios": scenarios,
         "results": results,
     }
+    if skipped_models:
+        output["skipped_models"] = [
+            {"model": m, "reason": r} for m, r in skipped_models
+        ]
 
     # Ensure parent directory exists
     output_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Write JSON
     with open(output_file, "w") as f:
-        json.dump(output, f, indent=2)
+        json.dump(output, f, indent=2, cls=_SafeEncoder)
 
     return str(output_file.resolve())
 
@@ -85,6 +104,7 @@ def write_markdown_summary(
     model_scores: list[ModelScore],
     path: str,
     results: list[dict] | None = None,
+    skipped_models: list[tuple[str, str]] | None = None,
 ) -> str:
     """Write a Markdown summary of model evaluation results.
 
@@ -94,6 +114,8 @@ def write_markdown_summary(
             with '/', outputs to {path}/summary_{today}.md.
         results: Optional list of result dicts for per-model
             failure details. If None, details section is omitted.
+        skipped_models: Optional list of (model_name, reason) tuples
+            for models skipped due to deployment errors.
 
     Returns:
         Absolute path to the written Markdown file as a string.
@@ -169,7 +191,15 @@ def write_markdown_summary(
 
             lines.append("")
 
-    # Section 4: Recommendation
+    # Section 4: Skipped models (if any)
+    if skipped_models:
+        lines.append("## Skipped Models")
+        lines.append("")
+        for model_name, reason in skipped_models:
+            lines.append(f"- **{model_name}**: {reason}")
+        lines.append("")
+
+    # Section 5: Recommendation
     lines.append("## Recommendation")
     lines.append("")
 

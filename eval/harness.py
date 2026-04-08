@@ -336,15 +336,35 @@ async def main() -> None:
     )
 
     all_results: list[dict] = []
+    evaluated_models: list[str] = []
+    skipped_models: list[tuple[str, str]] = []
+
     for model in models_to_run:
-        results = await run_model(model, scenarios, verbose=args.verbose)
-        all_results.extend(results)
+        try:
+            results = await run_model(
+                model, scenarios, verbose=args.verbose
+            )
+            all_results.extend(results)
+            evaluated_models.append(model)
+        except Exception as exc:
+            reason = str(exc)
+            logger.warning(
+                "Skipping model '{}': {}", model, reason
+            )
+            skipped_models.append((model, reason))
+
+    if skipped_models:
+        logger.warning(
+            "Skipped {} model(s): {}",
+            len(skipped_models),
+            [m for m, _ in skipped_models],
+        )
 
     _print_results(all_results)
 
     if args.output:
         model_scores = []
-        for model in models_to_run:
+        for model in evaluated_models:
             model_results = [
                 r for r in all_results if r["model"] == model
             ]
@@ -360,10 +380,14 @@ async def main() -> None:
                 aggregate_model_scores(model, scenario_scores)
             )
         json_path = write_json_results(
-            all_results, args.output, models=models_to_run
+            all_results, args.output,
+            models=evaluated_models,
+            skipped_models=skipped_models,
         )
         md_path = write_markdown_summary(
-            model_scores, args.output, results=all_results
+            model_scores, args.output,
+            results=all_results,
+            skipped_models=skipped_models,
         )
         logger.info("Results written to: {}", json_path)
         logger.info("Summary written to: {}", md_path)

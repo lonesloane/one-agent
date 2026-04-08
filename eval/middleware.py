@@ -30,7 +30,13 @@ class RecorderMiddleware(FunctionMiddleware):
             "arguments": dict(context.arguments),
         }
         await call_next()
-        record["result"] = context.result
+        result = context.result
+        if hasattr(result, "to_dict"):
+            record["result"] = result.to_dict()
+        elif isinstance(result, (str, int, float, bool, dict, list)):
+            record["result"] = result
+        else:
+            record["result"] = str(result)
         self.calls.append(record)
 
     def reset(self) -> None:
