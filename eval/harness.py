@@ -13,9 +13,12 @@ from loguru import logger
 from agent_framework import Agent
 from agent_framework.foundry import FoundryChatClient
 
+from eval.aggregators import aggregate_model_scores
 from eval.evaluators import score_scenario
 from eval.middleware import RecorderMiddleware
+from eval.results_writer import write_json_results, write_markdown_summary
 from eval.tools import ALL_TOOLS, SCENARIO_DATA
+from eval.types import ScenarioScore
 
 load_dotenv()
 
@@ -332,18 +335,38 @@ async def main() -> None:
         args.category or "none",
     )
 
-    if args.output:
-        logger.warning(
-            "--output is not yet implemented; results will"
-            " not be saved. Coming in TASK-024/025."
-        )
-
     all_results: list[dict] = []
     for model in models_to_run:
         results = await run_model(model, scenarios, verbose=args.verbose)
         all_results.extend(results)
 
     _print_results(all_results)
+
+    if args.output:
+        model_scores = []
+        for model in models_to_run:
+            model_results = [
+                r for r in all_results if r["model"] == model
+            ]
+            scenario_scores = [
+                ScenarioScore(
+                    scenario_id=r["scenario_id"],
+                    criteria=r["scores"]["criteria"],
+                    details=r["scores"]["details"],
+                )
+                for r in model_results
+            ]
+            model_scores.append(
+                aggregate_model_scores(model, scenario_scores)
+            )
+        json_path = write_json_results(
+            all_results, args.output, models=models_to_run
+        )
+        md_path = write_markdown_summary(
+            model_scores, args.output, results=all_results
+        )
+        logger.info("Results written to: {}", json_path)
+        logger.info("Summary written to: {}", md_path)
 
 
 if __name__ == "__main__":
