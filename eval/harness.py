@@ -1,4 +1,4 @@
-"""Evaluation harness for running scenarios against Azure AI Foundry models."""
+"""Evaluation harness for scenarios against Azure AI Foundry models."""
 
 import argparse
 import asyncio
