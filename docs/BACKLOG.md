@@ -11,12 +11,19 @@
 - [x] Implement C1 evaluator; C2-C4 stubbed for Phase 0b
 - [x] **TASK-026**: run `python -m eval.harness` against live `gpt-4.1-mini` via Azure AI Foundry — completed 2026-04-06. A1 PASS, B1 PASS (after adding delegate-creation sequence rule to system prompt), C1 FAIL (genuine signal: model invoked write tools despite missing email, and hallucinated `Confidential` access level for a member delegate). C1 failure is valid data for C2/C4 evaluators in Phase 0b.
 
-### Phase 0b — Full Evaluation Suite (pending)
-- [ ] Define remaining 12 scenarios (A2-A5, B2, C2-C3, D1-D5) in `eval/scenarios/scenarios.json`
-- [ ] Implement C2 (schema-valid args), C3 (sequencing), C4 (asks vs invents) evaluators
-- [ ] Evaluate `gpt-4.1-mini` across all 15 scenarios
-- [ ] Evaluate remaining 5 models: `gpt-5.4-nano`, `gpt-4.1-nano`, `gpt-5.4-mini`, `o4-mini`, `grok-3-mini`
-- [ ] Decision: select cheapest model passing >= 85% aggregate and >= 75% per criterion
+### Phase 0b — Full Evaluation Suite ✓ (2026-04-08)
+- [x] Define remaining 12 scenarios (A2-A5, B2, C2-C3, D1-D5) in `eval/scenarios/scenarios.json`
+- [x] Implement C2 (schema-valid args), C3 (sequencing), C4 (asks vs invents) evaluators
+- [x] Implement score aggregation, CLI (`--all`, `--model`, `--category`, `--output`), JSON + Markdown output
+- [x] Run full evaluation: all 6 models × 15 scenarios (2026-04-08)
+- [x] **Finding**: No model passed. Two eval design gaps identified (B2 proactive trigger missing; D1-D5 lack `lookup_delegate` synthetic data). Excluding gaps: gpt-5.4-nano and gpt-4.1-mini both score 89%. See `docs/DECISIONS.md`.
+
+### Phase 0c — Eval Design Fix & Final Model Selection (pending)
+- [ ] Fix B2 scenario: add proactive-brief instruction to system prompt or system_context
+- [ ] Fix D1-D5 scenarios: add `lookup_delegate` synthetic results so agent can verify delegate before creating DAR
+- [ ] Re-run `python -m eval.harness --all --output eval/results/` with fixed scenarios
+- [ ] Apply decision rule: select cheapest model passing >= 85% aggregate and >= 75% per criterion
+- [ ] Update `docs/DECISIONS.md` with final model selection
 
 ## Phase 1 — Shared Data Layer + Classical App (Read Flows)
 > Foundation: database, business rules, seed data, classical app read screens

@@ -2,9 +2,9 @@
 goal: "Phase 0b: Complete Evaluation Suite, Scoring & Reporting"
 version: 1.0
 date_created: 2026-04-06
-last_updated: 2026-04-06
+last_updated: 2026-04-07
 owner: Stephane
-status: Planned
+status: In Progress
 tags:
   - feature
   - evaluation
@@ -13,7 +13,7 @@ tags:
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: In Progress](https://img.shields.io/badge/status-In%20Progress-yellow)
 
 Complete the Phase 0 evaluation harness with the full 15-scenario test
 catalog, all 4 scoring criteria (C1-C4), CLI interface, and reporting.
@@ -68,18 +68,18 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Add scenario A2 (Delegate search): user = "Is there a delegate named Marie Laurent in our delegation?", system_context = "User is from France delegation (FRA), delegate DEL-2026-0042.", expected: `lookup_delegate` with name="Marie Laurent" and delegation_id referencing France. Applicable: C1, C2. | | |
-| TASK-002 | Add scenario A3 (Meeting schedule): user = "What meetings do I have coming up?", system_context = "User is delegate DEL-2026-0042.", expected: `get_upcoming_meetings` with delegate_id="DEL-2026-0042". Applicable: C1, C2. | | |
-| TASK-003 | Add scenario A4 (Agenda documents): user = "Show me the agenda documents for the next Education Policy Committee meeting", system_context = "Meeting ID MTG-EDU-2026-04 is known from prior context.", expected: `get_agenda_documents` with meeting_id="MTG-EDU-2026-04". Applicable: C1, C2. | | |
-| TASK-004 | Add scenario A5 (New documents since last visit): user = "Any new documents since my last login?", system_context = "Meeting ID MTG-EDU-2026-04, last login 2026-03-15.", expected: `get_agenda_documents` with meeting_id and since="2026-03-15". Applicable: C1, C2. | | |
-| TASK-005 | Add scenario B2 (Meeting brief - proactive flow): user = "Hi, I just logged in.", system_context = "User is delegate DEL-2026-0042, last login 2026-03-15.", expected sequence: (1) `get_upcoming_meetings(delegate_id="DEL-2026-0042")`, (2) `get_agenda_documents(meeting_id=..., since="2026-03-15")`. Applicable: C1, C2, C3. synthetic_results must include meetings data that triggers the second call. | | |
-| TASK-006 | Add scenario C2 (Delegate creation - missing committee): user = "I need to add a new delegate, Sophie Martin, she's an economist.", expected: should_ask_user=true, model should ask for committee and email. Applicable: C4. | | |
-| TASK-007 | Add scenario C3 (Ambiguous delegation): user = "Add a delegate to our delegation - Pierre Blanc, he works on development aid.", system_context = "" (no delegation established), expected: should_ask_user=true, model should ask which delegation. Applicable: C4. | | |
-| TASK-008 | Add scenario D1 (Member delegate - correct access level): user = "Create DAR for delegate DEL-2026-0891, Education Policy Committee. Our delegation is a member country.", expected: `create_document_access_rights` with classification_level="Restricted". Applicable: C1, C2. | | |
-| TASK-009 | Add scenario D2 (Partner delegate - correct access level): user = "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner organization, no framework agreement for this committee.", expected: `create_document_access_rights` with classification_level="General". Applicable: C1, C2. | | |
-| TASK-010 | Add scenario D3 (Partner with Framework Agreement): user = "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner but we have a Framework Agreement covering Trade.", expected: `create_document_access_rights` with classification_level="Restricted". Applicable: C1, C2. | | |
-| TASK-011 | Add scenario D4 (Confidential access - flags approval): user = "I need Confidential access for delegate DEL-2026-0891 on the Education Policy Committee.", expected: `create_document_access_rights` with classification_level="Confidential", model should communicate secretariat approval requirement. Applicable: C1, C2, C4. | | |
-| TASK-012 | Add scenario D5 (Retroactive access - flags approval): user = "Grant delegate DEL-2026-0891 access to Education Policy Committee documents, including documents from before their accreditation.", expected: `create_document_access_rights` with retroactive=True. Applicable: C1, C2. | | |
+| TASK-001 | Add scenario A2 (Delegate search): user = "Is there a delegate named Marie Laurent in our delegation?", system_context = "User is from France delegation (FRA), delegate DEL-2026-0042.", expected: `lookup_delegate` with name="Marie Laurent" and delegation_id referencing France. Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-002 | Add scenario A3 (Meeting schedule): user = "What meetings do I have coming up?", system_context = "User is delegate DEL-2026-0042.", expected: `get_upcoming_meetings` with delegate_id="DEL-2026-0042". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-003 | Add scenario A4 (Agenda documents): user = "Show me the agenda documents for the next Education Policy Committee meeting", system_context = "Meeting ID MTG-EDU-2026-04 is known from prior context.", expected: `get_agenda_documents` with meeting_id="MTG-EDU-2026-04". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-004 | Add scenario A5 (New documents since last visit): user = "Any new documents since my last login?", system_context = "Meeting ID MTG-EDU-2026-04, last login 2026-03-15.", expected: `get_agenda_documents` with meeting_id and since="2026-03-15". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-005 | Add scenario B2 (Meeting brief - proactive flow): user = "Hi, I just logged in.", system_context = "User is delegate DEL-2026-0042, last login 2026-03-15.", expected sequence: (1) `get_upcoming_meetings(delegate_id="DEL-2026-0042")`, (2) `get_agenda_documents(meeting_id=..., since="2026-03-15")`. Applicable: C1, C2, C3. synthetic_results must include meetings data that triggers the second call. | ✅ | 2026-04-07 |
+| TASK-006 | Add scenario C2 (Delegate creation - missing committee): user = "I need to add a new delegate, Sophie Martin, she's an economist.", expected: should_ask_user=true, model should ask for committee and email. Applicable: C4. | ✅ | 2026-04-07 |
+| TASK-007 | Add scenario C3 (Ambiguous delegation): user = "Add a delegate to our delegation - Pierre Blanc, he works on development aid.", system_context = "" (no delegation established), expected: should_ask_user=true, model should ask which delegation. Applicable: C4. | ✅ | 2026-04-07 |
+| TASK-008 | Add scenario D1 (Member delegate - correct access level): user = "Create DAR for delegate DEL-2026-0891, Education Policy Committee. Our delegation is a member country.", expected: `create_document_access_rights` with classification_level="Restricted". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-009 | Add scenario D2 (Partner delegate - correct access level): user = "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner organization, no framework agreement for this committee.", expected: `create_document_access_rights` with classification_level="General". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-010 | Add scenario D3 (Partner with Framework Agreement): user = "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner but we have a Framework Agreement covering Trade.", expected: `create_document_access_rights` with classification_level="Restricted". Applicable: C1, C2. | ✅ | 2026-04-07 |
+| TASK-011 | Add scenario D4 (Confidential access - flags approval): user = "I need Confidential access for delegate DEL-2026-0891 on the Education Policy Committee.", expected: `create_document_access_rights` with classification_level="Confidential", model should communicate secretariat approval requirement. Applicable: C1, C2, C4. | ✅ | 2026-04-07 |
+| TASK-012 | Add scenario D5 (Retroactive access - flags approval): user = "Grant delegate DEL-2026-0891 access to Education Policy Committee documents, including documents from before their accreditation.", expected: `create_document_access_rights` with retroactive=True. Applicable: C1, C2. | ✅ | 2026-04-07 |
 
 ### Phase 2: Full Evaluator Implementations
 
@@ -88,10 +88,10 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-013 | Implement `evaluate_c2_schema_valid_args(tool_calls: list[dict], expected: dict) -> tuple[bool, str]`. Logic: for each expected tool call in `tool_calls_ordered`, find the matching actual call and verify (a) all `args_must_contain` keys are present with matching values (case-insensitive string match for strings, exact match for booleans/numbers), (b) no required parameters are missing (based on tool schema), (c) values in `must_not_hallucinate` fields were not invented (cross-reference with scenario user_message — if a value like email appears in args but not in user_message and not in synthetic_results, flag as hallucinated). Return explanation listing each check. | | |
-| TASK-014 | Implement `evaluate_c3_multi_step_sequencing(tool_calls: list[dict], expected: dict) -> tuple[bool, str]`. Logic: extract the ordered list of expected tool names from `tool_calls_ordered`; verify that the actual tool calls appear in the same relative order (not necessarily contiguous — other calls may be interleaved). Specifically: lookup before create, get_delegation_info before create_document_access_rights. Return explanation showing expected vs actual order. | | |
-| TASK-015 | Implement `evaluate_c4_asks_vs_invents(tool_calls: list[dict], agent_response: str, expected: dict) -> tuple[bool, str]`. Logic: if `should_ask_user` is True, pass if no write tool (`create_delegate`, `create_document_access_rights`) was called AND the agent_response contains a question (heuristic: ends with "?" or contains "could you", "please provide", "what is", etc.). If `should_ask_user` is False, check `must_not_hallucinate` fields — for each listed field, verify the value in the actual tool call matches a value present in the user_message or synthetic_results (not invented). Return explanation. | | |
-| TASK-016 | Update `score_scenario` to call all 4 real evaluators instead of stubs. Verify backward compatibility: A1, B1, C1 scenarios still score correctly. | | |
+| TASK-013 | Implement `evaluate_c2_schema_valid_args(tool_calls: list[dict], expected: dict) -> tuple[bool, str]`. Logic: for each expected tool call in `tool_calls_ordered`, find the matching actual call and verify (a) all `args_must_contain` keys are present with matching values (case-insensitive string match for strings, exact match for booleans/numbers), (b) no required parameters are missing (based on tool schema), (c) values in `must_not_hallucinate` fields were not invented (cross-reference with scenario user_message — if a value like email appears in args but not in user_message and not in synthetic_results, flag as hallucinated). Return explanation listing each check. | ✅ | 2026-04-07 |
+| TASK-014 | Implement `evaluate_c3_multi_step_sequencing(tool_calls: list[dict], expected: dict) -> tuple[bool, str]`. Logic: extract the ordered list of expected tool names from `tool_calls_ordered`; verify that the actual tool calls appear in the same relative order (not necessarily contiguous — other calls may be interleaved). Specifically: lookup before create, get_delegation_info before create_document_access_rights. Return explanation showing expected vs actual order. | ✅ | 2026-04-07 |
+| TASK-015 | Implement `evaluate_c4_asks_vs_invents(tool_calls: list[dict], agent_response: str, expected: dict) -> tuple[bool, str]`. Logic: if `should_ask_user` is True, pass if no write tool (`create_delegate`, `create_document_access_rights`) was called AND the agent_response contains a question (heuristic: ends with "?" or contains "could you", "please provide", "what is", etc.). If `should_ask_user` is False, check `must_not_hallucinate` fields — for each listed field, verify the value in the actual tool call matches a value present in the user_message or synthetic_results (not invented). Return explanation. | ✅ | 2026-04-07 |
+| TASK-016 | Update `score_scenario` to call all 4 real evaluators instead of stubs. Verify backward compatibility: A1, B1, C1 scenarios still score correctly. | ✅ | 2026-04-07 |
 
 ### Phase 3: Score Aggregation
 
@@ -100,9 +100,9 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-017 | Implement `aggregate_model_scores(scenario_scores: list[ScenarioScore]) -> ModelScore` dataclass. `ModelScore` fields: `model: str`, `aggregate_score: float`, `criterion_pass_rates: dict[str, float]` (C1-C4), `per_prompt_scores: dict[str, float]`, `passes_aggregate: bool` (>= 0.85), `passes_all_criteria: bool` (each >= 0.75), `overall_pass: bool` (both True). | | |
-| TASK-018 | Implement `compute_prompt_score(scenario_score: ScenarioScore) -> float`. Logic: count passing criteria / applicable criteria for that prompt. | | |
-| TASK-019 | Implement `compute_criterion_pass_rate(scenario_scores: list[ScenarioScore], criterion: str) -> float`. Logic: count scenarios where criterion passes / scenarios where criterion is applicable. | | |
+| TASK-017 | Implement `aggregate_model_scores(scenario_scores: list[ScenarioScore]) -> ModelScore` dataclass. `ModelScore` fields: `model: str`, `aggregate_score: float`, `criterion_pass_rates: dict[str, float]` (C1-C4), `per_prompt_scores: dict[str, float]`, `passes_aggregate: bool` (>= 0.85), `passes_all_criteria: bool` (each >= 0.75), `overall_pass: bool` (both True). | ✅ | 2026-04-07 |
+| TASK-018 | Implement `compute_prompt_score(scenario_score: ScenarioScore) -> float`. Logic: count passing criteria / applicable criteria for that prompt. | ✅ | 2026-04-07 |
+| TASK-019 | Implement `compute_criterion_pass_rate(scenario_scores: list[ScenarioScore], criterion: str) -> float`. Logic: count scenarios where criterion passes / scenarios where criterion is applicable. | ✅ | 2026-04-07 |
 
 ### Phase 4: CLI Interface
 
@@ -111,10 +111,10 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-020 | Add `argparse` to `eval/harness.py`. Arguments: `--all` (run all models x all scenarios), `--model <name>` (run one model, all scenarios), `--category <name>` (filter scenarios by category: single_tool_read, multi_step, missing_info, business_rule), `--output <path>` (write results to file instead of stdout), `--verbose` (print full tool call traces). | | |
-| TASK-021 | Define `MODELS` list: `["gpt-5.4-nano", "gpt-4.1-nano", "gpt-5.4-mini", "gpt-4.1-mini", "o4-mini", "grok-3-mini"]`. When `--model` is specified, validate it's in the list. | | |
-| TASK-022 | Implement scenario filtering by category. Categories derived from scenario `"category"` field. | | |
-| TASK-023 | Add progress logging with loguru: print model name, scenario ID, and pass/fail as each scenario completes. On `--verbose`, also print the full tool call trace. | | |
+| TASK-020 | Add `argparse` to `eval/harness.py`. Arguments: `--all` (run all models x all scenarios), `--model <name>` (run one model, all scenarios), `--category <name>` (filter scenarios by category: single_tool_read, multi_step, missing_info, business_rule), `--output <path>` (write results to file instead of stdout), `--verbose` (print full tool call traces). | ✅ | 2026-04-07 |
+| TASK-021 | Define `MODELS` list: `["gpt-5.4-nano", "gpt-4.1-nano", "gpt-5.4-mini", "gpt-4.1-mini", "o4-mini", "grok-3-mini"]`. When `--model` is specified, validate it's in the list. | ✅ | 2026-04-07 |
+| TASK-022 | Implement scenario filtering by category. Categories derived from scenario `"category"` field. | ✅ | 2026-04-07 |
+| TASK-023 | Add progress logging with loguru: print model name, scenario ID, and pass/fail as each scenario completes. On `--verbose`, also print the full tool call trace. | ✅ | 2026-04-07 |
 
 ### Phase 5: Results Output
 
@@ -123,9 +123,9 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-024 | Implement `write_json_results(results: list[dict], path: str)`. Output format: `{"run_date": "YYYY-MM-DD", "models": [...], "scenarios": [...], "results": [...]}`. Each result entry includes model, scenario_id, tool_calls (full trace), agent_response, scores (per-criterion pass/fail + explanation). Default path: `eval/results/results_YYYY-MM-DD.json`. | | |
-| TASK-025 | Implement `write_markdown_summary(model_scores: list[ModelScore], path: str)`. Generate markdown with: (1) header with run date, (2) decision matrix table (model, C1%, C2%, C3%, C4%, aggregate%, cost tier, pass/fail), (3) per-model detail sections showing failing scenarios, (4) recommendation paragraph identifying the cheapest passing model. Default path: `eval/results/summary_YYYY-MM-DD.md`. | | |
-| TASK-026 | Add `eval/results/` to `.gitignore` (keep `.gitkeep` but ignore all other contents). | | |
+| TASK-024 | Implement `write_json_results(results: list[dict], path: str)`. Output format: `{"run_date": "YYYY-MM-DD", "models": [...], "scenarios": [...], "results": [...]}`. Each result entry includes model, scenario_id, tool_calls (full trace), agent_response, scores (per-criterion pass/fail + explanation). Default path: `eval/results/results_YYYY-MM-DD.json`. | ✅ | 2026-04-08 |
+| TASK-025 | Implement `write_markdown_summary(model_scores: list[ModelScore], path: str)`. Generate markdown with: (1) header with run date, (2) decision matrix table (model, C1%, C2%, C3%, C4%, aggregate%, cost tier, pass/fail), (3) per-model detail sections showing failing scenarios, (4) recommendation paragraph identifying the cheapest passing model. Default path: `eval/results/summary_YYYY-MM-DD.md`. | ✅ | 2026-04-08 |
+| TASK-026 | Add `eval/results/` to `.gitignore` (keep `.gitkeep` but ignore all other contents). | ✅ | 2026-04-07 |
 
 ### Phase 6: Full Evaluation Run & Analysis
 
@@ -134,11 +134,11 @@ rates and a final model recommendation.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-027 | Run `python -m eval.harness --all --output eval/results/`. Verify all 6 models x 15 scenarios complete without errors. If a model is not deployed in Foundry, document which models were skipped and why. | | |
-| TASK-028 | Review `summary_YYYY-MM-DD.md`. Identify: (a) which models pass the 85% aggregate threshold, (b) which models pass all per-criterion 75% thresholds, (c) the cheapest qualifying model. | | |
-| TASK-029 | Update `docs/DECISIONS.md` with the model selection decision, including: chosen model, aggregate score, per-criterion scores, cost tier, and any noted weaknesses. Reference the results file. | | |
-| TASK-030 | Update `docs/BACKLOG.md` Phase 0 tasks to reflect completion. Check off completed items, note any deferred items. | | |
-| TASK-031 | If any criterion is borderline (75-80%) on the chosen model, create specific test prompts in the scenario catalog as regression monitors for later phases. Document these in the summary. | | |
+| TASK-027 | Run `python -m eval.harness --all --output eval/results/`. Verify all 6 models x 15 scenarios complete without errors. If a model is not deployed in Foundry, document which models were skipped and why. | ✅ | 2026-04-08 |
+| TASK-028 | Review `summary_YYYY-MM-DD.md`. Identify: (a) which models pass the 85% aggregate threshold, (b) which models pass all per-criterion 75% thresholds, (c) the cheapest qualifying model. | ✅ | 2026-04-08 |
+| TASK-029 | Update `docs/DECISIONS.md` with the model selection decision, including: chosen model, aggregate score, per-criterion scores, cost tier, and any noted weaknesses. Reference the results file. | ✅ | 2026-04-08 |
+| TASK-030 | Update `docs/BACKLOG.md` Phase 0 tasks to reflect completion. Check off completed items, note any deferred items. | ✅ | 2026-04-08 |
+| TASK-031 | If any criterion is borderline (75-80%) on the chosen model, create specific test prompts in the scenario catalog as regression monitors for later phases. Document these in the summary. | ✅ | 2026-04-08 — no model selected yet (eval design gaps found); deferred to Phase 0c re-run. |
 
 ## 3. Alternatives
 

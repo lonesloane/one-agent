@@ -23,6 +23,100 @@
     }
   },
   {
+    "id": "A2",
+    "category": "single_tool_read",
+    "description": "Delegate lookup by name",
+    "system_context": "User is from France delegation (FRA), delegate DEL-2026-0042.",
+    "user_message": "Is there a delegate named Marie Laurent in our delegation?",
+    "synthetic_results": {
+      "lookup_delegate": "Delegate found: Marie Laurent (DEL-2026-0891), Education Policy Advisor, Education Policy Committee"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "lookup_delegate",
+          "args_must_contain": {
+            "name": "Marie Laurent",
+            "delegation_id": "FRA"
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2"]
+    }
+  },
+  {
+    "id": "A3",
+    "category": "single_tool_read",
+    "description": "Upcoming meetings for delegate",
+    "system_context": "User is delegate DEL-2026-0042.",
+    "user_message": "What meetings do I have coming up?",
+    "synthetic_results": {
+      "get_upcoming_meetings": "{\"meetings\": [{\"id\": \"MTG-EDU-2026-04\", \"committee\": \"Education Policy\", \"date\": \"2026-04-15\", \"location\": \"Paris\"}]}"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "get_upcoming_meetings",
+          "args_must_contain": {
+            "delegate_id": "DEL-2026-0042"
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2"]
+    }
+  },
+  {
+    "id": "A4",
+    "category": "single_tool_read",
+    "description": "Agenda documents for a meeting",
+    "system_context": "Meeting ID MTG-EDU-2026-04 is known from prior context.",
+    "user_message": "Show me the agenda documents for the next Education Policy Committee meeting",
+    "synthetic_results": {
+      "get_agenda_documents": "{\"documents\": [{\"id\": \"DOC-001\", \"title\": \"Draft Agenda\", \"classification\": \"General\"}, {\"id\": \"DOC-002\", \"title\": \"Policy Review 2026\", \"classification\": \"Restricted\"}]}"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "get_agenda_documents",
+          "args_must_contain": {
+            "meeting_id": "MTG-EDU-2026-04"
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2"]
+    }
+  },
+  {
+    "id": "A5",
+    "category": "single_tool_read",
+    "description": "New documents since last login",
+    "system_context": "Meeting ID MTG-EDU-2026-04 is known from prior context. User's last login was 2026-03-15.",
+    "user_message": "Any new documents since my last login?",
+    "synthetic_results": {
+      "get_agenda_documents": "{\"documents\": [{\"id\": \"DOC-003\", \"title\": \"Supplementary Note\", \"classification\": \"General\", \"added\": \"2026-03-20\"}]}"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "get_agenda_documents",
+          "args_must_contain": {
+            "meeting_id": "MTG-EDU-2026-04",
+            "since": "2026-03-15"
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2"]
+    }
+  },
+  {
     "id": "B1",
     "category": "multi_step_sequencing",
     "description": "Delegate creation - full info provided",
@@ -47,6 +141,37 @@
     }
   },
   {
+    "id": "B2",
+    "category": "multi_step_sequencing",
+    "description": "Meeting brief on login - proactive two-step",
+    "system_context": "User is delegate DEL-2026-0042, last login 2026-03-15.",
+    "user_message": "Hi, I just logged in.",
+    "synthetic_results": {
+      "get_upcoming_meetings": "{\"meetings\": [{\"id\": \"MTG-EDU-2026-04\", \"committee\": \"Education Policy\", \"date\": \"2026-04-15\"}]}",
+      "get_agenda_documents": "{\"documents\": [{\"id\": \"DOC-003\", \"title\": \"Supplementary Note\", \"added\": \"2026-03-20\"}]}"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "get_upcoming_meetings",
+          "args_must_contain": {
+            "delegate_id": "DEL-2026-0042"
+          }
+        },
+        {
+          "name": "get_agenda_documents",
+          "args_must_contain": {
+            "meeting_id": "MTG-EDU-2026-04",
+            "since": "2026-03-15"
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2", "C3"]
+    }
+  },
+  {
     "id": "C1",
     "category": "missing_information",
     "description": "Delegate creation - missing email",
@@ -61,6 +186,158 @@
       "must_not_hallucinate": ["email"],
       "should_ask_user": true,
       "applicable_criteria": ["C1", "C4"]
+    }
+  },
+  {
+    "id": "C2",
+    "category": "missing_information",
+    "description": "Delegate creation - missing committee and email",
+    "system_context": "",
+    "user_message": "I need to add a new delegate, Sophie Martin, she's an economist.",
+    "synthetic_results": {},
+    "expected": {
+      "tool_calls_ordered": [],
+      "must_not_hallucinate": [],
+      "should_ask_user": true,
+      "applicable_criteria": ["C4"]
+    }
+  },
+  {
+    "id": "C3",
+    "category": "missing_information",
+    "description": "Add delegate - no delegation context",
+    "system_context": "",
+    "user_message": "Add a delegate to our delegation - Pierre Blanc, he works on development aid.",
+    "synthetic_results": {},
+    "expected": {
+      "tool_calls_ordered": [],
+      "must_not_hallucinate": [],
+      "should_ask_user": true,
+      "applicable_criteria": ["C4"]
+    }
+  },
+  {
+    "id": "D1",
+    "category": "business_rule",
+    "description": "DAR for member delegation - Restricted access",
+    "system_context": "",
+    "user_message": "Create DAR for delegate DEL-2026-0891, Education Policy Committee. Our delegation is a member country.",
+    "synthetic_results": {
+      "create_document_access_rights": "Access rights granted: delegate=DEL-2026-0891, committee=EDU-POL, level=Restricted"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "create_document_access_rights",
+          "args_must_contain": {
+            "delegate_id": "DEL-2026-0891",
+            "committee_id": "EDU-POL",
+            "classification_level": "Restricted"
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2"]
+    }
+  },
+  {
+    "id": "D2",
+    "category": "business_rule",
+    "description": "DAR for partner delegation without FA - General access",
+    "system_context": "",
+    "user_message": "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner organization, no framework agreement for this committee.",
+    "synthetic_results": {
+      "create_document_access_rights": "Access rights granted: delegate=DEL-2026-0500, committee=TRADE, level=General"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "create_document_access_rights",
+          "args_must_contain": {
+            "delegate_id": "DEL-2026-0500",
+            "committee_id": "TRADE",
+            "classification_level": "General"
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2"]
+    }
+  },
+  {
+    "id": "D3",
+    "category": "business_rule",
+    "description": "DAR for partner with FA - Restricted access",
+    "system_context": "",
+    "user_message": "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner but we have a Framework Agreement covering Trade.",
+    "synthetic_results": {
+      "create_document_access_rights": "Access rights granted: delegate=DEL-2026-0500, committee=TRADE, level=Restricted"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "create_document_access_rights",
+          "args_must_contain": {
+            "delegate_id": "DEL-2026-0500",
+            "committee_id": "TRADE",
+            "classification_level": "Restricted"
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2"]
+    }
+  },
+  {
+    "id": "D4",
+    "category": "business_rule",
+    "description": "Confidential DAR - requires secretariat approval",
+    "system_context": "",
+    "user_message": "I need Confidential access for delegate DEL-2026-0891 on the Education Policy Committee.",
+    "synthetic_results": {
+      "create_document_access_rights": "Access rights created (PENDING secretariat approval): delegate=DEL-2026-0891, committee=EDU-POL, level=Confidential"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "create_document_access_rights",
+          "args_must_contain": {
+            "delegate_id": "DEL-2026-0891",
+            "classification_level": "Confidential"
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2", "C4"]
+    }
+  },
+  {
+    "id": "D5",
+    "category": "business_rule",
+    "description": "Retroactive DAR - includes pre-accreditation documents",
+    "system_context": "User is editor for France delegation (FRA), a member country.",
+    "user_message": "Grant delegate DEL-2026-0891 access to Education Policy Committee documents, including documents from before their accreditation.",
+    "synthetic_results": {
+      "create_document_access_rights": "Access rights granted: delegate=DEL-2026-0891, committee=EDU-POL, retroactive=true"
+    },
+    "expected": {
+      "tool_calls_ordered": [
+        {
+          "name": "create_document_access_rights",
+          "args_must_contain": {
+            "delegate_id": "DEL-2026-0891",
+            "classification_level": "Restricted",
+            "retroactive": true
+          }
+        }
+      ],
+      "must_not_hallucinate": [],
+      "should_ask_user": false,
+      "applicable_criteria": ["C1", "C2"]
     }
   }
 ]
