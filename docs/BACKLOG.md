@@ -26,7 +26,7 @@
 - [x] Apply decision rule — no model passed (closest: gpt-4.1-nano at 77%)
 - [x] Update `docs/DECISIONS.md` — three new design gaps documented (Phase 0d)
 
-### Phase 0d — Remaining Eval Design Gaps (planned)
+### Phase 0d — Remaining Eval Design Gaps (planned) — [plan](../plan/feature-phase0d-eval-fix-and-model-selection-1.md)
 > Three additional design gaps prevent any model from clearing 85%. These are
 > scenario data/prompt deficiencies, not model capability limits.
 
