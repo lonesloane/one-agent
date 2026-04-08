@@ -249,7 +249,7 @@ class TestC3MultiStepSequencing:
         assert "get_delegation_info" in detail
 
     def test_c3_single_tool_not_applicable(self):
-        """Only one expected tool — sequencing not applicable, returns True."""
+        """Single expected tool: sequencing not applicable, returns True."""
         tool_calls = [_tc("lookup_delegate", name="Jean Dupont")]
         expected = {
             "tool_calls_ordered": [

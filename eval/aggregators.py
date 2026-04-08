@@ -1,4 +1,5 @@
-"""Score aggregation across scenarios and criteria for model evaluation."""
+"""Score aggregation across scenarios and criteria for model
+evaluation."""
 
 from dataclasses import dataclass
 
