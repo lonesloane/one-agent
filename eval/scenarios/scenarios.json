@@ -224,7 +224,7 @@
     "user_message": "Create DAR for delegate DEL-2026-0891, Education Policy Committee. Our delegation is a member country.",
     "synthetic_results": {
       "lookup_delegate": "{\"id\": \"DEL-2026-0891\", \"name\": \"Alex Moreau\", \"delegation_id\": \"FRA\", \"status\": \"active\"}",
-      "get_delegation_info": "{\"id\": \"FRA\", \"name\": \"France\", \"type\": \"member\", \"delegates\": 45}",
+      "get_delegation_info": "{\"id\": \"FRA\", \"name\": \"France\", \"type\": \"member\", \"delegates\": 45, \"committees\": [{\"name\": \"Education Policy Committee\", \"id\": \"EDU-POL\"}]}",
       "create_document_access_rights": "Access rights granted: delegate=DEL-2026-0891, committee=EDU-POL, level=Restricted"
     },
     "expected": {
@@ -251,7 +251,7 @@
     "user_message": "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner organization, no framework agreement for this committee.",
     "synthetic_results": {
       "lookup_delegate": "{\"id\": \"DEL-2026-0500\", \"name\": \"Carlos Rivera\", \"delegation_id\": \"PARTNER-ORG\", \"status\": \"active\"}",
-      "get_delegation_info": "{\"id\": \"PARTNER-ORG\", \"name\": \"Partner Organization\", \"type\": \"partner\", \"delegates\": 5, \"framework_agreements\": []}",
+      "get_delegation_info": "{\"id\": \"PARTNER-ORG\", \"name\": \"Partner Organization\", \"type\": \"partner\", \"delegates\": 5, \"framework_agreements\": [], \"committees\": [{\"name\": \"Trade Committee\", \"id\": \"TRADE\"}]}",
       "create_document_access_rights": "Access rights granted: delegate=DEL-2026-0500, committee=TRADE, level=General"
     },
     "expected": {
@@ -278,7 +278,7 @@
     "user_message": "Create DAR for delegate DEL-2026-0500, Trade Committee. We're a partner but we have a Framework Agreement covering Trade.",
     "synthetic_results": {
       "lookup_delegate": "{\"id\": \"DEL-2026-0500\", \"name\": \"Carlos Rivera\", \"delegation_id\": \"PARTNER-ORG\", \"status\": \"active\"}",
-      "get_delegation_info": "{\"id\": \"PARTNER-ORG\", \"name\": \"Partner Organization\", \"type\": \"partner\", \"delegates\": 5, \"framework_agreements\": [\"Trade\"]}",
+      "get_delegation_info": "{\"id\": \"PARTNER-ORG\", \"name\": \"Partner Organization\", \"type\": \"partner\", \"delegates\": 5, \"framework_agreements\": [\"Trade\"], \"committees\": [{\"name\": \"Trade Committee\", \"id\": \"TRADE\"}]}",
       "create_document_access_rights": "Access rights granted: delegate=DEL-2026-0500, committee=TRADE, level=Restricted"
     },
     "expected": {
