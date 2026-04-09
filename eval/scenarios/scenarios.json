@@ -96,13 +96,20 @@
     "id": "A5",
     "category": "single_tool_read",
     "description": "New documents since last login",
-    "system_context": "Meeting ID MTG-EDU-2026-04 is known from prior context. User's last login was 2026-03-15.",
+    "system_context": "User is delegate DEL-2026-0042, last login 2026-03-15.",
     "user_message": "Any new documents since my last login?",
     "synthetic_results": {
+      "get_upcoming_meetings": "{\"meetings\": [{\"id\": \"MTG-EDU-2026-04\", \"committee\": \"Education Policy\", \"date\": \"2026-04-15\"}]}",
       "get_agenda_documents": "{\"documents\": [{\"id\": \"DOC-003\", \"title\": \"Supplementary Note\", \"classification\": \"General\", \"added\": \"2026-03-20\"}]}"
     },
     "expected": {
       "tool_calls_ordered": [
+        {
+          "name": "get_upcoming_meetings",
+          "args_must_contain": {
+            "delegate_id": "DEL-2026-0042"
+          }
+        },
         {
           "name": "get_agenda_documents",
           "args_must_contain": {
@@ -113,7 +120,7 @@
       ],
       "must_not_hallucinate": [],
       "should_ask_user": false,
-      "applicable_criteria": ["C1", "C2"]
+      "applicable_criteria": ["C1", "C2", "C3"]
     }
   },
   {
