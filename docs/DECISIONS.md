@@ -156,6 +156,53 @@ Fails on C3 (67%, needs 75%) and aggregate (84%, needs 85%).
 remains `gpt-5.4-nano` — 1% from the aggregate threshold, all per-criterion rates ≥ 75%
 except C3 (67%), which is directly caused by the write-guard over-application on B1.
 
+### [2026-04-09] Phase 0e eval run — no model passed; classification_level gap is primary remaining blocker
+
+Full evaluation run after rewording the write-guard in SYSTEM_PROMPT (permission-then-restriction
+form: "When all required information is available, call the appropriate creation or
+modification tool directly. If any required field is missing, ask the user for it before
+making the tool call."). Results file: `eval/results/results_2026-04-09.json`.
+One timeout: D4/gpt-4.1-mini (1 scenario; score still reliable — below 3-scenario threshold).
+
+**Write-guard reword confirmed working (targeted check):** gpt-5.4-nano B1 PASSED C1/C2/C3
+when tested in isolation. C1/C3 missing-info scenarios also PASSED C4. The reword fixed
+the targeted regression.
+
+**Full-run scores (all 15 scenarios, Phase 0e write-guard applied):**
+
+| Model | Aggregate | C1 | C2 | C3 | C4 | Tier | Result |
+|-------|-----------|----|----|----|----|------|--------|
+| gpt-5.4-nano | 72% | 77% | 58% | 100% | 80% | nano | ❌ FAIL |
+| gpt-4.1-nano | 71% | 85% | 67% | 100% | 60% | nano | ❌ FAIL |
+| gpt-5.4-mini | 70% | 85% | 67% | 100% | 60% | mini | ❌ FAIL |
+| gpt-4.1-mini | 79% | 83% | 73% | 100% | 75% | mini | ❌ FAIL |
+| o4-mini | 64% | 54% | 50% | 67% | 100% | reasoning | ❌ FAIL |
+| grok-3-mini | 64% | 54% | 50% | 67% | 100% | mini | ❌ FAIL |
+
+**Closest model:** `gpt-4.1-mini` at 79% aggregate (needs 85%) and C2=73% (needs 75%).
+
+**Observations:**
+
+1. **gpt-5.4-nano regression vs Phase 0d (84% → 72%)**: C3 improved from 67% → 100% as
+   expected (write-guard reword worked), but A4 and D5 now fail where they passed before.
+   A4 (missing `get_agenda_documents`) is a read-only scenario — the write-guard cannot
+   cause this. Evidence of model nondeterminism across runs.
+
+2. **classification_level is the dominant C2 failure**: D1, D3, D5 fail C2 across multiple
+   models because the expected access level (`Restricted` vs `General`) cannot be inferred
+   from the data provided — the rule is not encoded anywhere. This is the ALT-004 gap
+   flagged in Phase 0d: member delegation → Restricted; partner without FA → General;
+   partner with FA → Restricted. Must be encoded in SYSTEM_PROMPT (Phase 0f) or MCP KB.
+
+3. **Residual C1 write-guard non-compliance**: gpt-4.1-mini, gpt-4.1-nano, gpt-5.4-mini
+   still call write tools in the missing-email scenario (C1 fails C1/C4). The new permissive
+   phrasing ("when all required information is available, call the tool") is interpreted as
+   a blanket permission by these models even when email is absent.
+
+**Decision:** No model selected. Phase 0f will add the access-classification rule to
+SYSTEM_PROMPT and investigate the D4 timeout. Leading candidate: `gpt-4.1-mini` (79%
+aggregate, 2pp short on C2, 6pp short on aggregate; highest absolute scores in this run).
+
 ### [2025-04] MCP-exposed business knowledge base (not system prompt, not RAG-only)
 
 Business rules live in git-backed markdown files with structured frontmatter, embedded into ChromaDB, and exposed via an MCP server. The agent queries the KB at runtime (agent-driven, multi-hop capable) rather than having rules pre-loaded into the system prompt. RAG is the engine inside; MCP is the interface. Start with system prompt encoding for Phase 1 (read-only), switch to MCP KB for Phase 2 (write agent with DAR reasoning).

@@ -37,20 +37,25 @@
 - [x] Re-run `python -m eval.harness --all` — no model passed.
   Closest: gpt-5.4-nano at 84% aggregate. See `docs/DECISIONS.md`.
 
-### Phase 0e — Write-Guard Wording Fix & Final Model Selection (planned)
-> Single remaining issue: write-guard over-application causes gpt-5.4-nano
-> to refuse write tools even when all required info is present (B1, D4 regress).
-> Fixing the wording is expected to push gpt-5.4-nano above both thresholds.
+### Phase 0e — Write-Guard Wording Fix ✓ (2026-04-09) — [plan](../plan/feature-phase0e-eval-fix-and-model-selection-1.md)
 
-**Leading candidate:** `gpt-5.4-nano` — 84% aggregate, C3=67%.
-Both failures are write-guard regressions on B1/D4. Estimated post-fix: ~93%.
+- [x] Reword write-guard: permission-then-restriction form (SYSTEM_PROMPT lines 44–47).
+- [x] Targeted check: gpt-5.4-nano B1 PASSED C1/C2/C3; C1/C3 still pass C4. Fix confirmed.
+- [x] Full run: no model passed (closest: gpt-4.1-mini at 79%). See `docs/DECISIONS.md`.
+- [x] Root cause of remaining gaps: classification_level rule not encoded (D-category);
+  model nondeterminism in gpt-5.4-nano (A4, D5); residual write-guard non-compliance (C1).
 
-- [ ] Reword write-guard so it only applies when info is *missing*, not as a
-  blanket prohibition. Candidate: "If any required field is missing, ask the
-  user before calling a creation or modification tool. When all required
-  information is available, proceed without asking."
-- [ ] Verify B1 passes (all models call write tools when all info is present).
-- [ ] Verify C1/C3 still pass C4 (write-guard still catches missing-info cases).
+### Phase 0f — Access-Classification Rule & Final Model Selection (planned)
+> Add classification_level business rule to SYSTEM_PROMPT. Primary target: gpt-4.1-mini
+> at 79% aggregate. Needs +6pp on aggregate and +2pp on C2 to qualify.
+
+**Leading candidate:** `gpt-4.1-mini` — 79% aggregate, C2=73%.
+Core failures: D1/D3/D5 classification_level (missing rule), D4 timeout to investigate.
+
+- [ ] Add access-classification rule to SYSTEM_PROMPT: member delegation → Restricted;
+  partner without FA → General; partner with FA → Restricted.
+- [ ] Investigate D4 timeout for gpt-4.1-mini (confidential DAR — secretariat approval).
+- [ ] Verify C1 missing-info guard still works after SYSTEM_PROMPT changes.
 - [ ] Re-run `python -m eval.harness --all`.
 - [ ] Apply decision rule and update `docs/DECISIONS.md`.
 
