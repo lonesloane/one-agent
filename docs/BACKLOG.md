@@ -26,25 +26,33 @@
 - [x] Apply decision rule — no model passed (closest: gpt-4.1-nano at 77%)
 - [x] Update `docs/DECISIONS.md` — three new design gaps documented (Phase 0d)
 
-### Phase 0d — Remaining Eval Design Gaps (planned) — [plan](../plan/feature-phase0d-eval-fix-and-model-selection-1.md)
-> Three additional design gaps prevent any model from clearing 85%. These are
-> scenario data/prompt deficiencies, not model capability limits.
+### Phase 0d — Remaining Eval Design Gaps ✓ (2026-04-09) — [plan](../plan/feature-phase0d-eval-fix-and-model-selection-1.md)
 
-- [ ] **Fix committee_id mapping (D1–D3)**: Add committee code info to
-  `get_delegation_info` synthetic results in D1, D2, D3 so models can resolve
-  "Education Policy Committee" → "EDU-POL" and "Trade Committee" → "TRADE".
-  Example addition to D1 `get_delegation_info`:
-  `{"id": "FRA", "type": "member", "committees": [{"name": "Education Policy Committee", "id": "EDU-POL"}]}`
-- [ ] **Fix A5 stale context**: Replace `system_context` "Meeting ID known from
-  prior context" with a `get_upcoming_meetings` synthetic result. A5 becomes a
-  two-step scenario (get_upcoming_meetings → get_agenda_documents). Update
-  `expected.tool_calls_ordered` and `applicable_criteria` accordingly.
-- [ ] **Fix C4 write-before-asking**: Add an explicit guard to SYSTEM_PROMPT:
-  "Never call create_delegate or create_document_access_rights until you have
-  confirmed all required fields with the user." Verify this does not break B1
-  (which legitimately calls write tools when all info is present).
-- [ ] Re-run `python -m eval.harness --all` with fixes
-- [ ] Apply decision rule and update `docs/DECISIONS.md` with final model selection
+- [x] Fix committee_id mapping (D1–D3): added `committees` array to
+  `get_delegation_info` synthetic results with name→code mappings.
+- [x] Fix A5 stale context: replaced stale system_context with
+  `get_upcoming_meetings` synthetic result; A5 now a two-step scenario.
+- [x] Fix C4 write-before-asking: added write-guard to SYSTEM_PROMPT (two
+  iterations). C3 scenario now passes C4 for most models.
+- [x] Re-run `python -m eval.harness --all` — no model passed.
+  Closest: gpt-5.4-nano at 84% aggregate. See `docs/DECISIONS.md`.
+
+### Phase 0e — Write-Guard Wording Fix & Final Model Selection (planned)
+> Single remaining issue: write-guard over-application causes gpt-5.4-nano
+> to refuse write tools even when all required info is present (B1, D4 regress).
+> Fixing the wording is expected to push gpt-5.4-nano above both thresholds.
+
+**Leading candidate:** `gpt-5.4-nano` — 84% aggregate, C3=67%.
+Both failures are write-guard regressions on B1/D4. Estimated post-fix: ~93%.
+
+- [ ] Reword write-guard so it only applies when info is *missing*, not as a
+  blanket prohibition. Candidate: "If any required field is missing, ask the
+  user before calling a creation or modification tool. When all required
+  information is available, proceed without asking."
+- [ ] Verify B1 passes (all models call write tools when all info is present).
+- [ ] Verify C1/C3 still pass C4 (write-guard still catches missing-info cases).
+- [ ] Re-run `python -m eval.harness --all`.
+- [ ] Apply decision rule and update `docs/DECISIONS.md`.
 
 ## Phase 1 — Shared Data Layer + Classical App (Read Flows)
 > Foundation: database, business rules, seed data, classical app read screens

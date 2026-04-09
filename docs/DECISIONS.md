@@ -105,6 +105,57 @@ the next run.
    rule. Fix: add an explicit "do not call write tools until you have confirmed
    all required fields with the user" instruction to the SYSTEM_PROMPT.
 
+### [2026-04-09] Phase 0d eval run — no model passed; write-guard over-application identified
+
+Full evaluation run after fixing D1–D3 committee mappings, A5 stale-context, and adding
+a write-guard to SYSTEM_PROMPT. Results file: `eval/results/results_2026-04-09.json`.
+One timeout: C1/gpt-4.1-mini (skipped, score still reliable — below 3-scenario threshold).
+
+**Scores (all 15 scenarios, Phase 0d fixes applied):**
+
+| Model | Aggregate | C1 | C2 | C3 | C4 | Tier | Result |
+|-------|-----------|----|----|----|----|------|--------|
+| gpt-5.4-nano | 84% | 85% | 75% | 67% | 80% | nano | ❌ FAIL |
+| gpt-4.1-nano | 80% | 92% | 67% | 100% | 80% | nano | ❌ FAIL |
+| gpt-5.4-mini | 70% | 85% | 67% | 100% | 60% | mini | ❌ FAIL |
+| gpt-4.1-mini | 70% | 67% | 58% | 67% | 100% | mini | ❌ FAIL |
+| o4-mini | 60% | 62% | 58% | 100% | 80% | reasoning | ❌ FAIL |
+| grok-3-mini | 64% | 54% | 50% | 67% | 100% | mini | ❌ FAIL |
+
+**Closest model:** `gpt-5.4-nano` at 84% aggregate — 1% below threshold.
+Fails on C3 (67%, needs 75%) and aggregate (84%, needs 85%).
+
+**What Phase 0d fixed (confirmed working):**
+- A5: All models now correctly call `get_upcoming_meetings` → `get_agenda_documents`.
+- C3 C4: write-guard helped most models ask before writing when context is missing.
+- Committee mapping (D2/D3): Several models correctly resolve "Trade Committee" → "TRADE";
+  gpt-4.1-nano still uses the human-readable name — real model limitation, not a design gap.
+
+**Root cause of remaining failures:**
+
+1. **Write-guard over-application (gpt-5.4-nano B1, D4)** — primary gap for Phase 0e.
+   The write-guard wording ("Do not call any tool that creates or modifies data unless
+   the user has *explicitly* provided all required fields") causes gpt-5.4-nano to refuse
+   write tools even when ALL information is present (B1 full-info scenario, D4 confidential
+   DAR). B1 fails C1/C2/C3; D4 fails C1/C2. Fixing the write-guard wording to clarify it
+   only applies when info is *missing* would likely push gpt-5.4-nano above both thresholds
+   (estimated: 93%+ aggregate, C3 100%).
+
+2. **classification_level business rule (D1/D3/D5, most models)** — genuine model weakness.
+   Models fail to infer the correct access level (Restricted vs General) from delegation
+   type and framework agreements. The rule is not documented in SYSTEM_PROMPT. May require
+   a brief access-classification rule in the system prompt (Phase 0e) or the MCP KB
+   (Phase 5).
+
+3. **C1 hallucinated email (most models)** — genuine model limitation.
+   Models invent an email address for the missing-email scenario and proceed to create the
+   delegate anyway. The write-guard partially helps (C3 now passes) but C1 is stubborn.
+   Acceptable as a real weakness — does not block model selection if aggregate > 85%.
+
+**Decision:** No model selected. Phase 0e will fix write-guard wording. Leading candidate
+remains `gpt-5.4-nano` — 1% from the aggregate threshold, all per-criterion rates ≥ 75%
+except C3 (67%), which is directly caused by the write-guard over-application on B1.
+
 ### [2025-04] MCP-exposed business knowledge base (not system prompt, not RAG-only)
 
 Business rules live in git-backed markdown files with structured frontmatter, embedded into ChromaDB, and exposed via an MCP server. The agent queries the KB at runtime (agent-driven, multi-hop capable) rather than having rules pre-loaded into the system prompt. RAG is the engine inside; MCP is the interface. Start with system prompt encoding for Phase 1 (read-only), switch to MCP KB for Phase 2 (write agent with DAR reasoning).
