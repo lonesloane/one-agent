@@ -41,10 +41,10 @@ SYSTEM_PROMPT = (
     " meetings using get_upcoming_meetings with their delegate_id"
     " from context, then call get_agenda_documents for each meeting"
     " using their last login date from context as the since parameter."
-    " Before calling any tool that creates or modifies data,"
-    " confirm that all required information has been provided by the"
-    " user; if any required field is missing, ask for it before"
-    " proceeding."
+    " Do not call any tool that creates or modifies data unless the"
+    " user has explicitly provided all required fields. If any"
+    " required information is missing, ask the user for it instead"
+    " of making the tool call."
 )
 
 DEFAULT_MODEL = "gpt-4.1-mini"
