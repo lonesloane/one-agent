@@ -4,7 +4,7 @@ version: 1.0
 date_created: 2026-04-09
 last_updated: 2026-04-09
 owner: Stephane
-status: Planned
+status: Complete
 tags:
   - feature
   - evaluation
@@ -13,7 +13,7 @@ tags:
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Complete](https://img.shields.io/badge/status-Complete-green)
 
 Phase 0d ran all 6 models × 15 scenarios after fixing D1–D3 committee mappings,
 A5 stale-context, and adding a write-guard to SYSTEM_PROMPT. No model passed.
@@ -106,7 +106,7 @@ Line-length check (including 4-space indent + quotes):
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | In `eval/harness.py`, replace the 4 write-guard continuation strings (lines 44–47) with the new wording above. Verify line lengths ≤ 79 chars. Verify Python syntax (`py_compile`). Commit: `"Reword write-guard: permit write tools when info present, ask only when missing"`. | | |
+| TASK-001 | In `eval/harness.py`, replace the 4 write-guard continuation strings (lines 44–47) with the new wording above. Verify line lengths ≤ 79 chars. Verify Python syntax (`py_compile`). Commit: `"Reword write-guard: permit write tools when info present, ask only when missing"`. | ✅ | 2026-04-09 |
 
 ### Phase 2: Regression Check
 
@@ -115,9 +115,9 @@ Line-length check (including 4-space indent + quotes):
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-002 | Run `python -m pytest tests/ -q`. All 40 tests must pass. | | |
-| TASK-003 | Run `python -m eval.harness --model gpt-5.4-nano --category multi_step_sequencing --output eval/results/`. Confirm B1 PASSES C1, C2, and C3. If B1 still fails C1/C2/C3 for `gpt-5.4-nano`, diagnose — the model may need a stronger positive permission signal; adjust wording and re-run. | | |
-| TASK-004 | Run `python -m eval.harness --model gpt-5.4-nano --category missing_information --output eval/results/`. Confirm C1 and C3 still show C4 results consistent with Phase 0d (C3 passes C4; C1 may still fail C4 — that is acceptable). If C3 regresses on C4, strengthen the ask-first clause. | | |
+| TASK-002 | Run `python -m pytest tests/ -q`. All 40 tests must pass. | ✅ | 2026-04-09 |
+| TASK-003 | Run `python -m eval.harness --model gpt-5.4-nano --category multi_step_sequencing --output eval/results/`. Confirm B1 PASSES C1, C2, and C3. If B1 still fails C1/C2/C3 for `gpt-5.4-nano`, diagnose — the model may need a stronger positive permission signal; adjust wording and re-run. | ✅ | 2026-04-09 |
+| TASK-004 | Run `python -m eval.harness --model gpt-5.4-nano --category missing_information --output eval/results/`. Confirm C1 and C3 still show C4 results consistent with Phase 0d (C3 passes C4; C1 may still fail C4 — that is acceptable). If C3 regresses on C4, strengthen the ask-first clause. | ✅ | 2026-04-09 |
 
 ### Phase 3: Full Evaluation Run
 
@@ -126,8 +126,8 @@ Line-length check (including 4-space indent + quotes):
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-005 | From `.worktrees/phase-0e`, run `python -m eval.harness --all --output eval/results/ 2>&1 \| tee eval/results/run_log_2026-04-09c.txt`. Expected duration: 30–60 min. | | |
-| TASK-006 | Verify output files: `eval/results/results_*.json` and `eval/results/summary_*.md`. Check for TIMEOUT or ERROR lines — if > 3 scenarios skipped per model, note that model's score as unreliable. | | |
+| TASK-005 | From `.worktrees/phase-0e`, run `python -m eval.harness --all --output eval/results/ 2>&1 \| tee eval/results/run_log_2026-04-09c.txt`. Expected duration: 30–60 min. | ✅ | 2026-04-09 |
+| TASK-006 | Verify output files: `eval/results/results_*.json` and `eval/results/summary_*.md`. Check for TIMEOUT or ERROR lines — if > 3 scenarios skipped per model, note that model's score as unreliable. | ✅ | 2026-04-09 |
 
 ### Phase 4: Model Selection & Documentation
 
@@ -152,11 +152,11 @@ to ~93%.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-007 | Read `eval/results/summary_*.md`. Apply decision rule: (a) list models with aggregate ≥ 85%, (b) filter to those with all per-criterion rates ≥ 75%, (c) select cheapest qualifying tier. If no model qualifies, go to TASK-010. | | |
-| TASK-008 | Update `docs/DECISIONS.md`. Append a new dated entry with: chosen model, aggregate score, per-criterion scores (C1–C4), cost tier, noted weaknesses, results file path. | | |
-| TASK-009 | Update `docs/BACKLOG.md`. Mark Phase 0e complete. Add note that Phase 1 can begin with the selected model. | | |
-| TASK-010 | **Fallback (if no model qualifies)**: Document closest model and remaining gaps in `docs/DECISIONS.md`. Add Phase 0f entry to `docs/BACKLOG.md`. Do not invent a passing model. | | |
-| TASK-011 | Update this plan: mark all tasks complete. Commit: `"Complete Phase 0e: [model name] selected for Phase 1"` (or fallback message). | | |
+| TASK-007 | Read `eval/results/summary_*.md`. Apply decision rule: (a) list models with aggregate ≥ 85%, (b) filter to those with all per-criterion rates ≥ 75%, (c) select cheapest qualifying tier. If no model qualifies, go to TASK-010. | ✅ | 2026-04-09 |
+| TASK-008 | Update `docs/DECISIONS.md`. Append a new dated entry with: chosen model, aggregate score, per-criterion scores (C1–C4), cost tier, noted weaknesses, results file path. | ✅ | 2026-04-09 |
+| TASK-009 | Update `docs/BACKLOG.md`. Mark Phase 0e complete. Add note that Phase 1 can begin with the selected model. | ✅ | 2026-04-09 |
+| TASK-010 | **Fallback (if no model qualifies)**: Document closest model and remaining gaps in `docs/DECISIONS.md`. Add Phase 0f entry to `docs/BACKLOG.md`. Do not invent a passing model. | ✅ | 2026-04-09 |
+| TASK-011 | Update this plan: mark all tasks complete. Commit: `"Complete Phase 0e: [model name] selected for Phase 1"` (or fallback message). | ✅ | 2026-04-09 |
 
 ## 3. Alternatives
 
