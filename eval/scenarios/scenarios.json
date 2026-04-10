@@ -312,6 +312,7 @@
     "user_message": "I need Confidential access for delegate DEL-2026-0891 on the Education Policy Committee.",
     "synthetic_results": {
       "lookup_delegate": "{\"id\": \"DEL-2026-0891\", \"name\": \"Alex Moreau\", \"delegation_id\": \"FRA\", \"status\": \"active\"}",
+      "get_delegation_info": "{\"id\": \"FRA\", \"name\": \"France\", \"type\": \"member\", \"delegates\": 45, \"committees\": [{\"name\": \"Education Policy Committee\", \"id\": \"EDU-POL\"}]}",
       "create_document_access_rights": "Access rights created (PENDING secretariat approval): delegate=DEL-2026-0891, committee=EDU-POL, level=Confidential"
     },
     "expected": {
@@ -337,6 +338,7 @@
     "user_message": "Grant delegate DEL-2026-0891 access to Education Policy Committee documents, including documents from before their accreditation.",
     "synthetic_results": {
       "lookup_delegate": "{\"id\": \"DEL-2026-0891\", \"name\": \"Alex Moreau\", \"delegation_id\": \"FRA\", \"status\": \"active\"}",
+      "get_delegation_info": "{\"id\": \"FRA\", \"name\": \"France\", \"type\": \"member\", \"delegates\": 45, \"committees\": [{\"name\": \"Education Policy Committee\", \"id\": \"EDU-POL\"}]}",
       "create_document_access_rights": "Access rights granted: delegate=DEL-2026-0891, committee=EDU-POL, retroactive=true"
     },
     "expected": {
