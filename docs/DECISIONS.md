@@ -203,6 +203,62 @@ the targeted regression.
 SYSTEM_PROMPT and investigate the D4 timeout. Leading candidate: `gpt-4.1-mini` (79%
 aggregate, 2pp short on C2, 6pp short on aggregate; highest absolute scores in this run).
 
+### [2026-04-10] Phase 0f eval run — gpt-4.1-mini selected for Phase 1
+
+Full evaluation run after adding access-classification rule to SYSTEM_PROMPT
+and adding missing `get_delegation_info` synthetic data to D4 and D5.
+Results files:
+- Main run: `eval/results/summary_2026-04-10.md`
+- gpt-5.4-nano re-run: `eval/results/rerun-gpt-5.4-nano/summary_2026-04-10.md`
+- grok-3-mini re-run: `eval/results/rerun-grok-3-mini/summary_2026-04-10.md`
+
+Note: gpt-5.4-nano and grok-3-mini had >3 timeouts in the main run (network
+instability). Both were re-run individually; gpt-5.4-nano results use the
+re-run score as authoritative.
+
+**Final scores:**
+
+| Model | Aggregate | C1 | C2 | C3 | C4 | Tier | Result |
+|-------|-----------|----|----|----|----|------|--------|
+| gpt-5.4-nano¹ | 86% | 85% | 83% | 100% | 80% | nano | ✅ PASS |
+| gpt-4.1-nano | 84% | 92% | 75% | 100% | 80% | nano | ❌ FAIL |
+| gpt-5.4-mini | 76% | 77% | 83% | 100% | 60% | mini | ❌ FAIL |
+| gpt-4.1-mini | **100%** | 100% | 100% | 100% | 100% | mini | ✅ PASS |
+| o4-mini | 56% | 25% | 0% | 100% | 100% | reasoning | ❌ FAIL |
+| grok-3-mini¹ | 69% | 71% | 57% | 100% | 100% | mini | ❌ FAIL |
+
+¹ Score from individual re-run after network-related timeouts in main run.
+
+**Two qualifying models:** `gpt-5.4-nano` (86%, nano tier) and `gpt-4.1-mini`
+(100%, mini tier). The strict decision rule (cheapest qualifying tier) would
+select `gpt-5.4-nano`. However, `gpt-4.1-mini` was chosen for Phase 1 on the
+basis of its zero-defect score — 100% across all criteria with no known failure
+scenarios. The 14pp quality gap is meaningful for a production system.
+
+**Selected model: `gpt-4.1-mini` (mini tier)**
+
+**Rationale:** Perfect score (100% aggregate, all criteria) provides the
+strongest confidence baseline for Phase 1 development. Known weaknesses of
+`gpt-5.4-nano` (A4 agenda lookup, C1 write-guard, D4 Confidential DAR) make it
+unsuitable as the primary model until those gaps are better understood.
+
+**Cost note:** `gpt-5.4-nano` is a validated alternative — it passes all
+thresholds (86% aggregate, all per-criterion ≥ 75%) with no network issues.
+If cost reduction becomes a priority, it can be evaluated as a drop-in
+replacement in Phase 3 or later.
+
+**gpt-5.4-nano known weaknesses (re-run):**
+- A4: does not call `get_agenda_documents` (agenda documents lookup failure)
+- C1: calls write tools when email is missing (write-guard non-compliance)
+- D4: does not call `create_document_access_rights` for Confidential DAR
+
+**Phase 0f fixes applied:**
+1. Access-classification rule added to SYSTEM_PROMPT (member→Restricted,
+   partner without FA→General, partner with FA→Restricted). D1/D3/D5 now
+   pass C2 for all qualifying models.
+2. Missing `get_delegation_info` synthetic data added to D4 and D5 scenarios
+   (model was stalling when the tool returned no result).
+
 ### [2025-04] MCP-exposed business knowledge base (not system prompt, not RAG-only)
 
 Business rules live in git-backed markdown files with structured frontmatter, embedded into ChromaDB, and exposed via an MCP server. The agent queries the KB at runtime (agent-driven, multi-hop capable) rather than having rules pre-loaded into the system prompt. RAG is the engine inside; MCP is the interface. Start with system prompt encoding for Phase 1 (read-only), switch to MCP KB for Phase 2 (write agent with DAR reasoning).

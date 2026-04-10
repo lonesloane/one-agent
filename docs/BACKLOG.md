@@ -45,19 +45,19 @@
 - [x] Root cause of remaining gaps: classification_level rule not encoded (D-category);
   model nondeterminism in gpt-5.4-nano (A4, D5); residual write-guard non-compliance (C1).
 
-### Phase 0f — Access-Classification Rule & Final Model Selection (planned)
-> Add classification_level business rule to SYSTEM_PROMPT. Primary target: gpt-4.1-mini
-> at 79% aggregate. Needs +6pp on aggregate and +2pp on C2 to qualify.
+### Phase 0f — Access-Classification Rule & Final Model Selection ✓ (2026-04-10) — [plan](../plan/feature-phase0f-eval-fix-and-model-selection-1.md)
 
-**Leading candidate:** `gpt-4.1-mini` — 79% aggregate, C2=73%.
-Core failures: D1/D3/D5 classification_level (missing rule), D4 timeout to investigate.
-
-- [ ] Add access-classification rule to SYSTEM_PROMPT: member delegation → Restricted;
-  partner without FA → General; partner with FA → Restricted.
-- [ ] Investigate D4 timeout for gpt-4.1-mini (confidential DAR — secretariat approval).
-- [ ] Verify C1 missing-info guard still works after SYSTEM_PROMPT changes.
-- [ ] Re-run `python -m eval.harness --all`.
-- [ ] Apply decision rule and update `docs/DECISIONS.md`.
+- [x] Add access-classification rule to SYSTEM_PROMPT (member→Restricted,
+  partner without FA→General, partner with FA→Restricted). D1/D3/D5 now pass C2.
+- [x] Fix D4 and D5: missing `get_delegation_info` synthetic data added;
+  model was stalling without a tool result to proceed on.
+- [x] Verify unit tests (40/40 pass), B1 write-guard unaffected, C1/C3 guard intact.
+- [x] Full run (2026-04-10): gpt-5.4-nano and grok-3-mini had network timeouts;
+  both re-run individually. gpt-5.4-nano qualifies at 86%; grok-3-mini fails at 69%.
+- [x] **Selected model: `gpt-4.1-mini`** — 100% aggregate, all criteria 100%.
+  `gpt-5.4-nano` (86%, all criteria pass) noted as a validated cost-saving alternative.
+  See `docs/DECISIONS.md` for full rationale.
+- [x] Phase 1 can begin with `gpt-4.1-mini`.
 
 ## Phase 1 — Shared Data Layer + Classical App (Read Flows)
 > Foundation: database, business rules, seed data, classical app read screens
