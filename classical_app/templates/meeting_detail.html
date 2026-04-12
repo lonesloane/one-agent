@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}{{ meeting.title }} — ONE MP{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('committees_list') }}">My Committees</a>
+    </li>
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('committee_detail', committee_id=committee.id) }}">
+        {{ committee.name }}
+      </a>
+    </li>
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('upcoming_meetings', committee_id=committee.id) }}">
+        Upcoming Meetings
+      </a>
+    </li>
+    <li class="breadcrumb-item active">{{ meeting.title }}</li>
+  </ol>
+</nav>
+
+<h2 class="mb-1">{{ meeting.title }}</h2>
+<p class="text-muted mb-1">
+  {{ meeting.date.strftime('%d %B %Y') }}
+  {% if meeting.location %}&mdash; {{ meeting.location }}{% endif %}
+</p>
+<p class="mb-4">
+  <span class="badge bg-secondary">{{ committee.name }}</span>
+</p>
+
+<h5>Agenda Documents</h5>
+{% if agenda_items %}
+<table class="table table-hover">
+  <thead class="table-dark">
+    <tr>
+      <th>#</th>
+      <th>Document</th>
+      <th>Classification</th>
+      <th>Last Modified</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in agenda_items %}
+    <tr>
+      <td>{{ item.item_order }}</td>
+      <td>
+        <a href="{{ url_for('document_detail', document_id=item.document.id) }}">
+          {{ item.document.title }}
+        </a>
+      </td>
+      <td>
+        <span class="badge
+          {% if item.document.classification.value == 'CONFIDENTIAL' %}bg-danger
+          {% elif item.document.classification.value == 'RESTRICTED' %}bg-warning text-dark
+          {% elif item.document.classification.value == 'GENERAL' %}bg-info text-dark
+          {% else %}bg-light text-dark{% endif %}">
+          {{ item.document.classification.value }}
+        </span>
+      </td>
+      <td>{{ item.document.last_modified.strftime('%d %b %Y') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-muted">No documents available for this meeting.</p>
+{% endif %}
+{% endblock %}

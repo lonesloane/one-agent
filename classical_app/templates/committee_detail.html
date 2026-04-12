@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ committee.name }} — ONE MP{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('committees_list') }}">My Committees</a>
+    </li>
+    <li class="breadcrumb-item active">{{ committee.name }}</li>
+  </ol>
+</nav>
+
+<h2 class="mb-1">{{ committee.name }}</h2>
+{% if committee.description %}
+<p class="text-muted mb-4">{{ committee.description }}</p>
+{% endif %}
+
+<a href="{{ url_for('upcoming_meetings', committee_id=committee.id) }}"
+   class="btn btn-primary">
+  Upcoming Meetings
+</a>
+{% endblock %}

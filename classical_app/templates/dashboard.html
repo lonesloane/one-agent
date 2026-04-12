@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — ONE MP{% endblock %}
+
+{% block content %}
+<h2 class="mb-1">Welcome, {{ delegate.full_name }}</h2>
+<p class="text-muted mb-4">
+  {{ delegation.name }}
+  <span class="badge {% if delegation.membership_type.value == 'MEMBER' %}bg-primary{% else %}bg-secondary{% endif %} ms-1">
+    {{ delegation.membership_type.value }}
+  </span>
+</p>
+
+<div class="row g-4">
+  <div class="col-md-4">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title">My Committees</h5>
+        <p class="card-text text-muted">
+          View your committee memberships and upcoming meetings.
+        </p>
+        <a href="{{ url_for('committees_list') }}" class="btn btn-primary">
+          Go to Committees
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

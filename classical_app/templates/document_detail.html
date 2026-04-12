@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ document.title }} — ONE MP{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('committees_list') }}">My Committees</a>
+    </li>
+    <li class="breadcrumb-item active">{{ document.title }}</li>
+  </ol>
+</nav>
+
+<h2 class="mb-2">{{ document.title }}</h2>
+
+<div class="mb-4">
+  <span class="badge
+    {% if document.classification.value == 'CONFIDENTIAL' %}bg-danger
+    {% elif document.classification.value == 'RESTRICTED' %}bg-warning text-dark
+    {% elif document.classification.value == 'GENERAL' %}bg-info text-dark
+    {% else %}bg-light text-dark{% endif %}
+    me-2">
+    {{ document.classification.value }}
+  </span>
+  <span class="badge bg-secondary">{{ committee.name }}</span>
+</div>
+
+<dl class="row mb-4">
+  <dt class="col-sm-3">Published</dt>
+  <dd class="col-sm-9">{{ document.publication_date.strftime('%d %B %Y') }}</dd>
+
+  <dt class="col-sm-3">Last Modified</dt>
+  <dd class="col-sm-9">{{ document.last_modified.strftime('%d %B %Y') }}</dd>
+
+  <dt class="col-sm-3">Document ID</dt>
+  <dd class="col-sm-9"><code>{{ document.id }}</code></dd>
+</dl>
+
+{% if document.summary %}
+<h5>Summary</h5>
+<p>{{ document.summary }}</p>
+{% endif %}
+
+<hr>
+<a href="#" class="btn btn-outline-secondary disabled" aria-disabled="true">
+  [Download PDF]
+</a>
+<small class="text-muted ms-2">PDF download not available in this demo.</small>
+{% endblock %}

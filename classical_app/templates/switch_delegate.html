@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Select Delegate — ONE MP{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Select Delegate</h2>
+<p class="text-muted">Choose a delegate to impersonate for this demo session.</p>
+
+<form method="POST" action="{{ url_for('switch_delegate') }}">
+  <table class="table table-hover">
+    <thead class="table-dark">
+      <tr>
+        <th>Name</th>
+        <th>Function</th>
+        <th>Delegation</th>
+        <th>Type</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for delegate in delegates %}
+      <tr>
+        <td>{{ delegate.full_name }}</td>
+        <td>{{ delegate.function }}</td>
+        <td>{{ delegate.delegation.name }}</td>
+        <td>
+          <span class="badge {% if delegate.delegation.membership_type.value == 'MEMBER' %}bg-primary{% else %}bg-secondary{% endif %}">
+            {{ delegate.delegation.membership_type.value }}
+          </span>
+        </td>
+        <td>
+          <button type="submit" name="delegate_id" value="{{ delegate.id }}"
+                  class="btn btn-sm btn-outline-primary">
+            Select
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</form>
+{% endblock %}
