@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}My Committees — ONE MP{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item"><a href="{{ url_for('dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">My Committees</li>
+  </ol>
+</nav>
+
+<h2 class="mb-4">My Committees</h2>
+
+{% if committees %}
+<table class="table table-hover">
+  <thead class="table-dark">
+    <tr>
+      <th>Committee</th>
+      <th>Next Meeting</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in committees %}
+    <tr>
+      <td>
+        <a href="{{ url_for('committee_detail', committee_id=item.committee.id) }}">
+          {{ item.committee.name }}
+        </a>
+      </td>
+      <td>
+        {% if item.next_meeting_date %}
+          {{ item.next_meeting_date.strftime('%d %b %Y') }}
+        {% else %}
+          <span class="text-muted">—</span>
+        {% endif %}
+      </td>
+      <td>
+        <a href="{{ url_for('committee_detail', committee_id=item.committee.id) }}"
+           class="btn btn-sm btn-outline-secondary">
+          View
+        </a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="text-muted">You are not a member of any committees.</p>
+{% endif %}
+{% endblock %}
