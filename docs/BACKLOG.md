@@ -82,6 +82,18 @@
 ## Phase 2 — Classical App (Write Flows) — [PRD](prd-phase2-classical-write-flows.md)
 > Delegate creation wizard — the 8-screen contrast tool
 
+### Phase 2A — Schema and Seed Data Extensions ✓ (2026-04-15)
+- [x] Add `DelegateRole` enum (DELEGATE, DELEGATION_EDITOR) and `role` column to Delegate model
+- [x] Extend seed data: mark 3 delegation editors (DEL-2026-0001, DEL-2026-0005, DEL-2026-0007)
+- [x] Add 3 target delegations (TGT-ALPHA, TGT-BETA, TGT-GAMMA) for demo wizard writes
+- [x] Write 8 tests covering role seeding, target delegations, migration idempotency (110 tests total)
+- [x] **TASK-026**: Fresh DB init — 7 delegations (4 original + 3 targets), 3 delegation editors
+- [x] **TASK-027**: Migration idempotency — role column added, verified on repeat run
+- [x] **TASK-028**: Full test suite — 110 tests pass (102 Phase 1 + 8 new Phase 2A)
+- [x] **TASK-029**: Manual UI check (SKIPPED — requires Flask dev server + browser)
+- [x] **TASK-030**: Update BACKLOG.md and DESIGN.md with Phase 2A completion
+
+### Phase 2B–2D — Write Flows (upcoming)
 - [ ] Extend `shared/seed_data.py` — add write-flow demo scenarios (incremental, does not rebuild Phase 1 data)
 - [ ] Classical app: Delegation list (Screen 2)
 - [ ] Classical app: Delegation detail with delegate list (Screen 3)

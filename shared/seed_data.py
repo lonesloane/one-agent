@@ -4,9 +4,11 @@ ONE-MP Agent PoC shared data layer - Seed data for database initialization.
 This module provides seed data and seeding functions for the ONE-MP Agent
 PoC database. It creates a comprehensive demo dataset covering:
 
-- 4 delegations (2 MEMBER: FRA, DEU; 2 PARTNER: BRA, IND)
+- 7 delegations (4 demo + 3 targets: FRA, DEU, BRA, IND, TGT-ALPHA,
+  TGT-BETA, TGT-GAMMA)
 - 5 committees (EDU, TRADE, DAC, ENV, SKILLS)
-- 9 delegates with various roles and committee assignments
+- 9 delegates with various roles and committee assignments (3 marked as
+  DELEGATION_EDITOR: DEL-2026-0001, DEL-2026-0005, DEL-2026-0007)
 - 2 framework agreements (BRA-EDU active, IND-DAC expired)
 - 18 documents across all committees with varied classifications
 - 24 document access rights (DARs) based on business rules
@@ -35,6 +37,7 @@ from shared.database import (
     Delegation,
     Committee,
     Delegate,
+    DelegateRole,
     FrameworkAgreement,
     Document,
     DocumentAccessRight,
@@ -136,6 +139,7 @@ def seed_delegates(session: Session) -> None:
             "delegation_id": "FRA",
             "accreditation_date": datetime(2026, 1, 10),
             "last_login": datetime(2026, 4, 10),
+            "role": DelegateRole.DELEGATION_EDITOR,
             "committees": ["EDU", "TRADE", "DAC", "ENV", "SKILLS"],
         },
         {
@@ -147,6 +151,7 @@ def seed_delegates(session: Session) -> None:
             "delegation_id": "FRA",
             "accreditation_date": datetime(2026, 1, 15),
             "last_login": datetime(2026, 4, 8),
+            "role": DelegateRole.DELEGATE,
             "committees": ["EDU", "ENV", "TRADE"],
         },
         {
@@ -158,6 +163,7 @@ def seed_delegates(session: Session) -> None:
             "delegation_id": "DEU",
             "accreditation_date": datetime(2026, 1, 12),
             "last_login": datetime(2026, 4, 9),
+            "role": DelegateRole.DELEGATE,
             "committees": ["TRADE", "DAC", "SKILLS", "ENV"],
         },
         {
@@ -169,6 +175,7 @@ def seed_delegates(session: Session) -> None:
             "delegation_id": "DEU",
             "accreditation_date": datetime(2026, 2, 1),
             "last_login": datetime(2026, 4, 7),
+            "role": DelegateRole.DELEGATE,
             "committees": ["EDU", "SKILLS"],
         },
         {
@@ -180,6 +187,7 @@ def seed_delegates(session: Session) -> None:
             "delegation_id": "BRA",
             "accreditation_date": datetime(2026, 1, 20),
             "last_login": datetime(2026, 4, 11),
+            "role": DelegateRole.DELEGATION_EDITOR,
             "committees": ["EDU", "TRADE", "DAC"],
         },
         {
@@ -191,6 +199,7 @@ def seed_delegates(session: Session) -> None:
             "delegation_id": "BRA",
             "accreditation_date": datetime(2026, 2, 5),
             "last_login": None,
+            "role": DelegateRole.DELEGATE,
             "committees": ["EDU"],
         },
         {
@@ -202,6 +211,7 @@ def seed_delegates(session: Session) -> None:
             "delegation_id": "IND",
             "accreditation_date": datetime(2026, 1, 25),
             "last_login": datetime(2026, 4, 10),
+            "role": DelegateRole.DELEGATION_EDITOR,
             "committees": ["DAC", "ENV", "TRADE"],
         },
         {
@@ -213,6 +223,7 @@ def seed_delegates(session: Session) -> None:
             "delegation_id": "IND",
             "accreditation_date": datetime(2026, 2, 10),
             "last_login": datetime(2026, 4, 5),
+            "role": DelegateRole.DELEGATE,
             "committees": ["TRADE", "DAC"],
         },
         {
@@ -224,6 +235,7 @@ def seed_delegates(session: Session) -> None:
             "delegation_id": "DEU",
             "accreditation_date": datetime(2026, 3, 1),
             "last_login": None,
+            "role": DelegateRole.DELEGATE,
             "committees": ["EDU"],
         },
     ]
@@ -601,14 +613,49 @@ def seed_agenda_items(session: Session) -> None:
         session.merge(agenda_item)
 
 
+def seed_target_delegations(session: Session) -> None:
+    """
+    Seed target delegations table.
+
+    Creates 3 empty target delegations for the demo wizard:
+    - TGT-ALPHA with membership_type=MEMBER
+    - TGT-BETA with membership_type=PARTNER
+    - TGT-GAMMA with membership_type=PARTNER
+
+    These delegations have no delegates, DARs, or framework agreements.
+    They exist purely as write targets for the demo wizard.
+    """
+    target_delegations = [
+        Delegation(
+            id="TGT-ALPHA",
+            name="Target Alpha",
+            membership_type=MembershipType.MEMBER,
+        ),
+        Delegation(
+            id="TGT-BETA",
+            name="Target Beta",
+            membership_type=MembershipType.PARTNER,
+        ),
+        Delegation(
+            id="TGT-GAMMA",
+            name="Target Gamma",
+            membership_type=MembershipType.PARTNER,
+        ),
+    ]
+    for delegation in target_delegations:
+        session.merge(delegation)
+
+
 def seed_all(session: Session) -> None:
     """
     Seed all tables in correct dependency order.
 
-    Order: delegations → committees → delegates → framework_agreements →
-    documents → document_access_rights → meetings → agenda_items
+    Order: delegations → target_delegations → committees → delegates →
+    framework_agreements → documents → document_access_rights →
+    meetings → agenda_items
     """
     seed_delegations(session)
+    seed_target_delegations(session)
     seed_committees(session)
     seed_delegates(session)
     seed_framework_agreements(session)
@@ -631,6 +678,12 @@ if __name__ == "__main__":
         print(f"  Delegations: {session.query(Delegation).count()}")
         print(f"  Committees: {session.query(Committee).count()}")
         print(f"  Delegates: {session.query(Delegate).count()}")
+        delegation_editors = (
+            session.query(Delegate)
+            .filter(Delegate.role == DelegateRole.DELEGATION_EDITOR)
+            .count()
+        )
+        print(f"  Delegation Editors: {delegation_editors}")
         print(
             f"  Framework Agreements: "
             f"{session.query(FrameworkAgreement).count()}"

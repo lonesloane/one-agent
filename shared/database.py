@@ -92,13 +92,38 @@ class ClassificationLevel(Enum):
 
 
 class ApprovalStatus(Enum):
-    """Enumeration of document access right approval statuses."""
+    """
+    Enumeration of document access right approval statuses.
+
+    Maps PRD approval routes to enum values:
+        AUTO_APPROVED: PRD "auto-approved route" — GENERAL and PUBLIC
+            classification levels with retroactive=False
+        PENDING_DELEGATION_HEAD: PRD "pending_delegation_head" —
+            RESTRICTED classification level with retroactive=False
+        PENDING_SECRETARIAT: PRD "pending_secretariat" — CONFIDENTIAL
+            classification or retroactive=True for any classification
+        APPROVED: Access right has been approved by delegation head
+        REJECTED: Access right has been rejected
+    """
 
     AUTO_APPROVED = "AUTO_APPROVED"
     PENDING_DELEGATION_HEAD = "PENDING_DELEGATION_HEAD"
     PENDING_SECRETARIAT = "PENDING_SECRETARIAT"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+
+
+class DelegateRole(Enum):
+    """
+    Enumeration of delegate role types.
+
+    Defines the roles a delegate can have within a delegation:
+        DELEGATE: Standard delegate with basic privileges
+        DELEGATION_EDITOR: Delegate with delegation management privileges
+    """
+
+    DELEGATE = "DELEGATE"
+    DELEGATION_EDITOR = "DELEGATION_EDITOR"
 
 
 # ============================================================================
@@ -192,6 +217,7 @@ class Delegate(Base):
         accreditation_date: Date when the delegate was accredited
         is_active: Whether the delegate is currently active
         last_login: Optional timestamp of last login
+        role: Role of the delegate within the delegation
         delegation: Reference to the parent delegation
         committees: List of committees the delegate is member of
         document_access_rights: List of document access rights granted
@@ -213,6 +239,12 @@ class Delegate(Base):
     accreditation_date = Column(DateTime, nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
     last_login = Column(DateTime, nullable=True)
+    role = Column(
+        SQLEnum(DelegateRole, native_enum=False),
+        nullable=False,
+        server_default=DelegateRole.DELEGATE.value,
+        default=DelegateRole.DELEGATE,
+    )
 
     delegation = relationship("Delegation", back_populates="delegates")
     committees = relationship(
