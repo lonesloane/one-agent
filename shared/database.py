@@ -113,6 +113,19 @@ class ApprovalStatus(Enum):
     REJECTED = "REJECTED"
 
 
+class DelegateRole(Enum):
+    """
+    Enumeration of delegate role types.
+
+    Defines the roles a delegate can have within a delegation:
+        DELEGATE: Standard delegate with basic privileges
+        DELEGATION_EDITOR: Delegate with delegation management privileges
+    """
+
+    DELEGATE = "DELEGATE"
+    DELEGATION_EDITOR = "DELEGATION_EDITOR"
+
+
 # ============================================================================
 # SQLAlchemy Base and Association Tables
 # ============================================================================
@@ -204,6 +217,7 @@ class Delegate(Base):
         accreditation_date: Date when the delegate was accredited
         is_active: Whether the delegate is currently active
         last_login: Optional timestamp of last login
+        role: Role of the delegate within the delegation
         delegation: Reference to the parent delegation
         committees: List of committees the delegate is member of
         document_access_rights: List of document access rights granted
@@ -225,6 +239,12 @@ class Delegate(Base):
     accreditation_date = Column(DateTime, nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
     last_login = Column(DateTime, nullable=True)
+    role = Column(
+        SQLEnum(DelegateRole, native_enum=False),
+        nullable=False,
+        server_default=DelegateRole.DELEGATE.value,
+        default=DelegateRole.DELEGATE,
+    )
 
     delegation = relationship("Delegation", back_populates="delegates")
     committees = relationship(
