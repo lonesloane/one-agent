@@ -110,5 +110,7 @@ one-agent-poc/                 # Project root
 └── one_agent.db               # SQLite (shared, Phase 1+)
 ```
 
-> **Current state (2026-04-06)**: Phase 0a complete. Only `eval/` exists on disk.
-> All other directories will be built in subsequent phases.
+> **Current state (2026-04-14)**: Phase 1 complete. `eval/`, `shared/`, and `classical_app/` exist on disk.
+> `shared/` contains SQLAlchemy models, business rules, and seed data (80 tests passing).
+> `classical_app/` has all 6 read screens + delegate picker (102 tests passing).
+> Phase 2 (write flows) is next.

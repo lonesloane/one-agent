@@ -259,6 +259,21 @@ replacement in Phase 3 or later.
 2. Missing `get_delegation_info` synthetic data added to D4 and D5 scenarios
    (model was stalling when the tool returned no result).
 
+### [2026-04-12] Seed data: hardcoded Python + domain-realistic content
+
+`shared/seed_data.py` uses static Python dicts/lists — no Faker, no JSON
+fixtures. The data set is small enough (4 delegations, 8–10 delegates,
+15–20 documents) that hardcoding is simpler, fully version-controlled, and
+easy to trace. Faker-generated data was rejected because demo repeatability
+requires stable IDs and relationships.
+
+Content uses domain-realistic naming: OECD-flavored delegation names
+(France, Brazil), real committee names (Education Policy Committee, Trade
+Committee), and document titles that read like OECD output
+(e.g. "Working Paper on Digital Skills Policy — EDC/WD(2026)4").
+One-liner document summaries are acceptable — full briefing-language
+paragraphs are out of scope for the PoC.
+
 ### [2025-04] MCP-exposed business knowledge base (not system prompt, not RAG-only)
 
 Business rules live in git-backed markdown files with structured frontmatter, embedded into ChromaDB, and exposed via an MCP server. The agent queries the KB at runtime (agent-driven, multi-hop capable) rather than having rules pre-loaded into the system prompt. RAG is the engine inside; MCP is the interface. Start with system prompt encoding for Phase 1 (read-only), switch to MCP KB for Phase 2 (write agent with DAR reasoning).

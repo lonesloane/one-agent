@@ -33,9 +33,10 @@ Questions deferred from design, tracked here until resolved.
 **Relevant phase**: Phase 3
 **Context**: The brainstorming docs suggest Next.js + Vercel AI SDK for the agent frontend (streaming, tool call display). Is this confirmed, or should a simpler alternative (e.g., a terminal/CLI interface) suffice for the PoC demo?
 
-### OQ-8: Test data generation strategy
+### OQ-8: Test data generation strategy ✓ Resolved (2026-04-12)
 **Relevant phase**: Phase 1
 **Context**: Test data must cover all demo scenarios (member + partner delegations, Framework Agreements, various meeting/document states, delegate login history). Manual crafting vs. scripted generation? What level of realism is needed for stakeholder demos?
+**Decision**: Hardcoded Python in `shared/seed_data.py` (no Faker, no JSON fixtures) with domain-realistic content (OECD-flavored delegation names, real-ish committee names, document titles that sound like OECD output). One-liner placeholder summaries are acceptable — full briefing-language summaries are out of scope. See `docs/DECISIONS.md`.
 
 ### OQ-9: Delegation head approval workflow implementation
 **Relevant phase**: Phase 4

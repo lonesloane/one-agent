@@ -59,23 +59,30 @@
   See `docs/DECISIONS.md` for full rationale.
 - [x] Phase 1 can begin with `gpt-4.1-mini`.
 
-## Phase 1 — Shared Data Layer + Classical App (Read Flows)
+## Phase 1 — Shared Data Layer + Classical App (Read Flows) ✓ (2026-04-12) — [PRD](prd-phase1-shared-layer-and-classical-read.md)
 > Foundation: database, business rules, seed data, classical app read screens
 
-- [ ] Implement `shared/database.py` — SQLAlchemy models (Delegation, Delegate, Committee, Document, DAR, Meeting, FrameworkAgreement, MeetingAgendaItem)
-- [ ] Implement `shared/business_rules.py` — `compute_default_access_level`, `determine_approval_route`, `get_new_documents_since`
-- [ ] Implement `shared/seed_data.py` — populate test data covering all demo scenarios
-- [ ] Initialize `one_agent.db` with seed data
-- [ ] Classical app: Dashboard (Screen 1)
-- [ ] Classical app: My Committees list (Screen 2)
-- [ ] Classical app: Committee detail (Screen 3)
-- [ ] Classical app: Upcoming Meetings list (Screen 4)
-- [ ] Classical app: Meeting detail + agenda documents (Screen 5)
-- [ ] Classical app: Document detail (Screen 6)
+### Phase 1A — Shared Data Layer ✓ (2026-04-12)
+- [x] Implement `shared/database.py` — SQLAlchemy models (Delegation, Delegate, Committee, Document, DAR, Meeting, FrameworkAgreement, MeetingAgendaItem)
+- [x] Implement `shared/business_rules.py` — `compute_default_access_level`, `determine_approval_route`, `is_document_visible`, `get_visible_agenda_documents`, `get_new_documents_since`
+- [x] Implement `shared/seed_data.py` — populate seed data for UC1 read-flow scenarios (idempotent, incremental — Phase 2+ extends without rebuilding)
+- [x] Initialize `one_agent.db` with seed data
+- [x] 80 tests passing
 
-## Phase 2 — Classical App (Write Flows)
+### Phase 1B — Classical App (Read Flows) ✓ (2026-04-12)
+- [x] Classical app: Delegate picker / impersonation (navbar dropdown + session)
+- [x] Classical app: Dashboard (Screen 1)
+- [x] Classical app: My Committees list (Screen 2)
+- [x] Classical app: Committee detail (Screen 3)
+- [x] Classical app: Upcoming Meetings list (Screen 4)
+- [x] Classical app: Meeting detail + agenda documents (Screen 5) — document visibility enforced
+- [x] Classical app: Document detail (Screen 6) — 403 if DAR insufficient
+- [x] 102 tests passing
+
+## Phase 2 — Classical App (Write Flows) — [PRD](prd-phase2-classical-write-flows.md)
 > Delegate creation wizard — the 8-screen contrast tool
 
+- [ ] Extend `shared/seed_data.py` — add write-flow demo scenarios (incremental, does not rebuild Phase 1 data)
 - [ ] Classical app: Delegation list (Screen 2)
 - [ ] Classical app: Delegation detail with delegate list (Screen 3)
 - [ ] Classical app: Add Delegate Step 1 — Personal info (Screen 4)
