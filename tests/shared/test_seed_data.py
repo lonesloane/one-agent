@@ -20,6 +20,7 @@ from shared.database import (
     FrameworkAgreement,
     Meeting,
     MeetingAgendaItem,
+    DelegateRole,
 )
 from shared.seed_data import seed_all
 from shared.business_rules import get_visible_agenda_documents
@@ -386,3 +387,117 @@ class TestDemoScenarios:
         assert visible[1].id == "DOC-2026-0002"
         assert visible[2].id == "DOC-2026-0003"
         assert visible[3].id == "DOC-2026-0017"
+
+
+class TestSeedDataRoleSeeding:
+    """Verify delegates with DELEGATION_EDITOR role are seeded correctly."""
+
+    def test_three_delegation_editors_seeded(
+        self,
+        seeded_session: Session,
+    ) -> None:
+        """
+        Verify exactly 3 delegates are seeded as DELEGATION_EDITOR.
+
+        Run seed_all(session). Query delegates where
+        role == DelegateRole.DELEGATION_EDITOR. Assert count == 3 and
+        IDs are exactly {"DEL-2026-0001", "DEL-2026-0005",
+        "DEL-2026-0007"}.
+        """
+        editors = seeded_session.query(Delegate).filter_by(
+            role=DelegateRole.DELEGATION_EDITOR
+        ).all()
+
+        assert len(editors) == 3, (
+            f"Expected exactly 3 DELEGATION_EDITORs, got {len(editors)}"
+        )
+
+        editor_ids = {e.id for e in editors}
+        expected_ids = {
+            "DEL-2026-0001",
+            "DEL-2026-0005",
+            "DEL-2026-0007",
+        }
+        assert editor_ids == expected_ids, (
+            f"Expected editor IDs {expected_ids}, got {editor_ids}"
+        )
+
+    def test_target_delegations_present(
+        self,
+        seeded_session: Session,
+    ) -> None:
+        """
+        Verify target delegations exist with 0 delegates each.
+
+        Run seed_all(session). For each of TGT-ALPHA, TGT-BETA,
+        TGT-GAMMA: assert the delegation exists, and assert it has
+        0 delegates.
+        """
+        target_ids = {"TGT-ALPHA", "TGT-BETA", "TGT-GAMMA"}
+
+        for target_id in target_ids:
+            delegation = seeded_session.query(Delegation).filter_by(
+                id=target_id
+            ).first()
+
+            assert delegation is not None, (
+                f"Target delegation {target_id} not found"
+            )
+
+            delegate_count = seeded_session.query(Delegate).filter_by(
+                delegation_id=target_id
+            ).count()
+
+            assert delegate_count == 0, (
+                f"Expected {target_id} to have 0 delegates, "
+                f"got {delegate_count}"
+            )
+
+    def test_seed_all_idempotent_with_role(
+        self,
+        seeded_session: Session,
+    ) -> None:
+        """
+        Verify seed_all() is idempotent and preserves delegate roles.
+
+        Run seed_all(session) twice. Assert total delegate count
+        unchanged after second run. Assert the 3 editors are still
+        editors (not reverted to DELEGATE).
+        """
+        # Record initial counts
+        initial_delegate_count = seeded_session.query(Delegate).count()
+        initial_editor_count = seeded_session.query(Delegate).filter_by(
+            role=DelegateRole.DELEGATION_EDITOR
+        ).count()
+
+        # Run seed_all again
+        seed_all(seeded_session)
+        seeded_session.commit()
+
+        # Verify counts unchanged
+        final_delegate_count = seeded_session.query(Delegate).count()
+        final_editor_count = seeded_session.query(Delegate).filter_by(
+            role=DelegateRole.DELEGATION_EDITOR
+        ).count()
+
+        assert final_delegate_count == initial_delegate_count, (
+            f"Delegate count changed from {initial_delegate_count} "
+            f"to {final_delegate_count}"
+        )
+
+        assert final_editor_count == initial_editor_count == 3, (
+            f"Expected 3 editors to remain after second seed, "
+            f"got {final_editor_count}"
+        )
+
+        # Verify editor IDs are preserved
+        editors = seeded_session.query(Delegate).filter_by(
+            role=DelegateRole.DELEGATION_EDITOR
+        ).all()
+        editor_ids = {e.id for e in editors}
+        expected_ids = {
+            "DEL-2026-0001",
+            "DEL-2026-0005",
+            "DEL-2026-0007",
+        }
+        assert editor_ids == expected_ids

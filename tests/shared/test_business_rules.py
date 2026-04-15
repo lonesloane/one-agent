@@ -136,6 +136,22 @@ def test_retroactive_restricted_pending_secretariat():
     assert result == ApprovalStatus.PENDING_SECRETARIAT
 
 
+def test_retroactive_confidential_pending_secretariat():
+    """
+    Test retroactive CONFIDENTIAL requires secretariat approval.
+
+    Assert determine_approval_route(ClassificationLevel.CONFIDENTIAL,
+    True) == ApprovalStatus.PENDING_SECRETARIAT. Closes the
+    retroactive coverage matrix — GENERAL and RESTRICTED already
+    tested.
+    """
+    result = determine_approval_route(
+        ClassificationLevel.CONFIDENTIAL,
+        True,
+    )
+    assert result == ApprovalStatus.PENDING_SECRETARIAT
+
+
 # ============================================================================
 # TASK-039: is_document_visible Tests
 # ============================================================================

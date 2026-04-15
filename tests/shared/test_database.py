@@ -12,6 +12,8 @@ from shared.database import (
     MeetingAgendaItem,
     MembershipType,
     ClassificationLevel,
+    DelegateRole,
+    ApprovalStatus,
 )
 
 
@@ -180,3 +182,82 @@ def test_meeting_agenda_items_ordered(session: Session):
     ).first()
     orders = [item.item_order for item in retrieved_meeting.agenda_items]
     assert orders == [1, 2, 3]
+
+
+def test_delegate_role_default(session: Session):
+    """
+    Test Delegate role defaults to DelegateRole.DELEGATE.
+
+    Persist a Delegate without explicitly setting role. Reload from DB.
+    Assert role == DelegateRole.DELEGATE.
+    """
+    delegation = Delegation(
+        id="FRA",
+        name="France",
+        membership_type=MembershipType.MEMBER,
+    )
+    delegate = Delegate(
+        id="DEL-2026-0001",
+        full_name="Alice Dupont",
+        email="alice@example.com",
+        function="Representative",
+        delegation_id="FRA",
+        accreditation_date=datetime(2026, 1, 15),
+    )
+    session.add(delegation)
+    session.add(delegate)
+    session.flush()
+
+    retrieved = session.query(Delegate).filter_by(
+        id="DEL-2026-0001"
+    ).first()
+    assert retrieved.role == DelegateRole.DELEGATE
+
+
+def test_delegate_role_editor_roundtrip(session: Session):
+    """
+    Test Delegate role=DELEGATION_EDITOR persists correctly.
+
+    Persist a Delegate with role=DelegateRole.DELEGATION_EDITOR.
+    Reload from DB. Assert role == DelegateRole.DELEGATION_EDITOR.
+    """
+    delegation = Delegation(
+        id="DEU",
+        name="Germany",
+        membership_type=MembershipType.MEMBER,
+    )
+    delegate = Delegate(
+        id="DEL-2026-0005",
+        full_name="Bob Mueller",
+        email="bob@example.com",
+        function="Representative",
+        delegation_id="DEU",
+        accreditation_date=datetime(2026, 1, 15),
+        role=DelegateRole.DELEGATION_EDITOR,
+    )
+    session.add(delegation)
+    session.add(delegate)
+    session.flush()
+
+    retrieved = session.query(Delegate).filter_by(
+        id="DEL-2026-0005"
+    ).first()
+    assert retrieved.role == DelegateRole.DELEGATION_EDITOR
+
+
+def test_approval_status_contains_required_values(session: Session):
+    """
+    Test ApprovalStatus enum contains required approval values.
+
+    Assert that {AUTO_APPROVED, PENDING_DELEGATION_HEAD,
+    PENDING_SECRETARIAT} is a subset of set(ApprovalStatus).
+    """
+    approval_statuses = set(ApprovalStatus)
+
+    required_statuses = {
+        ApprovalStatus.AUTO_APPROVED,
+        ApprovalStatus.PENDING_DELEGATION_HEAD,
+        ApprovalStatus.PENDING_SECRETARIAT,
+    }
+
+    assert required_statuses.issubset(approval_statuses)
