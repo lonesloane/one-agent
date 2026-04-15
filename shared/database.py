@@ -92,7 +92,19 @@ class ClassificationLevel(Enum):
 
 
 class ApprovalStatus(Enum):
-    """Enumeration of document access right approval statuses."""
+    """
+    Enumeration of document access right approval statuses.
+
+    Maps PRD approval routes to enum values:
+        AUTO_APPROVED: PRD "auto-approved route" — GENERAL and PUBLIC
+            classification levels with retroactive=False
+        PENDING_DELEGATION_HEAD: PRD "pending_delegation_head" —
+            RESTRICTED classification level with retroactive=False
+        PENDING_SECRETARIAT: PRD "pending_secretariat" — CONFIDENTIAL
+            classification or retroactive=True for any classification
+        APPROVED: Access right has been approved by delegation head
+        REJECTED: Access right has been rejected
+    """
 
     AUTO_APPROVED = "AUTO_APPROVED"
     PENDING_DELEGATION_HEAD = "PENDING_DELEGATION_HEAD"
