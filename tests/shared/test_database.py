@@ -245,7 +245,7 @@ def test_delegate_role_editor_roundtrip(session: Session):
     assert retrieved.role == DelegateRole.DELEGATION_EDITOR
 
 
-def test_approval_status_contains_required_values(session: Session):
+def test_approval_status_contains_required_values():
     """
     Test ApprovalStatus enum contains required approval values.
 

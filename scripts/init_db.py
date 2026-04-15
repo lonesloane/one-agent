@@ -11,10 +11,10 @@ def main() -> None:
     """
     Initialize the database and seed it with demo data.
 
-    Creates all tables and populates with 4 delegations, 5 committees,
-    9 delegates (each with a role: DELEGATE or DELEGATION_EDITOR),
-    2 framework agreements, 18 documents, 24 document access rights,
-    5 meetings, and 19 agenda items.
+    Creates all tables and populates with 7 delegations (4 demo + 3 targets),
+    5 committees, 9 delegates (each with a role: DELEGATE or
+    DELEGATION_EDITOR), 2 framework agreements, 18 documents, 24 document
+    access rights, 5 meetings, and 19 agenda items.
     """
     db_path = Path(__file__).parent.parent / "one_agent.db"
     engine = get_engine(str(db_path))
