@@ -59,19 +59,30 @@
   See `docs/DECISIONS.md` for full rationale.
 - [x] Phase 1 can begin with `gpt-4.1-mini`.
 
-## Phase 1 — Shared Data Layer + Classical App (Read Flows)
+## Phase 1 — Shared Data Layer + Classical App (Read Flows) ✓ (2026-04-12)
 > Foundation: database, business rules, seed data, classical app read screens
 
-- [ ] Implement `shared/database.py` — SQLAlchemy models (Delegation, Delegate, Committee, Document, DAR, Meeting, FrameworkAgreement, MeetingAgendaItem)
-- [ ] Implement `shared/business_rules.py` — `compute_default_access_level`, `determine_approval_route`, `get_new_documents_since`
-- [ ] Implement `shared/seed_data.py` — populate test data covering all demo scenarios
-- [ ] Initialize `one_agent.db` with seed data
-- [ ] Classical app: Dashboard (Screen 1)
-- [ ] Classical app: My Committees list (Screen 2)
-- [ ] Classical app: Committee detail (Screen 3)
-- [ ] Classical app: Upcoming Meetings list (Screen 4)
-- [ ] Classical app: Meeting detail + agenda documents (Screen 5)
-- [ ] Classical app: Document detail (Screen 6)
+- [x] Implement `shared/database.py` — SQLAlchemy models (Delegation, Delegate, Committee, Document, DAR, Meeting, FrameworkAgreement, MeetingAgendaItem)
+- [x] Implement `shared/business_rules.py` — `compute_default_access_level`, `determine_approval_route`, `get_new_documents_since`
+- [x] Implement `shared/seed_data.py` — populate test data covering all demo scenarios
+- [x] Initialize `one_agent.db` with seed data
+- [x] Classical app: Dashboard (Screen 1)
+- [x] Classical app: My Committees list (Screen 2)
+- [x] Classical app: Committee detail (Screen 3)
+- [x] Classical app: Upcoming Meetings list (Screen 4)
+- [x] Classical app: Meeting detail + agenda documents (Screen 5)
+- [x] Classical app: Document detail (Screen 6)
+
+### Phase 2A — Schema and Seed Data Extensions ✓ (2026-04-15)
+- [x] Add `DelegateRole` enum (DELEGATE, DELEGATION_EDITOR) and `role` column to Delegate model
+- [x] Extend seed data: mark 3 delegation editors (DEL-2026-0001, DEL-2026-0005, DEL-2026-0007)
+- [x] Add 3 target delegations (TGT-ALPHA, TGT-BETA, TGT-GAMMA) for demo wizard writes
+- [x] Write 8 tests covering role seeding, target delegations, migration idempotency (110 tests total)
+- [x] **TASK-026**: Fresh DB init — 7 delegations (4 original + 3 targets), 3 delegation editors
+- [x] **TASK-027**: Migration idempotency — role column added, verified on repeat run
+- [x] **TASK-028**: Full test suite — 110 tests pass (102 Phase 1 + 8 new Phase 2A)
+- [x] **TASK-029**: Manual UI check (SKIPPED — requires Flask dev server + browser)
+- [x] **TASK-030**: Update BACKLOG.md and DESIGN.md with Phase 2A completion
 
 ## Phase 2 — Classical App (Write Flows)
 > Delegate creation wizard — the 8-screen contrast tool

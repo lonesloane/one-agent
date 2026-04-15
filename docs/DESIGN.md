@@ -110,5 +110,8 @@ one-agent-poc/                 # Project root
 └── one_agent.db               # SQLite (shared, Phase 1+)
 ```
 
-> **Current state (2026-04-06)**: Phase 0a complete. Only `eval/` exists on disk.
-> All other directories will be built in subsequent phases.
+> **Current state (2026-04-15)**: Phase 1 complete (shared data layer + 6 classical app read screens).
+> Phase 2A complete (schema extensions: DelegateRole enum, 3 delegation editor personas,
+> 3 target delegations for demo wizard). Database seeded with 7 delegations, 9 delegates
+> (3 DELEGATION_EDITOR), 5 committees, 18 documents, 24 document access rights, 5 meetings,
+> 19 agenda items. 110 tests passing. Phase 2B (write flows) begins next.
