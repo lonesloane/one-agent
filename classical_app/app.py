@@ -68,6 +68,7 @@ def create_app(db_url: str | None = None) -> Flask:
 
     session_factory = sessionmaker(bind=engine)
     db_session = scoped_session(session_factory)
+    flask_app.extensions["db_session"] = db_session
 
     # ------------------------------------------------------------------
     # Context processor
@@ -93,6 +94,24 @@ def create_app(db_url: str | None = None) -> Flask:
                 "current_delegate_name": "",
                 "current_delegation_name": "",
             }
+
+    from classical_app.permissions import (
+        is_editor_of as _is_editor_of,
+    )
+
+    @flask_app.context_processor
+    def inject_editor_check() -> dict:
+        """Inject is_editor_of_delegation into all templates."""
+        def is_editor_of_delegation(delegation_id: str) -> bool:
+            delegate_id = session.get("delegate_id")
+            if not delegate_id:
+                return False
+            return _is_editor_of(
+                flask_app.extensions["db_session"],
+                delegate_id,
+                delegation_id,
+            )
+        return {"is_editor_of_delegation": is_editor_of_delegation}
 
     # ------------------------------------------------------------------
     # Request lifecycle
@@ -366,6 +385,10 @@ def create_app(db_url: str | None = None) -> Flask:
             document=document,
             committee=document.committee,
         )
+
+    from classical_app.routes.delegations import delegations_bp
+
+    flask_app.register_blueprint(delegations_bp)
 
     return flask_app
 
