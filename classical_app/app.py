@@ -107,7 +107,7 @@ def create_app(db_url: str | None = None) -> Flask:
             if not delegate_id:
                 return False
             return _is_editor_of(
-                flask_app.extensions["db_session"],
+                db_session,
                 delegate_id,
                 delegation_id,
             )
