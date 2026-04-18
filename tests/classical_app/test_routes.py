@@ -321,3 +321,142 @@ class TestDelegateSwitching:
 
         assert response.status_code == 200
         assert b"Carlos Silva" in response.data
+
+
+class TestDelegationList:
+    """TEST-009: Delegation list route."""
+
+    def test_delegation_list_returns_200(
+        self, client, member_delegate_id
+    ):
+        """GET /delegations returns 200 for authenticated delegate."""
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = member_delegate_id
+
+        response = client.get("/delegations")
+        assert response.status_code == 200
+
+    def test_delegation_list_shows_all_delegations(
+        self, client, member_delegate_id
+    ):
+        """Delegation list shows all seeded delegation names."""
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = member_delegate_id
+
+        response = client.get("/delegations")
+        assert response.status_code == 200
+        # Seeded delegations: FRA, BRA, IND
+        assert b"France" in response.data or b"FRA" in response.data
+        assert b"Brazil" in response.data or b"BRA" in response.data
+
+    def test_delegation_list_shows_type_badges(
+        self, client, member_delegate_id
+    ):
+        """Delegation list renders MEMBER and PARTNER type badges."""
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = member_delegate_id
+
+        response = client.get("/delegations")
+        assert response.status_code == 200
+        assert b"MEMBER" in response.data
+        assert b"PARTNER" in response.data
+
+    def test_delegation_list_without_session_redirects(self, client):
+        """GET /delegations without session redirects to picker."""
+        response = client.get(
+            "/delegations", follow_redirects=False
+        )
+        assert response.status_code == 302
+        assert "switch-delegate" in response.location
+
+    def test_delegation_list_nav_link_present(
+        self, client, member_delegate_id
+    ):
+        """Delegations nav link is present on authenticated pages."""
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = member_delegate_id
+
+        response = client.get("/")
+        assert response.status_code == 200
+        assert b"Delegations" in response.data
+
+
+class TestDelegationDetail:
+    """TEST-010: Delegation detail route."""
+
+    def test_delegation_detail_returns_200_for_existing(
+        self, client, member_delegate_id
+    ):
+        """GET /delegations/FRA returns 200 for existing delegation."""
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = member_delegate_id
+
+        response = client.get("/delegations/FRA")
+        assert response.status_code == 200
+
+    def test_delegation_detail_shows_delegate_roster(
+        self, client, member_delegate_id
+    ):
+        """Delegation detail lists delegate names in the roster."""
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = member_delegate_id
+
+        response = client.get("/delegations/FRA")
+        assert response.status_code == 200
+        assert b"Marie Dupont" in response.data
+
+    def test_delegation_detail_shows_framework_agreements(
+        self, client, partner_delegate_id
+    ):
+        """Delegation detail lists framework agreements when present."""
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = partner_delegate_id
+
+        # BRA has a framework agreement with EDU committee
+        response = client.get("/delegations/BRA")
+        assert response.status_code == 200
+        assert b"Framework Agreements" in response.data
+
+    def test_delegation_detail_returns_404_for_nonexistent(
+        self, client, member_delegate_id
+    ):
+        """GET /delegations/FAKE returns 404 for unknown delegation."""
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = member_delegate_id
+
+        response = client.get("/delegations/FAKE")
+        assert response.status_code == 404
+
+    def test_delegation_detail_shows_add_button_for_editor(
+        self, client, member_delegate_id
+    ):
+        """Add New Delegate button is visible for delegation editor."""
+        # DEL-2026-0001 (Marie Dupont) is DELEGATION_EDITOR for FRA
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = member_delegate_id
+
+        response = client.get("/delegations/FRA")
+        assert response.status_code == 200
+        assert b"Add New Delegate" in response.data
+
+    def test_delegation_detail_hides_add_button_for_non_editor(
+        self, client, member_delegate_id
+    ):
+        """Add New Delegate button is hidden for non-editor delegate."""
+        # DEL-2026-0001 (FRA editor) visits BRA — not their delegation
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = member_delegate_id
+
+        response = client.get("/delegations/BRA")
+        assert response.status_code == 200
+        assert b"Add New Delegate" not in response.data
+
+    def test_delegation_detail_without_session_redirects(
+        self, client
+    ):
+        """GET /delegations/FRA without session redirects to picker."""
+        response = client.get(
+            "/delegations/FRA", follow_redirects=False
+        )
+        assert response.status_code == 302
+        assert "switch-delegate" in response.location

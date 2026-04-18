@@ -16,6 +16,10 @@
           <span class="navbar-text text-light">
             {{ current_delegate_name }} &mdash; {{ current_delegation_name }}
           </span>
+          <a class="nav-link text-light"
+             href="{{ url_for('delegations.delegation_list') }}">
+            Delegations
+          </a>
           <a class="nav-link text-light" href="{{ url_for('switch_delegate') }}">
             Switch Delegate
           </a>

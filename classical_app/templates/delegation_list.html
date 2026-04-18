@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Delegations — ONE MP{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Delegations</h2>
+<table class="table table-hover">
+  <thead class="table-dark">
+    <tr>
+      <th>Name</th>
+      <th>Type</th>
+      <th>Delegates</th>
+      <th>Framework Agreements</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in delegations %}
+    <tr>
+      <td>
+        <a href="{{ url_for('delegations.delegation_detail', delegation_id=item.delegation.id) }}">
+          {{ item.delegation.name }}
+        </a>
+      </td>
+      <td>
+        <span class="badge {% if item.delegation.membership_type.value == 'MEMBER' %}bg-primary{% else %}bg-secondary{% endif %}">
+          {{ item.delegation.membership_type.value }}
+        </span>
+      </td>
+      <td>{{ item.delegate_count }}</td>
+      <td>{{ item.fa_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ delegation.name }} — ONE MP{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2>
+      {{ delegation.name }}
+      <span class="badge {% if delegation.membership_type.value == 'MEMBER' %}bg-primary{% else %}bg-secondary{% endif %} fs-6">
+        {{ delegation.membership_type.value }}
+      </span>
+    </h2>
+  </div>
+  {% if is_editor_of_delegation(delegation.id) %}
+  <a href="{{ url_for('delegations.wizard_step1', delegation_id=delegation.id) }}"
+     class="btn btn-success">Add New Delegate</a>
+  {% endif %}
+</div>
+
+{% if delegation.framework_agreements %}
+<h5>Framework Agreements</h5>
+<ul class="list-unstyled mb-4">
+  {% for fa in delegation.framework_agreements %}
+  <li><span class="badge bg-info text-dark">{{ fa.committee.name }}</span></li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<h5>Delegates</h5>
+<table class="table table-hover">
+  <thead class="table-dark">
+    <tr>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Function</th>
+      <th>Committees</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for item in delegates_data %}
+    <tr>
+      <td>{{ item.delegate.full_name }}</td>
+      <td>{{ item.delegate.email }}</td>
+      <td>{{ item.delegate.function }}</td>
+      <td>{{ item.committee_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
