@@ -60,6 +60,18 @@ class TestDelegatePicker:
         assert response.status_code == 302
         assert "switch-delegate" in response.location
 
+    def test_editor_badge_visible_for_editor_delegate(
+        self, client
+    ):
+        """Editor badge appears for DELEGATION_EDITOR delegates in picker.
+
+        DEL-2026-0001 (Marie Dupont) has role DELEGATION_EDITOR, so the
+        bg-warning 'Editor' badge should be present in the picker table.
+        """
+        response = client.get("/switch-delegate")
+        assert response.status_code == 200
+        assert b"Editor" in response.data
+
 
 class TestDashboard:
     """TEST-002: Dashboard route."""

@@ -19,7 +19,12 @@
     <tbody>
       {% for delegate in delegates %}
       <tr>
-        <td>{{ delegate.full_name }}</td>
+        <td>
+          {{ delegate.full_name }}
+          {% if delegate.role.value == 'DELEGATION_EDITOR' %}
+          <span class="badge bg-warning text-dark ms-1">Editor</span>
+          {% endif %}
+        </td>
         <td>{{ delegate.function }}</td>
         <td>{{ delegate.delegation.name }}</td>
         <td>
