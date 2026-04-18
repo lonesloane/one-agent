@@ -13,6 +13,7 @@ from loguru import logger
 from sqlalchemy import select
 
 from shared.database import Delegation
+from classical_app.permissions import editor_of_delegation_required
 
 delegations_bp = Blueprint("delegations", __name__)
 
@@ -87,6 +88,7 @@ def delegation_detail(delegation_id: str) -> Any:
     "/delegations/<delegation_id>/delegates/new/step1",
     methods=["GET", "POST"],
 )
+@editor_of_delegation_required()
 def wizard_step1(delegation_id: str) -> Any:
     """Placeholder for wizard step 1 (implemented in Phase 2C)."""
     return "Not implemented", 501
