@@ -8,6 +8,9 @@ from sqlalchemy.orm import Session
 
 from shared.database import (
     Delegate,
+    Delegation,
+    DelegateRole,
+    MembershipType,
     get_engine,
     init_db,
 )
@@ -95,6 +98,82 @@ def partner_delegate_id(seeded_engine) -> str:
     """
     with Session(seeded_engine) as session:
         stmt = select(Delegate).where(Delegate.id == "DEL-2026-0005")
+        delegate = session.scalars(stmt).first()
+        assert delegate is not None
+        return delegate.id
+
+
+@pytest.fixture
+def editor_member_id(seeded_engine) -> str:
+    """
+    Get the ID of a DELEGATION_EDITOR from a MEMBER delegation.
+
+    Queries dynamically for the first DELEGATION_EDITOR whose delegation
+    has membership_type == MEMBER.
+
+    Returns:
+        Delegate ID string.
+    """
+    with Session(seeded_engine) as session:
+        stmt = (
+            select(Delegate)
+            .join(Delegation)
+            .where(Delegate.role == DelegateRole.DELEGATION_EDITOR)
+            .where(
+                Delegation.membership_type == MembershipType.MEMBER
+            )
+        )
+        delegate = session.scalars(stmt).first()
+        assert delegate is not None
+        return delegate.id
+
+
+@pytest.fixture
+def editor_partner_id(seeded_engine) -> str:
+    """
+    Get the ID of a DELEGATION_EDITOR from a PARTNER delegation.
+
+    Queries dynamically for the first DELEGATION_EDITOR whose delegation
+    has membership_type == PARTNER.
+
+    Returns:
+        Delegate ID string.
+    """
+    with Session(seeded_engine) as session:
+        stmt = (
+            select(Delegate)
+            .join(Delegation)
+            .where(Delegate.role == DelegateRole.DELEGATION_EDITOR)
+            .where(
+                Delegation.membership_type == MembershipType.PARTNER
+            )
+        )
+        delegate = session.scalars(stmt).first()
+        assert delegate is not None
+        return delegate.id
+
+
+@pytest.fixture
+def editor_other_delegation_id(seeded_engine) -> str:
+    """
+    Get the ID of an editor whose delegation is not FRA (MEMBER).
+
+    Returns the first DELEGATION_EDITOR from a PARTNER delegation.
+    This editor belongs to a different delegation than the one used
+    as the POST target (FRA) in permission enforcement tests.
+
+    Returns:
+        Delegate ID string.
+    """
+    with Session(seeded_engine) as session:
+        stmt = (
+            select(Delegate)
+            .join(Delegation)
+            .where(Delegate.role == DelegateRole.DELEGATION_EDITOR)
+            .where(
+                Delegation.membership_type == MembershipType.PARTNER
+            )
+        )
         delegate = session.scalars(stmt).first()
         assert delegate is not None
         return delegate.id
