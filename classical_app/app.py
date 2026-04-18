@@ -144,7 +144,7 @@ def create_app(db_url: str | None = None) -> Flask:
     def handle_forbidden(error: Any) -> tuple[str, int]:
         """Return 403 access-denied page."""
         logger.warning("Access forbidden: {}", error)
-        return render_template("403.html"), 403
+        return render_template("403.html", reason=None), 403
 
     @flask_app.errorhandler(404)
     def handle_not_found(error: Any) -> tuple[str, int]:

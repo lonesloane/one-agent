@@ -6,8 +6,11 @@
   <h1 class="display-4 text-danger">403</h1>
   <h2>Access Denied</h2>
   <p class="text-muted">
-    You do not have permission to view this document.
-    Your current access level does not permit access to this classification.
+    {% if reason %}
+      {{ reason }}
+    {% else %}
+      You do not have permission to access this resource.
+    {% endif %}
   </p>
   <a href="{{ url_for('dashboard') }}" class="btn btn-primary">Back to Dashboard</a>
 </div>
