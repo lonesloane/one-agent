@@ -6,11 +6,10 @@ wizard POST endpoint. Tests that duplicate coverage already in
 test_routes.py are intentionally omitted.
 """
 
-import pytest
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from shared.database import Delegate, Delegation
+from shared.database import Delegation
 
 
 class TestDelegationCounts:
@@ -31,21 +30,16 @@ class TestDelegationCounts:
         response = client.get("/delegations")
         assert response.status_code == 200
 
-        html = response.data.decode("utf-8")
-
         with Session(seeded_engine) as session:
             delegations = session.scalars(select(Delegation)).all()
             for delegation in delegations:
-                expected = len(delegation.delegates)
-                # The count appears in a plain <td> cell; verify that
-                # both the delegation name and its count appear in the
-                # rendered HTML.
-                assert delegation.name in html, (
-                    f"Delegation name '{delegation.name}' not in HTML"
-                )
-                assert str(expected) in html, (
-                    f"Expected count {expected} for {delegation.id} "
-                    f"not found in HTML"
+                expected_count = len(delegation.delegates)
+                # Check name appears in response
+                assert delegation.name.encode() in response.data
+                # Check count appears in a table data cell
+                assert (
+                    f"<td>{expected_count}</td>".encode()
+                    in response.data
                 )
 
 
@@ -55,7 +49,7 @@ class TestWizardPermissions:
     _WIZARD_URL = "/delegations/FRA/delegates/new/step1"
 
     def test_direct_post_from_non_editor_returns_403(
-        self, client, seeded_engine
+        self, client
     ) -> None:
         """Non-editor delegate POSTing wizard URL receives HTTP 403.
 
@@ -95,10 +89,10 @@ class TestWizardPermissions:
             sess["delegate_id"] = editor_member_id
 
         response = client.post(self._WIZARD_URL, data={})
-        assert response.status_code != 403
+        assert response.status_code == 501
 
     def test_403_template_rendered_on_permission_denied(
-        self, client, seeded_engine
+        self, client
     ) -> None:
         """403 error response renders the Access Denied template.
 

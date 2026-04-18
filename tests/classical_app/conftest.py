@@ -154,26 +154,10 @@ def editor_partner_id(seeded_engine) -> str:
 
 
 @pytest.fixture
-def editor_other_delegation_id(seeded_engine) -> str:
+def editor_other_delegation_id(editor_partner_id: str) -> str:
     """
-    Get the ID of an editor whose delegation is not FRA (MEMBER).
+    Return an editor whose delegation differs from the FRA test target.
 
-    Returns the first DELEGATION_EDITOR from a PARTNER delegation.
-    This editor belongs to a different delegation than the one used
-    as the POST target (FRA) in permission enforcement tests.
-
-    Returns:
-        Delegate ID string.
+    Delegates to editor_partner_id (BRA delegation).
     """
-    with Session(seeded_engine) as session:
-        stmt = (
-            select(Delegate)
-            .join(Delegation)
-            .where(Delegate.role == DelegateRole.DELEGATION_EDITOR)
-            .where(
-                Delegation.membership_type == MembershipType.PARTNER
-            )
-        )
-        delegate = session.scalars(stmt).first()
-        assert delegate is not None
-        return delegate.id
+    return editor_partner_id
