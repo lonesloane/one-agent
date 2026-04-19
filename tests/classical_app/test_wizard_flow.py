@@ -74,28 +74,24 @@ def _seed_full_fra_state(
         }
 
 
+def _encode_step3_rows(rows: list[dict]) -> dict:
+    """Return flat form-encoded dict for a step3 POST from row dicts."""
+    data: dict = {}
+    for i, row in enumerate(rows):
+        data[f"rows-{i}-committee_id"] = row["committee_id"]
+        data[f"rows-{i}-access_level"] = row["access_level"]
+        if row.get("retroactive"):
+            data[f"rows-{i}-retroactive"] = "on"
+    return data
+
+
 def _post_full_wizard(
     client,
     delegation_id: str,
     editor_id: str,
     step3_rows: list[dict],
 ):
-    """
-    Drive the wizard HTTP POSTs for steps 1–4.
-
-    Seeds delegate_id in the session, then POSTs step1, step2, step3,
-    and step4 in sequence.  Returns the final step4 response.
-
-    Args:
-        client: Flask test client.
-        delegation_id: Two-letter delegation code (e.g. "FRA").
-        editor_id: Delegate ID to set as the session user.
-        step3_rows: List of dicts with keys committee_id, access_level,
-            and retroactive (bool).
-
-    Returns:
-        The step4 POST response (follow_redirects=False).
-    """
+    """Drive wizard HTTP POSTs for steps 1–4 and return the step4 response."""
     base = f"/delegations/{delegation_id}/delegates/new"
     with client.session_transaction() as sess:
         sess["delegate_id"] = editor_id
@@ -118,15 +114,9 @@ def _post_full_wizard(
         follow_redirects=False,
     )
 
-    step3_data: dict = {}
-    for i, row in enumerate(step3_rows):
-        step3_data[f"rows-{i}-committee_id"] = row["committee_id"]
-        step3_data[f"rows-{i}-access_level"] = row["access_level"]
-        if row.get("retroactive"):
-            step3_data[f"rows-{i}-retroactive"] = "on"
     client.post(
         f"{base}/step3",
-        data=step3_data,
+        data=_encode_step3_rows(step3_rows),
         follow_redirects=False,
     )
 
