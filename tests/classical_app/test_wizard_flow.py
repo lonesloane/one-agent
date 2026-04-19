@@ -15,9 +15,8 @@ from sqlalchemy import select
 from tests.classical_app.conftest import (  # noqa: F401
     client,
     seeded_engine,
-    temp_db,
     editor_member_id,
-    editor_partner_id,
+    non_editor_member_id,
 )
 from shared.database import (
     ApprovalStatus,
@@ -73,6 +72,69 @@ def _seed_full_fra_state(
                 "updated_at": _FUTURE_TS,
             }
         }
+
+
+def _post_full_wizard(
+    client,
+    delegation_id: str,
+    editor_id: str,
+    step3_rows: list[dict],
+):
+    """
+    Drive the wizard HTTP POSTs for steps 1–4.
+
+    Seeds delegate_id in the session, then POSTs step1, step2, step3,
+    and step4 in sequence.  Returns the final step4 response.
+
+    Args:
+        client: Flask test client.
+        delegation_id: Two-letter delegation code (e.g. "FRA").
+        editor_id: Delegate ID to set as the session user.
+        step3_rows: List of dicts with keys committee_id, access_level,
+            and retroactive (bool).
+
+    Returns:
+        The step4 POST response (follow_redirects=False).
+    """
+    base = f"/delegations/{delegation_id}/delegates/new"
+    with client.session_transaction() as sess:
+        sess["delegate_id"] = editor_id
+
+    client.post(
+        f"{base}/step1",
+        data={
+            "full_name": "E2E Test Person",
+            "email": "e2e.test@example.com",
+            "function": "Attaché",
+            "title": "Ms",
+        },
+        follow_redirects=False,
+    )
+
+    committee_ids = [row["committee_id"] for row in step3_rows]
+    client.post(
+        f"{base}/step2",
+        data={"committee_ids": committee_ids},
+        follow_redirects=False,
+    )
+
+    step3_data: dict = {}
+    for i, row in enumerate(step3_rows):
+        step3_data[f"rows-{i}-committee_id"] = row["committee_id"]
+        step3_data[f"rows-{i}-access_level"] = row["access_level"]
+        if row.get("retroactive"):
+            step3_data[f"rows-{i}-retroactive"] = "on"
+    client.post(
+        f"{base}/step3",
+        data=step3_data,
+        follow_redirects=False,
+    )
+
+    return client.post(
+        f"{base}/step4",
+        data={"submit": "true"},
+        follow_redirects=False,
+    )
 
 
 class TestTTLExpiry:
@@ -162,12 +224,11 @@ class TestNonEditorAccess:
     """Non-editor delegate receives 403 on wizard POST."""
 
     def test_non_editor_post_step1_returns_403(
-        self, client
+        self, client, non_editor_member_id
     ) -> None:
         """POST step1 as a non-editor delegate on FRA returns 403."""
-        # DEL-2026-0002 (Jean Martin) is role=DELEGATE, not editor
         with client.session_transaction() as sess:
-            sess["delegate_id"] = "DEL-2026-0002"
+            sess["delegate_id"] = non_editor_member_id
 
         response = client.post(
             _STEP1_URL,
@@ -183,11 +244,11 @@ class TestNonEditorAccess:
         assert response.status_code == 403
 
     def test_non_editor_get_step1_returns_403(
-        self, client
+        self, client, non_editor_member_id
     ) -> None:
         """GET step1 as a non-editor delegate on FRA returns 403."""
         with client.session_transaction() as sess:
-            sess["delegate_id"] = "DEL-2026-0002"
+            sess["delegate_id"] = non_editor_member_id
 
         response = client.get(_STEP1_URL, follow_redirects=False)
 
@@ -253,60 +314,24 @@ class TestE2EHappyPath:
         self, client, editor_member_id, seeded_engine
     ) -> None:
         """Step1→2→3→4 creates 3 DARs with distinct approval statuses."""
-        # Seed delegate_id in session before starting the wizard
-        with client.session_transaction() as sess:
-            sess["delegate_id"] = editor_member_id
-
-        # Step 1
-        r1 = client.post(
-            _STEP1_URL,
-            data={
-                "full_name": "E2E Test Person",
-                "email": "e2e.test@example.com",
-                "function": "Attaché",
-                "title": "Ms",
-            },
-            follow_redirects=False,
+        step3_rows = [
+            # retroactive absent → AUTO_APPROVED
+            {"committee_id": "EDU", "access_level": "GENERAL",
+             "retroactive": False},
+            # restricted, no retroactive → PENDING_DELEGATION_HEAD
+            {"committee_id": "TRADE", "access_level": "RESTRICTED",
+             "retroactive": False},
+            # retroactive → PENDING_SECRETARIAT
+            {"committee_id": "DAC", "access_level": "CONFIDENTIAL",
+             "retroactive": True},
+        ]
+        r4 = _post_full_wizard(
+            client, "FRA", editor_member_id, step3_rows
         )
-        assert r1.status_code == 302
 
-        # Step 2 — select EDU, TRADE, DAC
-        r2 = client.post(
-            _STEP2_URL,
-            data={"committee_ids": ["EDU", "TRADE", "DAC"]},
-            follow_redirects=False,
-        )
-        assert r2.status_code == 302
-
-        # Step 3 — three rows with distinct routing combinations
-        r3 = client.post(
-            _STEP3_URL,
-            data={
-                "rows-0-committee_id": "EDU",
-                "rows-0-access_level": "GENERAL",
-                # retroactive absent → False → AUTO_APPROVED
-                "rows-1-committee_id": "TRADE",
-                "rows-1-access_level": "RESTRICTED",
-                # retroactive absent → PENDING_DELEGATION_HEAD
-                "rows-2-committee_id": "DAC",
-                "rows-2-access_level": "CONFIDENTIAL",
-                "rows-2-retroactive": "on",
-                # retroactive → PENDING_SECRETARIAT
-            },
-            follow_redirects=False,
-        )
-        assert r3.status_code == 302
-
-        # Step 4 POST — commit
-        r4 = client.post(
-            _STEP4_URL,
-            data={"submit": "true"},
-            follow_redirects=False,
-        )
         assert r4.status_code == 302
         assert "confirmation" in r4.location
 
-        # Verify DB state
         with Session(seeded_engine) as db:
             delegate = db.scalars(
                 select(Delegate).where(
@@ -324,9 +349,7 @@ class TestE2EHappyPath:
             assert len(dars) == 3
 
             statuses = {d.committee_id: d.approval_status for d in dars}
-            assert (
-                statuses["EDU"] == ApprovalStatus.AUTO_APPROVED
-            )
+            assert statuses["EDU"] == ApprovalStatus.AUTO_APPROVED
             assert (
                 statuses["TRADE"]
                 == ApprovalStatus.PENDING_DELEGATION_HEAD
@@ -343,29 +366,24 @@ class TestRetroactivePendingSecretariat:
         self, client, editor_member_id, seeded_engine
     ) -> None:
         """Seeded step4 state with retroactive row → PENDING_SECRETARIAT."""
+        retro_row = {
+            "committee_id": "EDU",
+            "access_level": "GENERAL",
+            "retroactive": True,
+        }
         with client.session_transaction() as sess:
             sess["delegate_id"] = editor_member_id
-            sess["delegate_wizard"] = {
-                "FRA": {
-                    "step1": {
-                        "full_name": "Retro Person",
-                        "email": "retro.person@example.com",
-                        "function": "Advisor",
-                        "title": "",
-                    },
-                    "step2": {"committee_ids": ["EDU"]},
-                    "step3": {
-                        "rows": [
-                            {
-                                "committee_id": "EDU",
-                                "access_level": "GENERAL",
-                                "retroactive": True,
-                            }
-                        ]
-                    },
-                    "updated_at": _FUTURE_TS,
-                }
-            }
+            sess["delegate_wizard"] = {"FRA": {
+                "step1": {
+                    "full_name": "Retro Person",
+                    "email": "retro.person@example.com",
+                    "function": "Advisor",
+                    "title": "",
+                },
+                "step2": {"committee_ids": ["EDU"]},
+                "step3": {"rows": [retro_row]},
+                "updated_at": _FUTURE_TS,
+            }}
 
         client.post(
             _STEP4_URL,

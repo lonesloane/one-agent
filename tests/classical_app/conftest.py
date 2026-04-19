@@ -154,6 +154,31 @@ def editor_partner_id(seeded_engine) -> str:
 
 
 @pytest.fixture
+def non_editor_member_id(seeded_engine) -> str:
+    """
+    Get the ID of a non-editor delegate from the FRA (MEMBER) delegation.
+
+    Queries dynamically for the first delegate with role == DELEGATE
+    whose delegation has membership_type == MEMBER.
+
+    Returns:
+        Delegate ID string.
+    """
+    with Session(seeded_engine) as session:
+        stmt = (
+            select(Delegate)
+            .join(Delegation)
+            .where(Delegate.role == DelegateRole.DELEGATE)
+            .where(
+                Delegation.membership_type == MembershipType.MEMBER
+            )
+        )
+        delegate = session.scalars(stmt).first()
+        assert delegate is not None
+        return delegate.id
+
+
+@pytest.fixture
 def editor_other_delegation_id(editor_partner_id: str) -> str:
     """
     Return an editor whose delegation differs from the FRA test target.
