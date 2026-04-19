@@ -83,13 +83,17 @@ class TestWizardPermissions:
     ) -> None:
         """FRA's own DELEGATION_EDITOR POSTing the FRA wizard is not 403.
 
-        The wizard returns 501 (stub), but permission must be granted.
+        An empty POST fails WTForms validation and re-renders step1 (200).
+        Permission must be granted (not 403) and the form must be shown.
         """
         with client.session_transaction() as sess:
             sess["delegate_id"] = editor_member_id
 
         response = client.post(self._WIZARD_URL, data={})
-        assert response.status_code == 501
+        assert response.status_code == 200
+        assert b"step1" in response.data.lower() or (
+            b"Personal Information" in response.data
+        )
 
     def test_403_template_rendered_on_permission_denied(
         self, client
