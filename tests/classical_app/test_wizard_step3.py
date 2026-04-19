@@ -17,7 +17,7 @@ from tests.classical_app.conftest import (  # noqa: F401 (fixtures)
     temp_db,
     editor_member_id,
 )
-from classical_app.routes.wizard import _allowed_levels
+from classical_app.routes.wizard_helpers import _allowed_levels
 from shared.database import ClassificationLevel, MembershipType
 
 

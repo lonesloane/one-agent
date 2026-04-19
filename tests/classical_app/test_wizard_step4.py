@@ -120,3 +120,36 @@ class TestWizardStep4Get:
         assert response.status_code == 200
         html = response.data.decode()
         assert "pending OECD secretariat approval" in html
+
+    def test_get_step4_general_nonretro_shows_auto_approved(
+        self, client, editor_member_id
+    ) -> None:
+        """GENERAL non-retroactive row shows 'auto-approved' label."""
+        with client.session_transaction() as sess:
+            sess["delegate_id"] = editor_member_id
+            sess["delegate_wizard"] = {
+                "FRA": {
+                    "step1": {
+                        "full_name": "Test User",
+                        "email": "test@example.com",
+                        "function": "Advisor",
+                        "title": "",
+                    },
+                    "step2": {"committee_ids": ["EDU"]},
+                    "step3": {
+                        "rows": [
+                            {
+                                "committee_id": "EDU",
+                                "access_level": "GENERAL",
+                                "retroactive": False,
+                            }
+                        ]
+                    },
+                    "updated_at": "2099-01-01T00:00:00+00:00",
+                }
+            }
+
+        response = client.get(_STEP4_URL)
+
+        assert response.status_code == 200
+        assert b"auto-approved" in response.data
