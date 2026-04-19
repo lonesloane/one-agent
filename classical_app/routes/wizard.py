@@ -18,9 +18,12 @@ from loguru import logger
 from sqlalchemy import func, select
 
 from classical_app import wizard_state
-from classical_app.forms.delegate_wizard import Step1PersonalInfoForm
+from classical_app.forms.delegate_wizard import (
+    Step1PersonalInfoForm,
+    Step2CommitteesForm,
+)
 from classical_app.permissions import editor_of_delegation_required
-from shared.database import ApprovalStatus, Delegate
+from shared.database import ApprovalStatus, Committee, Delegate
 
 
 APPROVAL_LABELS: dict[str, str] = {
@@ -151,14 +154,116 @@ def wizard_step1(delegation_id: str) -> Any:
     )
 
 
+def _build_committee_choices(
+    db_session: Any,
+) -> list[tuple[str, str]]:
+    """Query all committees ordered by name and return choice tuples.
+
+    Args:
+        db_session: SQLAlchemy scoped session.
+
+    Returns:
+        List of (id, name) tuples suitable for SelectMultipleField.
+    """
+    stmt = select(Committee).order_by(Committee.name)
+    committees = db_session.scalars(stmt).all()
+    return [(c.id, c.name) for c in committees]
+
+
+def _prefill_step2_form(
+    form: Step2CommitteesForm, state: dict
+) -> None:
+    """Pre-fill Step2CommitteesForm from saved wizard state.
+
+    Args:
+        form: The WTForms form instance to populate.
+        state: Wizard session state dict for the delegation.
+    """
+    step2_data = state.get("step2", {})
+    saved_ids = step2_data.get("committee_ids")
+    if saved_ids:
+        form.committee_ids.data = saved_ids
+
+
+def _handle_step2_post(
+    form: Step2CommitteesForm,
+    delegation_id: str,
+) -> Any:
+    """Process Step 2 POST — save state and redirect or re-render.
+
+    Args:
+        form: Validated Step2CommitteesForm instance.
+        delegation_id: Delegation identifier from the URL.
+
+    Returns:
+        Redirect to step 3 on valid submission, or re-rendered
+        step2 template when validation fails.
+    """
+    if form.validate_on_submit():
+        wizard_state.save(
+            delegation_id,
+            "step2",
+            {"committee_ids": form.committee_ids.data},
+        )
+        logger.info(
+            "Wizard step2 complete; advancing to step3:"
+            " delegation={}",
+            delegation_id,
+        )
+        return redirect(
+            url_for(
+                "wizard.wizard_step3",
+                delegation_id=delegation_id,
+            )
+        )
+
+    return render_template(
+        "wizard/step2.html",
+        form=form,
+        delegation_id=delegation_id,
+    )
+
+
 @wizard_bp.route(
     "/delegations/<delegation_id>/delegates/new/step2",
     methods=["GET", "POST"],
 )
 @editor_of_delegation_required()
 def wizard_step2(delegation_id: str) -> Any:
-    """Handle step 2 of the add-delegate wizard."""
-    return "Not implemented", 501
+    """Handle step 2 of the add-delegate wizard.
+
+    Args:
+        delegation_id: Delegation identifier from the URL.
+
+    Returns:
+        Rendered step2 template or a redirect to step 3.
+    """
+    redirect_response = wizard_state.require_steps(
+        delegation_id, ("step1",)
+    )
+    if redirect_response is not None:
+        return redirect_response
+
+    db_session = current_app.extensions["db_session"]
+    choices = _build_committee_choices(db_session)
+
+    form = Step2CommitteesForm()
+    # Reason: choices must be set before validation for
+    # SelectMultipleField to accept submitted values.
+    form.committee_ids.choices = choices
+
+    if form.is_submitted():
+        return _handle_step2_post(form, delegation_id)
+
+    state = wizard_state.load(delegation_id)
+    if state:
+        _prefill_step2_form(form, state)
+
+    return render_template(
+        "wizard/step2.html",
+        form=form,
+        delegation_id=delegation_id,
+    )
 
 
 @wizard_bp.route(

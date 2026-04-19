@@ -20,7 +20,7 @@
               <input type="checkbox" class="form-check-input"
                      id="committee_{{ choice_value }}" name="committee_ids"
                      value="{{ choice_value }}"
-                     {% if choice_value|string in form.committee_ids.data|map(attribute='id')|map(string)|list %}checked{% endif %}>
+                     {% if choice_value in (form.committee_ids.data or []) %}checked{% endif %}>
               <label class="form-check-label" for="committee_{{ choice_value }}">
                 {{ choice_label }}
               </label>
@@ -37,7 +37,7 @@
            class="btn btn-outline-secondary">Previous</a>
         <button type="submit" class="btn btn-primary">Next</button>
         <form method="post" action="{{ url_for('wizard.wizard_cancel', delegation_id=delegation_id) }}" class="d-inline">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          {{ form.hidden_tag() }}
           <button type="submit" class="btn btn-outline-secondary">Cancel</button>
         </form>
       </div>
