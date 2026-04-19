@@ -33,7 +33,6 @@ from shared.database import (
     Committee,
     Delegate,
     Delegation,
-    FrameworkAgreement,
     MembershipType,
 )
 
