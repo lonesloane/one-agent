@@ -4,7 +4,8 @@
 {% block content %}
 <h2>Add New Delegate — Step 2: Select Committees</h2>
 
-{% include "wizard/_progress.html" with step=2 %}
+{% set step = 2 %}
+{% include "wizard/_progress.html" %}
 
 <div class="card">
   <div class="card-body">
