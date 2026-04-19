@@ -63,7 +63,7 @@ class Step2CommitteesForm(FlaskForm):
         Raises:
             ValidationError: If no committees are selected.
         """
-        if not field.data or len(field.data) == 0:
+        if not field.data:
             raise ValidationError(
                 "Please select at least one committee."
             )
@@ -87,7 +87,7 @@ class DARRowForm(FlaskForm):
         "Access Level",
         coerce=str,
     )
-    retroactive = BooleanField("Retroactive", default=False)
+    retroactive = BooleanField("Retroactive")
 
 
 class Step3DARsForm(FlaskForm):
