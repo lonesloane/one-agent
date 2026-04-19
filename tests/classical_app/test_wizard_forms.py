@@ -26,7 +26,7 @@ def app() -> Flask:
 
 
 class TestStep1Form:
-    """TASK-018: Validation rules for Step1PersonalInfoForm."""
+    """Validation rules for Step1PersonalInfoForm."""
 
     def test_email_format_invalid(self, app: Flask) -> None:
         """Non-email string fails Email() validator."""
@@ -87,9 +87,24 @@ class TestStep1Form:
             form = Step1PersonalInfoForm()
             assert form.validate(), form.errors
 
+    def test_function_required(self, app: Flask) -> None:
+        """Empty function fails DataRequired validator."""
+        with app.test_request_context(
+            "/",
+            method="POST",
+            data={
+                "full_name": "Alice",
+                "email": "alice@example.com",
+                "function": "",
+            },
+        ):
+            form = Step1PersonalInfoForm()
+            assert not form.validate()
+            assert form.function.errors
+
 
 class TestStep2Form:
-    """TASK-018: Validation rules for Step2CommitteesForm."""
+    """Validation rules for Step2CommitteesForm."""
 
     def test_zero_selection_fails(self, app: Flask) -> None:
         """Empty committee_ids list triggers custom ValidationError."""
@@ -103,6 +118,10 @@ class TestStep2Form:
             form.committee_ids.choices = [("c1", "Committee 1")]
             assert not form.validate()
             assert form.committee_ids.errors
+            assert any(
+                "at least one committee" in e
+                for e in form.committee_ids.errors
+            )
 
     def test_one_selection_passes(self, app: Flask) -> None:
         """Selecting one committee satisfies the custom validator."""
@@ -117,7 +136,7 @@ class TestStep2Form:
 
 
 class TestDARRowForm:
-    """TASK-018: Structural properties of DARRowForm."""
+    """Structural properties of DARRowForm."""
 
     def test_fields_present(self, app: Flask) -> None:
         """DARRowForm exposes committee_id, access_level, retroactive."""
