@@ -29,6 +29,7 @@ from classical_app.routes.wizard_helpers import (
     APPROVAL_LABELS,  # noqa: F401 (re-exported for templates/callers)
     _build_review_rows,
     _build_step3_form,
+    _handle_step4_post,
 )
 from shared.database import (
     ClassificationLevel,
@@ -414,10 +415,12 @@ def wizard_step4(delegation_id: str) -> Any:
     if redirect_response is not None:
         return redirect_response
 
-    if request.method == "POST":
-        return "Not implemented", 501
-
     db_session = current_app.extensions["db_session"]
+
+    if request.method == "POST":
+        state = wizard_state.load(delegation_id) or {}
+        return _handle_step4_post(delegation_id, db_session, state)
+
     form, review_rows = _build_step4_context(delegation_id, db_session)
     logger.info(
         "Rendering wizard step4 review: delegation={} rows={}",
@@ -448,5 +451,19 @@ def wizard_confirmation(delegation_id: str) -> Any:
 )
 @editor_of_delegation_required()
 def wizard_cancel(delegation_id: str) -> Any:
-    """Cancel the add-delegate wizard and discard draft state."""
-    return "Not implemented", 501
+    """Cancel the add-delegate wizard and discard draft state.
+
+    Args:
+        delegation_id: Delegation identifier from the URL.
+
+    Returns:
+        Redirect to the delegation detail page.
+    """
+    wizard_state.clear(delegation_id)
+    logger.info("Wizard cancelled: delegation={}", delegation_id)
+    return redirect(
+        url_for(
+            "delegations.delegation_detail",
+            delegation_id=delegation_id,
+        )
+    )

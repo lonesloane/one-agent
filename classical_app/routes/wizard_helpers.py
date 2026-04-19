@@ -1,16 +1,19 @@
 """
-Pure helper functions for the add-delegate wizard.
+Helper functions for the add-delegate wizard.
 
-Contains business-rule helpers and form-building utilities used by
-``classical_app.routes.wizard``.  No Flask context required.
+Contains business-rule helpers, form-building utilities, and the
+submit transaction helper used by ``classical_app.routes.wizard``.
 """
 
+import flask
 from datetime import datetime, timezone
 from typing import Any
 
+from flask import flash, redirect, render_template, url_for
 from loguru import logger
+from sqlalchemy import select
 
-from classical_app.forms.delegate_wizard import Step3DARsForm
+from classical_app.forms.delegate_wizard import Step3DARsForm, Step4ReviewForm
 from shared.business_rules import (
     compute_default_access_level,
     determine_approval_route,
@@ -18,7 +21,11 @@ from shared.business_rules import (
 from shared.database import (
     ApprovalStatus,
     ClassificationLevel,
+    Committee,
+    Delegate,
+    DelegateRole,
     Delegation,
+    DocumentAccessRight,
     MembershipType,
 )
 
@@ -177,3 +184,133 @@ def _build_review_rows(
             }
         )
     return rows
+
+
+def _generate_delegate_id(db_session: Any) -> str:
+    """Generate the next delegate ID in DEL-YYYY-NNNN format.
+
+    Scans all existing delegate IDs, extracts the numeric sequence,
+    and returns one more than the current maximum.
+
+    Args:
+        db_session: SQLAlchemy scoped session.
+
+    Returns:
+        New delegate ID string, e.g. ``"DEL-2026-0042"``.
+    """
+    all_ids = db_session.scalars(select(Delegate.id)).all()
+    max_seq = 0
+    for did in all_ids:
+        parts = did.split("-")
+        if len(parts) == 3 and parts[0] == "DEL":
+            try:
+                max_seq = max(max_seq, int(parts[2]))
+            except ValueError:
+                pass
+    year = datetime.now(timezone.utc).year
+    return f"DEL-{year}-{max_seq + 1:04d}"
+
+
+def _handle_step4_post(
+    delegation_id: str,
+    db_session: Any,
+    state: dict,
+) -> Any:
+    """Execute the single-transaction delegate creation on step 4 POST.
+
+    Reads wizard state, creates a ``Delegate`` record with committees
+    and ``DocumentAccessRight`` rows, commits in a single transaction,
+    then stores the created delegate ID in session and clears wizard
+    state.  On commit failure, rolls back and re-renders step 4 with
+    a flash error message.
+
+    Args:
+        delegation_id: Delegation identifier from the URL.
+        db_session: SQLAlchemy scoped session.
+        state: Full wizard state dict for the delegation.
+
+    Returns:
+        Redirect to confirmation on success, or re-rendered step4
+        template on commit failure.
+    """
+    from classical_app import wizard_state  # avoid circular import
+
+    step1 = state.get("step1", {})
+    step3_rows = state.get("step3", {}).get("rows", [])
+
+    new_id = _generate_delegate_id(db_session)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    current_user = flask.session.get("delegate_id", "system")
+
+    delegate = Delegate(
+        id=new_id,
+        full_name=step1["full_name"],
+        email=step1["email"],
+        function=step1["function"],
+        title=step1.get("title") or None,
+        delegation_id=delegation_id,
+        accreditation_date=now,
+        is_active=True,
+        role=DelegateRole.DELEGATE,
+    )
+
+    committee_ids = [r["committee_id"] for r in step3_rows]
+    committees = db_session.scalars(
+        select(Committee).where(Committee.id.in_(committee_ids))
+    ).all()
+    delegate.committees = list(committees)
+
+    dars = [
+        DocumentAccessRight(
+            delegate_id=new_id,
+            committee_id=row["committee_id"],
+            classification_level=ClassificationLevel(row["access_level"]),
+            retroactive=row["retroactive"],
+            approval_status=determine_approval_route(
+                ClassificationLevel(row["access_level"]),
+                row["retroactive"],
+            ),
+            created_at=now,
+            created_by=current_user,
+        )
+        for row in step3_rows
+    ]
+
+    try:
+        db_session.add(delegate)
+        for dar in dars:
+            db_session.add(dar)
+        db_session.commit()
+    except Exception as exc:
+        db_session.rollback()
+        logger.error(
+            "Wizard step4 commit failed: delegation={} error={}",
+            delegation_id,
+            exc,
+        )
+        flash(
+            "An error occurred while saving. Please try again.",
+            "danger",
+        )
+        committee_map = {c.id: c.name for c in committees}
+        review_rows = _build_review_rows(state, committee_map)
+        return render_template(
+            "wizard/step4.html",
+            form=Step4ReviewForm(),
+            delegation_id=delegation_id,
+            review_rows=review_rows,
+        )
+
+    wizard_state.set_created_delegate_id(delegation_id, delegate.id)
+    wizard_state.clear(delegation_id)
+    logger.info(
+        "Delegate created: id={} delegation={}",
+        delegate.id,
+        delegation_id,
+    )
+    return redirect(
+        url_for(
+            "wizard.wizard_confirmation",
+            delegation_id=delegation_id,
+        )
+    )
