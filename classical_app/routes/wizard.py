@@ -36,6 +36,7 @@ from shared.database import (
     Committee,
     Delegate,
     Delegation,
+    DocumentAccessRight,
 )
 
 
@@ -438,14 +439,97 @@ def wizard_step4(delegation_id: str) -> Any:
     )
 
 
+def _build_dar_rows(
+    dars: list[DocumentAccessRight],
+    db_session: Any,
+) -> list[dict]:
+    """Build display rows for document-access-right entries.
+
+    Args:
+        dars: DocumentAccessRight ORM objects for a delegate.
+        db_session: Active SQLAlchemy session.
+
+    Returns:
+        List of dicts with keys committee_name, level,
+        retroactive, and status_label.
+    """
+    committee_ids = [d.committee_id for d in dars]
+    committees = db_session.scalars(
+        select(Committee).where(Committee.id.in_(committee_ids))
+    ).all()
+    committee_map = {c.id: c.name for c in committees}
+    return [
+        {
+            "committee_name": committee_map.get(
+                dar.committee_id, dar.committee_id
+            ),
+            "level": dar.classification_level.value,
+            "retroactive": dar.retroactive,
+            "status_label": APPROVAL_LABELS.get(
+                dar.approval_status.value,
+                dar.approval_status.value,
+            ),
+        }
+        for dar in dars
+    ]
+
+
 @wizard_bp.route(
     "/delegations/<delegation_id>/delegates/new/confirmation",
     methods=["GET"],
 )
 @editor_of_delegation_required()
 def wizard_confirmation(delegation_id: str) -> Any:
-    """Render the confirmation page after completing the wizard."""
-    return "Not implemented", 501
+    """Render the confirmation page after completing the wizard.
+
+    Args:
+        delegation_id: Delegation identifier from the URL.
+
+    Returns:
+        Rendered confirmation template, or redirect to delegation
+        detail when the created-delegate ID is missing or stale.
+    """
+    detail_url = url_for(
+        "delegations.delegation_detail",
+        delegation_id=delegation_id,
+    )
+    delegate_id = wizard_state.get_created_delegate_id(delegation_id)
+    if delegate_id is None:
+        logger.warning(
+            "No created delegate in wizard state: delegation={}",
+            delegation_id,
+        )
+        return redirect(detail_url)
+
+    db_session = current_app.extensions["db_session"]
+    delegate = db_session.scalars(
+        select(Delegate).where(Delegate.id == delegate_id)
+    ).first()
+    if delegate is None:
+        logger.warning(
+            "Delegate not found: delegate={} delegation={}",
+            delegate_id,
+            delegation_id,
+        )
+        return redirect(detail_url)
+
+    dars = db_session.scalars(
+        select(DocumentAccessRight).where(
+            DocumentAccessRight.delegate_id == delegate_id
+        )
+    ).all()
+    dar_rows = _build_dar_rows(dars, db_session)
+    logger.info(
+        "Rendering wizard confirmation: delegation={} delegate={}",
+        delegation_id,
+        delegate_id,
+    )
+    return render_template(
+        "wizard/confirmation.html",
+        delegate=delegate,
+        dar_rows=dar_rows,
+        delegation_id=delegation_id,
+    )
 
 
 @wizard_bp.route(
