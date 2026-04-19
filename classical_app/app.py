@@ -387,8 +387,10 @@ def create_app(db_url: str | None = None) -> Flask:
         )
 
     from classical_app.routes.delegations import delegations_bp
+    from classical_app.routes.wizard import wizard_bp
 
     flask_app.register_blueprint(delegations_bp)
+    flask_app.register_blueprint(wizard_bp)
 
     return flask_app
 

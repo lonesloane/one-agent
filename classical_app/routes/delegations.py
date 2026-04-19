@@ -82,13 +82,3 @@ def delegation_detail(delegation_id: str) -> Any:
         delegation=delegation,
         delegates_data=delegates_data,
     )
-
-
-@delegations_bp.route(
-    "/delegations/<delegation_id>/delegates/new/step1",
-    methods=["GET", "POST"],
-)
-@editor_of_delegation_required()
-def wizard_step1(delegation_id: str) -> Any:
-    """Placeholder for wizard step 1 (implemented in Phase 2C)."""
-    return "Not implemented", 501

@@ -12,7 +12,7 @@
     </h2>
   </div>
   {% if is_editor_of_delegation(delegation.id) %}
-  <a href="{{ url_for('delegations.wizard_step1', delegation_id=delegation.id) }}"
+  <a href="{{ url_for('wizard.wizard_step1', delegation_id=delegation.id) }}"
      class="btn btn-success">Add New Delegate</a>
   {% endif %}
 </div>
