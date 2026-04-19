@@ -24,9 +24,13 @@ from classical_app.forms.delegate_wizard import (
     Step1PersonalInfoForm,
     Step2CommitteesForm,
     Step3DARsForm,
+    Step4ReviewForm,
 )
 from classical_app.permissions import editor_of_delegation_required
-from shared.business_rules import compute_default_access_level
+from shared.business_rules import (
+    compute_default_access_level,
+    determine_approval_route,
+)
 from shared.database import (
     ApprovalStatus,
     ClassificationLevel,
@@ -481,13 +485,91 @@ def wizard_step3(delegation_id: str) -> Any:
     )
 
 
+def _build_review_rows(
+    state: dict, committee_map: dict[str, str]
+) -> list[dict]:
+    """Build review rows for the step 4 template.
+
+    For each DAR row in step3 state, resolve the approval route and
+    return a list of dicts suitable for the step4.html template.
+
+    Args:
+        state: Full wizard session state dict for the delegation.
+        committee_map: Mapping of committee_id to committee name.
+
+    Returns:
+        List of dicts with keys: committee_name, level, retroactive,
+        status_label.
+    """
+    rows = []
+    for row in state.get("step3", {}).get("rows", []):
+        level = ClassificationLevel(row["access_level"])
+        route = determine_approval_route(level, row["retroactive"])
+        rows.append(
+            {
+                "committee_name": committee_map.get(
+                    row["committee_id"], row["committee_id"]
+                ),
+                "level": row["access_level"],
+                "retroactive": row["retroactive"],
+                "status_label": APPROVAL_LABELS.get(
+                    route.value, route.value
+                ),
+            }
+        )
+    return rows
+
+
 @wizard_bp.route(
     "/delegations/<delegation_id>/delegates/new/step4",
     methods=["GET", "POST"],
 )
 @editor_of_delegation_required()
 def wizard_step4(delegation_id: str) -> Any:
-    """Handle step 4 of the add-delegate wizard."""
+    """Handle step 4 of the add-delegate wizard.
+
+    GET renders the review table showing approval routing per DAR row.
+    POST is reserved for Task #4 and currently returns 501.
+
+    Args:
+        delegation_id: Delegation identifier from the URL.
+
+    Returns:
+        Rendered step4 template on GET, or 501 on POST.
+    """
+    if request.method == "GET":
+        redirect_response = wizard_state.require_steps(
+            delegation_id, ("step1", "step2", "step3")
+        )
+        if redirect_response is not None:
+            return redirect_response
+
+        state = wizard_state.load(delegation_id) or {}
+        committee_ids = [
+            r["committee_id"]
+            for r in state.get("step3", {}).get("rows", [])
+        ]
+
+        db_session = current_app.extensions["db_session"]
+        committees = db_session.scalars(
+            select(Committee).where(Committee.id.in_(committee_ids))
+        ).all()
+        committee_map = {c.id: c.name for c in committees}
+
+        review_rows = _build_review_rows(state, committee_map)
+        form = Step4ReviewForm()
+        logger.info(
+            "Rendering wizard step4 review: delegation={} rows={}",
+            delegation_id,
+            len(review_rows),
+        )
+        return render_template(
+            "wizard/step4.html",
+            form=form,
+            delegation_id=delegation_id,
+            review_rows=review_rows,
+        )
+
     return "Not implemented", 501
 
 
