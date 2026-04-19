@@ -2,8 +2,7 @@
 Delegations blueprint — list and detail routes for Phase 2B.
 
 Provides read-only views for delegations, their delegates, and
-framework agreements. The wizard_step1 stub is a placeholder for the
-add-delegate wizard implemented in Phase 2C.
+framework agreements.
 """
 
 from typing import Any

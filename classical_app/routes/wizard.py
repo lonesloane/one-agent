@@ -72,6 +72,55 @@ def _email_exists_in_delegation(
     return db_session.scalars(stmt).first() is not None
 
 
+def _handle_step1_post(
+    form: Step1PersonalInfoForm,
+    db_session: Any,
+    delegation_id: str,
+) -> Any:
+    """Process a valid Step 1 POST submission.
+
+    Args:
+        form: Validated Step1PersonalInfoForm instance.
+        db_session: SQLAlchemy scoped session.
+        delegation_id: Delegation identifier from the URL.
+
+    Returns:
+        Redirect to step 2, or re-rendered step1 on duplicate email.
+    """
+    if _email_exists_in_delegation(
+        db_session, delegation_id, form.email.data
+    ):
+        logger.info(
+            "Duplicate email rejected in step1: delegation={} email={}",
+            delegation_id,
+            form.email.data,
+        )
+        form.email.errors.append(
+            "This email is already in use within this delegation."
+        )
+        return render_template(
+            "wizard/step1.html", form=form, delegation_id=delegation_id
+        )
+
+    wizard_state.save(
+        delegation_id,
+        "step1",
+        {
+            "full_name": form.full_name.data,
+            "email": form.email.data,
+            "function": form.function.data,
+            "title": form.title.data,
+        },
+    )
+    logger.info(
+        "Wizard step1 complete; advancing to step2: delegation={}",
+        delegation_id,
+    )
+    return redirect(
+        url_for("wizard.wizard_step2", delegation_id=delegation_id)
+    )
+
+
 @wizard_bp.route(
     "/delegations/<delegation_id>/delegates/new/step1",
     methods=["GET", "POST"],
@@ -79,13 +128,6 @@ def _email_exists_in_delegation(
 @editor_of_delegation_required()
 def wizard_step1(delegation_id: str) -> Any:
     """Handle step 1 of the add-delegate wizard.
-
-    GET: Render the personal info form, pre-filling from session if
-    a draft already exists for this delegation.
-
-    POST: Validate the form, check email uniqueness within the
-    delegation, save step data to the wizard session, and redirect
-    to step 2.
 
     Args:
         delegation_id: Delegation identifier from the URL.
@@ -97,53 +139,15 @@ def wizard_step1(delegation_id: str) -> Any:
     form = Step1PersonalInfoForm()
 
     if form.validate_on_submit():
-        if _email_exists_in_delegation(
-            db_session, delegation_id, form.email.data
-        ):
-            logger.info(
-                "Duplicate email rejected in step1:"
-                " delegation={} email={}",
-                delegation_id,
-                form.email.data,
-            )
-            form.email.errors.append(
-                "This email is already in use within this delegation."
-            )
-            return render_template(
-                "wizard/step1.html",
-                form=form,
-                delegation_id=delegation_id,
-            )
+        return _handle_step1_post(form, db_session, delegation_id)
 
-        wizard_state.save(
-            delegation_id,
-            "step1",
-            {
-                "full_name": form.full_name.data,
-                "email": form.email.data,
-                "function": form.function.data,
-                "title": form.title.data,
-            },
-        )
-        logger.info(
-            "Wizard step1 complete; advancing to step2:"
-            " delegation={}",
-            delegation_id,
-        )
-        return redirect(
-            url_for("wizard.wizard_step2", delegation_id=delegation_id)
-        )
-
-    # GET or failed validation — pre-fill from session on GET only.
     if not form.is_submitted():
         state = wizard_state.load(delegation_id)
         if state and "step1" in state:
             _prefill_step1_form(form, state)
 
     return render_template(
-        "wizard/step1.html",
-        form=form,
-        delegation_id=delegation_id,
+        "wizard/step1.html", form=form, delegation_id=delegation_id
     )
 
 
