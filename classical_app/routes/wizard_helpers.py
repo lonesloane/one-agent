@@ -11,10 +11,15 @@ from typing import Any
 
 from flask import flash, redirect, render_template, url_for
 from loguru import logger
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 
-from classical_app.forms.delegate_wizard import Step3DARsForm, Step4ReviewForm
+from classical_app.forms.delegate_wizard import (
+    Step1PersonalInfoForm,
+    Step2CommitteesForm,
+    Step3DARsForm,
+    Step4ReviewForm,
+)
 from shared.business_rules import (
     compute_default_access_level,
     determine_approval_route,
@@ -40,6 +45,73 @@ APPROVAL_LABELS: dict[str, str] = {
         "pending OECD secretariat approval"
     ),
 }
+
+
+def _prefill_step1_form(
+    form: Step1PersonalInfoForm, state: dict
+) -> None:
+    """Pre-fill Step1PersonalInfoForm from saved wizard state.
+
+    Args:
+        form: The WTForms form instance to populate.
+        state: Wizard session state dict for the delegation.
+    """
+    step1_data = state.get("step1", {})
+    form.full_name.data = step1_data.get("full_name", "")
+    form.email.data = step1_data.get("email", "")
+    form.function.data = step1_data.get("function", "")
+    form.title.data = step1_data.get("title", "")
+
+
+def _email_exists_in_delegation(
+    db_session: Any, delegation_id: str, email: str
+) -> bool:
+    """Check whether an email is already used in a delegation.
+
+    Args:
+        db_session: SQLAlchemy scoped session.
+        delegation_id: Delegation to search within.
+        email: Email address to check (case-insensitive).
+
+    Returns:
+        True if a delegate with that email exists, False otherwise.
+    """
+    stmt = select(Delegate).where(
+        Delegate.delegation_id == delegation_id,
+        func.lower(Delegate.email) == email.lower(),
+    )
+    return db_session.scalars(stmt).first() is not None
+
+
+def _build_committee_choices(
+    db_session: Any,
+) -> list[tuple[str, str]]:
+    """Query all committees ordered by name and return choice tuples.
+
+    Args:
+        db_session: SQLAlchemy scoped session.
+
+    Returns:
+        List of (id, name) tuples suitable for SelectMultipleField.
+    """
+    stmt = select(Committee).order_by(Committee.name)
+    committees = db_session.scalars(stmt).all()
+    return [(c.id, c.name) for c in committees]
+
+
+def _prefill_step2_form(
+    form: Step2CommitteesForm, state: dict
+) -> None:
+    """Pre-fill Step2CommitteesForm from saved wizard state.
+
+    Args:
+        form: The WTForms form instance to populate.
+        state: Wizard session state dict for the delegation.
+    """
+    step2_data = state.get("step2", {})
+    saved_ids = step2_data.get("committee_ids")
+    if saved_ids:
+        form.committee_ids.data = saved_ids
 
 
 def _allowed_levels(
@@ -185,6 +257,41 @@ def _build_review_rows(
             }
         )
     return rows
+
+
+def _build_dar_rows(
+    dars: list[DocumentAccessRight],
+    db_session: Any,
+) -> list[dict]:
+    """Build display rows for document-access-right entries.
+
+    Args:
+        dars: DocumentAccessRight ORM objects for a delegate.
+        db_session: Active SQLAlchemy session.
+
+    Returns:
+        List of dicts with keys committee_name, level,
+        retroactive, and status_label.
+    """
+    committee_ids = [d.committee_id for d in dars]
+    committees = db_session.scalars(
+        select(Committee).where(Committee.id.in_(committee_ids))
+    ).all()
+    committee_map = {c.id: c.name for c in committees}
+    return [
+        {
+            "committee_name": committee_map.get(
+                dar.committee_id, dar.committee_id
+            ),
+            "level": dar.classification_level.value,
+            "retroactive": dar.retroactive,
+            "status_label": APPROVAL_LABELS.get(
+                dar.approval_status.value,
+                dar.approval_status.value,
+            ),
+        }
+        for dar in dars
+    ]
 
 
 def _generate_delegate_id(db_session: Any) -> str:

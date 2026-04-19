@@ -16,7 +16,7 @@ from flask import (
     url_for,
 )
 from loguru import logger
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from classical_app import wizard_state
 from classical_app.forms.delegate_wizard import (
@@ -26,10 +26,14 @@ from classical_app.forms.delegate_wizard import (
 )
 from classical_app.permissions import editor_of_delegation_required
 from classical_app.routes.wizard_helpers import (
-    APPROVAL_LABELS,  # noqa: F401 (re-exported for templates/callers)
+    _build_committee_choices,
+    _build_dar_rows,
     _build_review_rows,
     _build_step3_form,
+    _email_exists_in_delegation,
     _handle_step4_post,
+    _prefill_step1_form,
+    _prefill_step2_form,
 )
 from shared.database import (
     ClassificationLevel,
@@ -41,42 +45,6 @@ from shared.database import (
 
 
 wizard_bp = Blueprint("wizard", __name__)
-
-
-def _prefill_step1_form(
-    form: Step1PersonalInfoForm, state: dict
-) -> None:
-    """Pre-fill Step1PersonalInfoForm from saved wizard state.
-
-    Args:
-        form: The WTForms form instance to populate.
-        state: Wizard session state dict for the delegation.
-    """
-    step1_data = state.get("step1", {})
-    form.full_name.data = step1_data.get("full_name", "")
-    form.email.data = step1_data.get("email", "")
-    form.function.data = step1_data.get("function", "")
-    form.title.data = step1_data.get("title", "")
-
-
-def _email_exists_in_delegation(
-    db_session: Any, delegation_id: str, email: str
-) -> bool:
-    """Check whether an email is already used in a delegation.
-
-    Args:
-        db_session: SQLAlchemy scoped session.
-        delegation_id: Delegation to search within.
-        email: Email address to check (case-insensitive).
-
-    Returns:
-        True if a delegate with that email exists, False otherwise.
-    """
-    stmt = select(Delegate).where(
-        Delegate.delegation_id == delegation_id,
-        func.lower(Delegate.email) == email.lower(),
-    )
-    return db_session.scalars(stmt).first() is not None
 
 
 def _handle_step1_post(
@@ -156,37 +124,6 @@ def wizard_step1(delegation_id: str) -> Any:
     return render_template(
         "wizard/step1.html", form=form, delegation_id=delegation_id
     )
-
-
-def _build_committee_choices(
-    db_session: Any,
-) -> list[tuple[str, str]]:
-    """Query all committees ordered by name and return choice tuples.
-
-    Args:
-        db_session: SQLAlchemy scoped session.
-
-    Returns:
-        List of (id, name) tuples suitable for SelectMultipleField.
-    """
-    stmt = select(Committee).order_by(Committee.name)
-    committees = db_session.scalars(stmt).all()
-    return [(c.id, c.name) for c in committees]
-
-
-def _prefill_step2_form(
-    form: Step2CommitteesForm, state: dict
-) -> None:
-    """Pre-fill Step2CommitteesForm from saved wizard state.
-
-    Args:
-        form: The WTForms form instance to populate.
-        state: Wizard session state dict for the delegation.
-    """
-    step2_data = state.get("step2", {})
-    saved_ids = step2_data.get("committee_ids")
-    if saved_ids:
-        form.committee_ids.data = saved_ids
 
 
 def _handle_step2_post(
@@ -439,39 +376,44 @@ def wizard_step4(delegation_id: str) -> Any:
     )
 
 
-def _build_dar_rows(
-    dars: list[DocumentAccessRight],
-    db_session: Any,
-) -> list[dict]:
-    """Build display rows for document-access-right entries.
+def _load_confirmation_context(
+    delegation_id: str, db_session: Any
+) -> tuple[Any, list[dict]] | None:
+    """Load delegate and DAR rows for the confirmation page.
 
     Args:
-        dars: DocumentAccessRight ORM objects for a delegate.
-        db_session: Active SQLAlchemy session.
+        delegation_id: Delegation identifier from the URL.
+        db_session: SQLAlchemy scoped session.
 
     Returns:
-        List of dicts with keys committee_name, level,
-        retroactive, and status_label.
+        Tuple of (delegate ORM object, dar_rows list), or None when
+        the created-delegate ID is missing or the delegate is not found.
     """
-    committee_ids = [d.committee_id for d in dars]
-    committees = db_session.scalars(
-        select(Committee).where(Committee.id.in_(committee_ids))
+    delegate_id = wizard_state.get_created_delegate_id(delegation_id)
+    if delegate_id is None:
+        logger.warning(
+            "No created delegate in wizard state: delegation={}",
+            delegation_id,
+        )
+        return None
+
+    delegate = db_session.scalars(
+        select(Delegate).where(Delegate.id == delegate_id)
+    ).first()
+    if delegate is None:
+        logger.warning(
+            "Delegate not found: delegate={} delegation={}",
+            delegate_id,
+            delegation_id,
+        )
+        return None
+
+    dars = db_session.scalars(
+        select(DocumentAccessRight).where(
+            DocumentAccessRight.delegate_id == delegate_id
+        )
     ).all()
-    committee_map = {c.id: c.name for c in committees}
-    return [
-        {
-            "committee_name": committee_map.get(
-                dar.committee_id, dar.committee_id
-            ),
-            "level": dar.classification_level.value,
-            "retroactive": dar.retroactive,
-            "status_label": APPROVAL_LABELS.get(
-                dar.approval_status.value,
-                dar.approval_status.value,
-            ),
-        }
-        for dar in dars
-    ]
+    return delegate, _build_dar_rows(dars, db_session)
 
 
 @wizard_bp.route(
@@ -493,36 +435,16 @@ def wizard_confirmation(delegation_id: str) -> Any:
         "delegations.delegation_detail",
         delegation_id=delegation_id,
     )
-    delegate_id = wizard_state.get_created_delegate_id(delegation_id)
-    if delegate_id is None:
-        logger.warning(
-            "No created delegate in wizard state: delegation={}",
-            delegation_id,
-        )
-        return redirect(detail_url)
-
     db_session = current_app.extensions["db_session"]
-    delegate = db_session.scalars(
-        select(Delegate).where(Delegate.id == delegate_id)
-    ).first()
-    if delegate is None:
-        logger.warning(
-            "Delegate not found: delegate={} delegation={}",
-            delegate_id,
-            delegation_id,
-        )
+    result = _load_confirmation_context(delegation_id, db_session)
+    if result is None:
         return redirect(detail_url)
 
-    dars = db_session.scalars(
-        select(DocumentAccessRight).where(
-            DocumentAccessRight.delegate_id == delegate_id
-        )
-    ).all()
-    dar_rows = _build_dar_rows(dars, db_session)
+    delegate, dar_rows = result
     logger.info(
         "Rendering wizard confirmation: delegation={} delegate={}",
         delegation_id,
-        delegate_id,
+        delegate.id,
     )
     return render_template(
         "wizard/confirmation.html",
