@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Add Delegate — Step 1{% endblock %}
+
+{% block content %}
+<h2>Add New Delegate — Step 1: Personal Information</h2>
+
+{% include "wizard/_progress.html" with step=1 %}
+
+<div class="card">
+  <div class="card-body">
+    <form method="post">
+      {{ form.hidden_tag() }}
+
+      <div class="mb-3">
+        <label for="{{ form.full_name.id }}" class="form-label">
+          {{ form.full_name.label.text }}
+        </label>
+        <input type="text" class="form-control" id="{{ form.full_name.id }}"
+               name="{{ form.full_name.name }}" value="{{ form.full_name.data or '' }}">
+        {% for error in form.full_name.errors %}
+          <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div class="mb-3">
+        <label for="{{ form.email.id }}" class="form-label">
+          {{ form.email.label.text }}
+        </label>
+        <input type="email" class="form-control" id="{{ form.email.id }}"
+               name="{{ form.email.name }}" value="{{ form.email.data or '' }}">
+        {% for error in form.email.errors %}
+          <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div class="mb-3">
+        <label for="{{ form.function.id }}" class="form-label">
+          {{ form.function.label.text }}
+        </label>
+        <input type="text" class="form-control" id="{{ form.function.id }}"
+               name="{{ form.function.name }}" value="{{ form.function.data or '' }}">
+        {% for error in form.function.errors %}
+          <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div class="mb-3">
+        <label for="{{ form.title.id }}" class="form-label">
+          {{ form.title.label.text }}
+        </label>
+        <input type="text" class="form-control" id="{{ form.title.id }}"
+               name="{{ form.title.name }}" value="{{ form.title.data or '' }}">
+        {% for error in form.title.errors %}
+          <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+      </div>
+
+      <div class="d-flex gap-2 mt-4">
+        <button type="submit" class="btn btn-primary">Next</button>
+        <form method="post" action="{{ url_for('wizard.wizard_cancel', delegation_id=delegation_id) }}" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-secondary">Cancel</button>
+        </form>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Add Delegate — Step 3{% endblock %}
+
+{% block content %}
+<h2>Add New Delegate — Step 3: Access Rights</h2>
+
+{% include "wizard/_progress.html" with step=3 %}
+
+<div class="card">
+  <div class="card-body">
+    <form method="post">
+      {{ form.hidden_tag() }}
+
+      <table class="table table-striped">
+        <thead class="table-light">
+          <tr>
+            <th>Committee</th>
+            <th>Access Level</th>
+            <th>Retroactive</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in form.rows %}
+            <tr>
+              <td>{{ row_labels[loop.index0] }}</td>
+              <td>
+                <select class="form-select" id="{{ row.access_level.id }}"
+                        name="{{ row.access_level.name }}">
+                  {% for choice_value, choice_label in row.access_level.choices %}
+                    <option value="{{ choice_value }}"
+                            {% if row.access_level.data == choice_value %}selected{% endif %}>
+                      {{ choice_label }}
+                    </option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td>
+                <div class="form-check">
+                  <input type="checkbox" class="form-check-input"
+                         id="{{ row.retroactive.id }}" name="{{ row.retroactive.name }}"
+                         {% if row.retroactive.data %}checked{% endif %}>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      {% for row in form.rows %}
+        {% for error in row.access_level.errors %}
+          <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+        {% for error in row.retroactive.errors %}
+          <div class="text-danger">{{ error }}</div>
+        {% endfor %}
+      {% endfor %}
+
+      <div class="d-flex gap-2 mt-4">
+        <a href="{{ url_for('wizard.wizard_step2', delegation_id=delegation_id) }}"
+           class="btn btn-outline-secondary">Previous</a>
+        <button type="submit" class="btn btn-primary">Next</button>
+        <form method="post" action="{{ url_for('wizard.wizard_cancel', delegation_id=delegation_id) }}" class="d-inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button type="submit" class="btn btn-outline-secondary">Cancel</button>
+        </form>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

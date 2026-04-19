@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Delegate Added Successfully{% endblock %}
+
+{% block content %}
+<div class="alert alert-success" role="alert">
+  <h2>Delegate Added Successfully</h2>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h5 class="mb-3">Delegate Information</h5>
+    <p class="mb-1"><strong>ID:</strong> {{ delegate.id }}</p>
+    <p class="mb-4"><strong>Name:</strong> {{ delegate.full_name }}</p>
+
+    <h5 class="mb-3">Delegation Access Requests</h5>
+    <ul>
+      {% for row in dar_rows %}
+        <li>
+          {{ row.committee_name }} — {{ row.level }}
+          {% if row.retroactive %} + retroactive{% endif %}
+          ({{ row.status_label }})
+        </li>
+      {% endfor %}
+    </ul>
+
+    <div class="d-flex gap-2 mt-4">
+      <a href="{{ url_for('delegations.delegation_detail', delegation_id=delegation_id) }}"
+         class="btn btn-primary">Back to Delegation</a>
+      <a href="{{ url_for('wizard.wizard_step1', delegation_id=delegation_id) }}"
+         class="btn btn-outline-primary">Add Another Delegate</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
