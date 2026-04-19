@@ -168,8 +168,13 @@ def require_steps(
         )
 
     state = load(delegation_id)
-    # state is guaranteed non-None here because is_stale returned False.
-    assert state is not None
+    if state is None:
+        clear(delegation_id)
+        return redirect(
+            url_for(
+                "wizard.wizard_step1", delegation_id=delegation_id
+            )
+        )
 
     missing = [k for k in step_keys if k not in state]
     if missing:
