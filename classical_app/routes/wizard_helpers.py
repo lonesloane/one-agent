@@ -12,6 +12,7 @@ from typing import Any
 from flask import flash, redirect, render_template, url_for
 from loguru import logger
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 
 from classical_app.forms.delegate_wizard import Step3DARsForm, Step4ReviewForm
 from shared.business_rules import (
@@ -211,12 +212,76 @@ def _generate_delegate_id(db_session: Any) -> str:
     return f"DEL-{year}-{max_seq + 1:04d}"
 
 
+def _build_delegate(
+    step1: dict,
+    delegation_id: str,
+    new_id: str,
+    now: datetime,
+) -> Delegate:
+    """Construct a Delegate ORM object from step1 wizard state.
+
+    Args:
+        step1: Step 1 wizard state dict (full_name, email, etc.)
+        delegation_id: Delegation this delegate belongs to.
+        new_id: Pre-generated unique delegate ID.
+        now: Current UTC timestamp (naive) for accreditation_date.
+
+    Returns:
+        Unsaved Delegate instance ready for db_session.add().
+    """
+    return Delegate(
+        id=new_id,
+        full_name=step1["full_name"],
+        email=step1["email"],
+        function=step1["function"],
+        title=step1.get("title") or None,
+        delegation_id=delegation_id,
+        accreditation_date=now,
+        is_active=True,
+        role=DelegateRole.DELEGATE,
+    )
+
+
+def _build_dars(
+    delegate_id: str,
+    step3_rows: list[dict],
+    now: datetime,
+    created_by: str,
+) -> list[DocumentAccessRight]:
+    """Build DocumentAccessRight objects from step3 wizard rows.
+
+    Args:
+        delegate_id: ID of the delegate being created.
+        step3_rows: List of dicts with committee_id, access_level,
+            retroactive.
+        now: Current UTC timestamp (naive) for created_at.
+        created_by: Session user ID for audit trail.
+
+    Returns:
+        List of unsaved DocumentAccessRight instances.
+    """
+    dars = []
+    for row in step3_rows:
+        level = ClassificationLevel(row["access_level"])
+        status = determine_approval_route(level, row["retroactive"])
+        dars.append(DocumentAccessRight(
+            delegate_id=delegate_id,
+            committee_id=row["committee_id"],
+            classification_level=level,
+            retroactive=row["retroactive"],
+            approval_status=status,
+            created_at=now,
+            created_by=created_by,
+        ))
+    return dars
+
+
 def _handle_step4_post(
     delegation_id: str,
     db_session: Any,
     state: dict,
 ) -> Any:
-    """Execute the single-transaction delegate creation on step 4 POST.
+    """Execute single-transaction delegate creation on step 4 POST.
 
     Reads wizard state, creates a ``Delegate`` record with committees
     and ``DocumentAccessRight`` rows, commits in a single transaction,
@@ -242,17 +307,7 @@ def _handle_step4_post(
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     current_user = flask.session.get("delegate_id", "system")
 
-    delegate = Delegate(
-        id=new_id,
-        full_name=step1["full_name"],
-        email=step1["email"],
-        function=step1["function"],
-        title=step1.get("title") or None,
-        delegation_id=delegation_id,
-        accreditation_date=now,
-        is_active=True,
-        role=DelegateRole.DELEGATE,
-    )
+    delegate = _build_delegate(step1, delegation_id, new_id, now)
 
     committee_ids = [r["committee_id"] for r in step3_rows]
     committees = db_session.scalars(
@@ -260,28 +315,14 @@ def _handle_step4_post(
     ).all()
     delegate.committees = list(committees)
 
-    dars = [
-        DocumentAccessRight(
-            delegate_id=new_id,
-            committee_id=row["committee_id"],
-            classification_level=ClassificationLevel(row["access_level"]),
-            retroactive=row["retroactive"],
-            approval_status=determine_approval_route(
-                ClassificationLevel(row["access_level"]),
-                row["retroactive"],
-            ),
-            created_at=now,
-            created_by=current_user,
-        )
-        for row in step3_rows
-    ]
+    dars = _build_dars(new_id, step3_rows, now, current_user)
 
     try:
         db_session.add(delegate)
         for dar in dars:
             db_session.add(dar)
         db_session.commit()
-    except Exception as exc:
+    except SQLAlchemyError as exc:
         db_session.rollback()
         logger.error(
             "Wizard step4 commit failed: delegation={} error={}",

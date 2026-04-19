@@ -401,13 +401,16 @@ def wizard_step4(delegation_id: str) -> Any:
     """Handle step 4 of the add-delegate wizard.
 
     GET renders the review table showing approval routing per DAR row.
-    POST is reserved for Task #4 (single-transaction submit).
+    POST creates the Delegate and DocumentAccessRight records in a
+    single transaction via ``_handle_step4_post``.
 
     Args:
         delegation_id: Delegation identifier from the URL.
 
     Returns:
-        Rendered step4 template on GET, or 501 on POST (stub).
+        On GET: rendered step4 template with review rows.
+        On POST: redirect to confirmation on success, or re-rendered
+        step4 with flash error on commit failure.
     """
     redirect_response = wizard_state.require_steps(
         delegation_id, ("step1", "step2", "step3")
