@@ -16,7 +16,12 @@ from tests.classical_app.conftest import (  # noqa: F401 (fixtures)
     temp_db,
     editor_member_id,
 )
-from shared.database import Delegate, DocumentAccessRight
+from shared.database import (
+    ApprovalStatus,
+    ClassificationLevel,
+    Delegate,
+    DocumentAccessRight,
+)
 
 
 _STEP4_URL = "/delegations/FRA/delegates/new/step4"
@@ -82,7 +87,7 @@ class TestWizardStep4Post:
             assert delegate.function == "Attaché"
             assert delegate.delegation_id == "FRA"
 
-            # Verify DocumentAccessRight was created
+            # Verify DocumentAccessRight was created with correct routing
             dars = db.scalars(
                 select(DocumentAccessRight).where(
                     DocumentAccessRight.delegate_id == delegate.id
@@ -91,6 +96,16 @@ class TestWizardStep4Post:
             assert len(dars) == 1
             assert dars[0].committee_id == "EDU"
             assert dars[0].retroactive is False
+            assert (
+                dars[0].classification_level
+                == ClassificationLevel.RESTRICTED
+            )
+            # RESTRICTED + non-retroactive → PENDING_DELEGATION_HEAD
+            assert (
+                dars[0].approval_status
+                == ApprovalStatus.PENDING_DELEGATION_HEAD
+            )
+            assert dars[0].created_by == editor_member_id
 
         # Verify session: created_delegate_id set, wizard state cleared
         with client.session_transaction() as sess:
@@ -152,7 +167,8 @@ class TestWizardCancel:
         response = client.post(_CANCEL_URL, follow_redirects=False)
 
         assert response.status_code == 302
-        assert "FRA" in response.location
+        # Must redirect to delegation detail, not back into the wizard
+        assert response.location.endswith("/delegations/FRA")
 
         with client.session_transaction() as sess:
             wizard = sess.get("delegate_wizard", {})
