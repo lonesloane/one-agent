@@ -9,8 +9,6 @@ Covers:
 - POST with no committees selected re-renders with error
 """
 
-import pytest
-
 from tests.classical_app.conftest import (  # noqa: F401 (fixtures)
     client,
     seeded_engine,
@@ -75,11 +73,7 @@ class TestWizardStep2Get:
         response = client.get(_STEP2_URL)
 
         assert response.status_code == 200
-        # Seeded committees include Education Committee (EDU)
-        assert (
-            b"Education Committee" in response.data
-            or b"EDU" in response.data
-        )
+        assert b"Education Committee" in response.data
 
     def test_get_step2_prefills_from_session_state(
         self, client, editor_member_id
@@ -103,8 +97,9 @@ class TestWizardStep2Get:
         response = client.get(_STEP2_URL)
 
         assert response.status_code == 200
-        # The selected value EDU should appear as selected in the HTML
-        assert b"EDU" in response.data
+        html = response.data.decode()
+        assert 'value="EDU"' in html
+        assert "checked" in html
 
 
 class TestWizardStep2Post:
@@ -158,10 +153,7 @@ class TestWizardStep2Post:
         )
 
         assert response.status_code == 200
-        assert (
-            b"at least one committee" in response.data
-            or b"committee" in response.data.lower()
-        )
+        assert b"at least one committee" in response.data
 
     def test_post_step2_without_step1_redirects_to_step1(
         self, client, editor_member_id

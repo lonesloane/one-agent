@@ -36,10 +36,9 @@
         <a href="{{ url_for('wizard.wizard_step1', delegation_id=delegation_id) }}"
            class="btn btn-outline-secondary">Previous</a>
         <button type="submit" class="btn btn-primary">Next</button>
-        <form method="post" action="{{ url_for('wizard.wizard_cancel', delegation_id=delegation_id) }}" class="d-inline">
-          {{ form.hidden_tag() }}
-          <button type="submit" class="btn btn-outline-secondary">Cancel</button>
-        </form>
+        <button type="submit"
+                formaction="{{ url_for('wizard.wizard_cancel', delegation_id=delegation_id) }}"
+                class="btn btn-outline-secondary">Cancel</button>
       </div>
     </form>
   </div>
