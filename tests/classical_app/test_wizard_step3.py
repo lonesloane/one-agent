@@ -111,10 +111,10 @@ class TestAllowedLevels:
             ClassificationLevel.CONFIDENTIAL,
         ]
 
-    def test_allowed_levels_partner_without_fa_returns_general_and_confidential(
+    def test_partner_no_fa_returns_general_and_confidential(
         self,
     ) -> None:
-        """PARTNER with no FA on the committee gets GENERAL and CONFIDENTIAL."""
+        """PARTNER with no FA gets GENERAL and CONFIDENTIAL only."""
         delegation = _MockDelegation(
             MembershipType.PARTNER,
             framework_agreements=[],
@@ -127,7 +127,7 @@ class TestAllowedLevels:
             ClassificationLevel.CONFIDENTIAL,
         ]
 
-    def test_allowed_levels_partner_with_expired_fa_returns_general_and_confidential(
+    def test_partner_expired_fa_returns_general_and_confidential(
         self,
     ) -> None:
         """PARTNER with an expired FA gets GENERAL and CONFIDENTIAL only."""

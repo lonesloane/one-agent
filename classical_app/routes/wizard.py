@@ -395,17 +395,21 @@ def _handle_step3_post(delegation_id: str) -> Any:
     """
     state = wizard_state.load(delegation_id) or {}
     committee_ids = state.get("step2", {}).get("committee_ids", [])
+    valid_levels = {lvl.value for lvl in ClassificationLevel}
 
     rows_data = []
     for i, committee_id in enumerate(committee_ids):
+        submitted_level = request.form.get(
+            f"rows-{i}-access_level", ClassificationLevel.GENERAL.value
+        )
+        if submitted_level not in valid_levels:
+            submitted_level = ClassificationLevel.GENERAL.value
         rows_data.append(
             {
                 "committee_id": request.form.get(
                     f"rows-{i}-committee_id", committee_id
                 ),
-                "access_level": request.form.get(
-                    f"rows-{i}-access_level"
-                ),
+                "access_level": submitted_level,
                 "retroactive": (
                     f"rows-{i}-retroactive" in request.form
                 ),
