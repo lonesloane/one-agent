@@ -124,6 +124,8 @@ def lookup_delegate(
         })
 
 
+# Reason: FunctionInvocationContext params are excluded from the
+# model-visible tool schema; delegate_id stays invisible to the model.
 @tool(approval_mode="never_require")
 def get_upcoming_meetings(
     ctx: FunctionInvocationContext,

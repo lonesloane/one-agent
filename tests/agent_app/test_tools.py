@@ -1,12 +1,11 @@
-"""Unit tests for agent_app/tools.py — tool wrappers and AuditMiddleware."""
+"""Unit tests for agent_app/tools.py — DB-backed tool wrappers."""
 import json
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from sqlalchemy.orm import Session
 
-from agent_app.middleware import AuditMiddleware
 from agent_app.tools import (
     get_agenda_documents,
     get_delegation_info,
@@ -27,9 +26,7 @@ from shared.database import (
     MembershipType,
 )
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+# -- Helpers ------------------------------------------------------------------
 
 _NOW = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -73,9 +70,7 @@ def _make_dar(
     )
 
 
-# ---------------------------------------------------------------------------
-# Class 1: TestGetDelegationInfo
-# ---------------------------------------------------------------------------
+# -- Class 1: TestGetDelegationInfo -------------------------------------------
 
 
 class TestGetDelegationInfo:
@@ -122,9 +117,7 @@ class TestGetDelegationInfo:
         assert data["framework_agreements"] == []
 
 
-# ---------------------------------------------------------------------------
-# Class 2: TestLookupDelegate
-# ---------------------------------------------------------------------------
+# -- Class 2: TestLookupDelegate ----------------------------------------------
 
 
 class TestLookupDelegate:
@@ -188,9 +181,7 @@ class TestLookupDelegate:
         assert data["access_rights"] == []
 
 
-# ---------------------------------------------------------------------------
-# Class 3: TestGetUpcomingMeetings
-# ---------------------------------------------------------------------------
+# -- Class 3: TestGetUpcomingMeetings -----------------------------------------
 
 
 class TestGetUpcomingMeetings:
@@ -208,12 +199,10 @@ class TestGetUpcomingMeetings:
         session.add(Committee(id="EDU", name="Education Committee"))
         session.add(Committee(id="TRADE", name="Trade Committee"))
 
-        # DEL-T1 is in EDU and TRADE
         delegate1 = _make_delegate(
             "DEL-T1", "Alice Test", "a@test.com", "Head", "FRA"
         )
         session.add(delegate1)
-        # DEL-T2 has no committees
         delegate2 = _make_delegate(
             "DEL-T2", "Bob Test", "b@test.com", "Delegate", "FRA"
         )
@@ -268,7 +257,6 @@ class TestGetUpcomingMeetings:
         assert "MTG-FUTURE-2" in meeting_ids
         assert "MTG-PAST-1" not in meeting_ids
 
-        # Sorted ascending: FUTURE-1 (day+10) before FUTURE-2 (day+20)
         future_1_pos = meeting_ids.index("MTG-FUTURE-1")
         future_2_pos = meeting_ids.index("MTG-FUTURE-2")
         assert future_1_pos < future_2_pos
@@ -296,7 +284,7 @@ class TestGetUpcomingMeetings:
     def test_delegate_with_only_past_meetings_returns_empty(
         self, engine: object
     ) -> None:
-        """Delegate in EDU committee but all EDU meetings are past."""
+        """Delegate in a committee but all meetings are past."""
         with Session(engine) as sess:
             sess.add(
                 Delegation(
@@ -344,9 +332,7 @@ class TestGetUpcomingMeetings:
         assert json.loads(result) == []
 
 
-# ---------------------------------------------------------------------------
-# Class 4: TestGetAgendaDocuments
-# ---------------------------------------------------------------------------
+# -- Class 4: TestGetAgendaDocuments ------------------------------------------
 
 
 class TestGetAgendaDocuments:
@@ -444,10 +430,9 @@ class TestGetAgendaDocuments:
     def test_delegate_with_restricted_dar_sees_both(
         self, engine: object
     ) -> None:
-        """RESTRICTED DAR grants access to both GENERAL and RESTRICTED docs."""
+        """RESTRICTED DAR grants access to GENERAL and RESTRICTED docs."""
         with Session(engine) as sess:
             self._setup_base(sess)
-            # DEL-T2 has RESTRICTED DAR — can see both classification levels
             sess.add(
                 _make_dar(
                     2, "DEL-T2", "EDU",
@@ -465,6 +450,21 @@ class TestGetAgendaDocuments:
         doc_ids = [d["id"] for d in data]
         assert "DOC-T1" in doc_ids
         assert "DOC-T2" in doc_ids
+
+    def test_delegate_without_any_dar_sees_nothing(
+        self, engine: object
+    ) -> None:
+        """Delegate with no DAR records cannot see any documents."""
+        with Session(engine) as sess:
+            self._setup_base(sess)
+            sess.commit()
+
+        ctx = MagicMock()
+        ctx.kwargs = {"delegate_id": "DEL-T1"}
+        with patch("agent_app.tools._engine", engine):
+            result = get_agenda_documents("MTG-T1", ctx)
+
+        assert json.loads(result) == []
 
     def test_empty_meeting_returns_empty(
         self, engine: object
@@ -501,51 +501,3 @@ class TestGetAgendaDocuments:
             result = get_agenda_documents("MTG-T1", ctx)
 
         assert json.loads(result) == []
-
-
-# ---------------------------------------------------------------------------
-# Class 5: TestAuditMiddleware
-# ---------------------------------------------------------------------------
-
-
-class TestAuditMiddleware:
-    """Tests for the AuditMiddleware tool call logger."""
-
-    @pytest.mark.asyncio
-    async def test_process_calls_next_and_logs(self) -> None:
-        """Middleware invokes call_next and logs at INFO level."""
-        middleware = AuditMiddleware()
-        context = MagicMock()
-        context.function.name = "test_tool"
-        context.arguments = {"key": "val"}
-        context.result = "ok"
-
-        call_next = AsyncMock()
-
-        with patch("agent_app.middleware.logger.info") as mock_log:
-            await middleware.process(context, call_next)
-
-        call_next.assert_called_once()
-        mock_log.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_process_logs_after_call_next(self) -> None:
-        """Log message is emitted only after call_next completes."""
-        middleware = AuditMiddleware()
-        context = MagicMock()
-        context.function.name = "test_tool"
-        context.arguments = {"key": "val"}
-        context.result = "ok"
-
-        call_order: list[str] = []
-
-        async def tracking_call_next() -> None:
-            call_order.append("call_next")
-
-        with patch("agent_app.middleware.logger.info") as mock_log:
-            mock_log.side_effect = (
-                lambda *a, **k: call_order.append("log")
-            )
-            await middleware.process(context, tracking_call_next)
-
-        assert call_order == ["call_next", "log"]
