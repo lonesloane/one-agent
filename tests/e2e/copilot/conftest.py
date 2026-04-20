@@ -5,6 +5,7 @@ a FastAPI subprocess on port 8000, and a Next.js subprocess on port 3000.
 """
 
 import os
+import signal
 import socket
 import subprocess
 import time
@@ -113,10 +114,9 @@ def fastapi_server(agent_db_path: str, agent_engine):
         RuntimeError: If port 8000 is already in use, or if the server
             does not become ready within 20 seconds.
     """
-    s = socket.socket()
-    s.settimeout(1)
-    result = s.connect_ex(("127.0.0.1", 8000))
-    s.close()
+    with socket.socket() as s:
+        s.settimeout(1)
+        result = s.connect_ex(("127.0.0.1", 8000))
     if result == 0:
         raise RuntimeError(
             "Port 8000 is already in use. "
@@ -137,28 +137,28 @@ def fastapi_server(agent_db_path: str, agent_engine):
         stderr=subprocess.DEVNULL,
     )
 
-    deadline = time.time() + 20
-    while time.time() < deadline:
-        try:
-            with urllib.request.urlopen(
-                "http://127.0.0.1:8000/api/delegates"
-            ) as resp:
-                if resp.status == 200:
-                    break
-        except urllib.error.URLError:
-            time.sleep(0.5)
+    try:
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            try:
+                with urllib.request.urlopen(
+                    "http://127.0.0.1:8000/api/delegates"
+                ) as resp:
+                    if resp.status == 200:
+                        break
+            except urllib.error.URLError:
+                time.sleep(0.5)
 
-    else:
+        else:
+            raise RuntimeError(
+                "FastAPI server did not start within 20 seconds"
+            )
+
+        yield
+
+    finally:
         process.terminate()
         process.wait()
-        raise RuntimeError(
-            "FastAPI server did not start within 20 seconds"
-        )
-
-    yield
-
-    process.terminate()
-    process.wait()
 
 
 @pytest.fixture(scope="session")
@@ -166,11 +166,13 @@ def nextjs_server(fastapi_server):
     """
     Session-scoped fixture that starts the Next.js dev server on port 3000.
 
-    Depends on fastapi_server to ensure the FastAPI backend is running
-    before the frontend starts.  Polls GET http://localhost:3000 every
-    0.5 seconds for up to 30 seconds.  Any HTTP response (including
-    non-200) is treated as "server ready"; only connection-refused
-    errors indicate the server is not yet up.
+    Checks that port 3000 is free before launching.  Depends on
+    fastapi_server to ensure the FastAPI backend is running before the
+    frontend starts.  Launches npm in a new process group so all child
+    Node processes are terminated on teardown.  Polls GET
+    http://localhost:3000 every 0.5 seconds for up to 30 seconds.  Any
+    HTTP response (including non-200) is treated as "server ready"; only
+    connection-refused errors indicate the server is not yet up.
 
     Args:
         fastapi_server: Ensures the FastAPI server is running first.
@@ -179,41 +181,51 @@ def nextjs_server(fastapi_server):
         None
 
     Raises:
-        RuntimeError: If the Next.js server does not become ready within
-            30 seconds.
+        RuntimeError: If port 3000 is already in use, or if the Next.js
+            server does not become ready within 30 seconds.
     """
+    with socket.socket() as s:
+        s.settimeout(1)
+        result = s.connect_ex(("localhost", 3000))
+    if result == 0:
+        raise RuntimeError(
+            "Port 3000 is already in use. Stop the dev Next.js "
+            "server before running e2e tests."
+        )
+
     frontend_dir = (
         Path(__file__).parent.parent.parent / "agent_app" / "frontend"
     )
     process = subprocess.Popen(
         ["npm", "run", "dev"],
         cwd=str(frontend_dir),
+        start_new_session=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
 
-    deadline = time.time() + 30
-    while time.time() < deadline:
-        try:
-            urllib.request.urlopen("http://localhost:3000")
-            break
-        except urllib.error.HTTPError:
-            # Reason: HTTPError means server responded — it is up.
-            break
-        except urllib.error.URLError:
-            time.sleep(0.5)
+    try:
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            try:
+                urllib.request.urlopen("http://localhost:3000")
+                break
+            except urllib.error.HTTPError:
+                # Reason: HTTPError means server responded — it is up.
+                break
+            except urllib.error.URLError:
+                time.sleep(0.5)
 
-    else:
-        process.terminate()
+        else:
+            raise RuntimeError(
+                "Next.js server did not start within 30 seconds"
+            )
+
+        yield
+
+    finally:
+        os.killpg(process.pid, signal.SIGTERM)
         process.wait()
-        raise RuntimeError(
-            "Next.js server did not start within 30 seconds"
-        )
-
-    yield
-
-    process.terminate()
-    process.wait()
 
 
 @pytest.fixture(autouse=True)
