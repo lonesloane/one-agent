@@ -1,66 +1,93 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+
+import { useState } from "react";
+import {
+  CopilotChat,
+  useDefaultRenderTool,
+} from "@copilotkit/react-core/v2";
+import "@copilotkit/react-core/v2/styles.css";
+import { DelegatePicker } from "./components/DelegatePicker";
+
+function ToolCallBlock({
+  name,
+  status,
+  parameters,
+  result,
+}: {
+  name: string;
+  status: "inProgress" | "executing" | "complete";
+  parameters: unknown;
+  result: string | undefined;
+}) {
+  const label =
+    status === "complete" ? `\u2713 ${name}` : `\u23f3 ${name}`;
+  return (
+    <details style={{ fontSize: "0.85em", margin: "4px 0" }}>
+      <summary style={{ cursor: "pointer" }}>{label} [{status}]</summary>
+      <pre style={{ margin: "4px 0 0 12px", whiteSpace: "pre-wrap" }}>
+        {JSON.stringify(parameters, null, 2)}
+      </pre>
+      {status === "complete" && result !== undefined && (
+        <pre style={{ margin: "4px 0 0 12px", whiteSpace: "pre-wrap" }}>
+          Result: {result}
+        </pre>
+      )}
+    </details>
+  );
+}
+
+function ChatPane({ threadId }: { threadId: string }) {
+  useDefaultRenderTool({
+    render: ({ name, status, parameters, result }) => (
+      <ToolCallBlock
+        name={name}
+        status={status}
+        parameters={parameters}
+        result={result}
+      />
+    ),
+  });
+
+  return (
+    <CopilotChat
+      threadId={threadId}
+      style={{ flex: 1, minHeight: 0 }}
+    />
+  );
+}
 
 export default function Home() {
+  const [threadId, setThreadId] = useState<string>(
+    () => crypto.randomUUID(),
+  );
+  const [selectedDelegateId, setSelectedDelegateId] =
+    useState<string>("");
+
+  function handleDelegateChange(id: string): void {
+    setSelectedDelegateId(id);
+  }
+
+  function handleThreadReset(): void {
+    setThreadId(crypto.randomUUID());
+  }
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+      }}
+    >
+      <div style={{ padding: "8px 16px", borderBottom: "1px solid #ddd" }}>
+        <DelegatePicker
+          onDelegateChange={handleDelegateChange}
+          onThreadReset={handleThreadReset}
         />
-        <div className={styles.intro}>
-          <h1>To get started, edit the page.tsx file.</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </div>
+      {selectedDelegateId !== "" && (
+        <ChatPane threadId={threadId} />
+      )}
     </div>
   );
 }
