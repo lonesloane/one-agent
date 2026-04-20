@@ -19,14 +19,15 @@ def test_brief_fires_on_session_open(page: Page, base_url: str) -> None:
 
 
 def test_brief_suppressed_no_new_docs(page: Page, base_url: str) -> None:
-    """Assert the brief is suppressed for a delegate with no new docs.
+    """Verify brief is suppressed for a delegate with no new documents.
 
-    Navigates to the app, then switches to Priya Sharma (India, no EDU
-    membership). Waits for any assistant message, then confirms that
-    the EDU test document is absent from the response.
+    DEL-2026-0007 (Priya Sharma, IND) is not in EDU, so the fresh
+    EDU test document should not appear in her brief.
     """
     page.goto(base_url)
-    page.select_option("select", label=re.compile("Priya Sharma"))
+    # Switch quickly before any brief starts streaming.
+    page.wait_for_selector("select:not([disabled])", timeout=10_000)
+    page.select_option("select", value="DEL-2026-0007")
     page.locator("[class*='message']").filter(
         has_text=re.compile(".+")
     ).first.wait_for(timeout=90_000)
@@ -43,7 +44,7 @@ def test_persona_switch_resets_thread(page: Page, base_url: str) -> None:
     page.goto(base_url)
     page.get_by_text("E2E Test Policy Draft").wait_for(timeout=90_000)
 
-    page.select_option("select", label=re.compile("Priya Sharma"))
+    page.select_option("select", value="DEL-2026-0007")
 
     # Wait for previous thread to clear before checking new thread.
     page.get_by_text("E2E Test Policy Draft").wait_for(
