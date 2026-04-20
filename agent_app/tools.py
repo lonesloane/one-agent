@@ -1,0 +1,217 @@
+"""ONE-MP Read Agent — DB-backed tool wrappers."""
+
+import json
+import os
+from datetime import datetime, timezone
+from typing import Annotated
+
+from agent_framework import FunctionInvocationContext, tool
+from pydantic import Field
+from sqlalchemy import select
+from sqlalchemy.orm import Session as _Session
+
+from shared.business_rules import get_visible_agenda_documents
+from shared.database import (
+    Delegate,
+    Delegation,
+    Meeting,
+    delegate_committees,
+    get_engine,
+)
+
+_engine = get_engine(
+    os.environ.get("DATABASE_PATH", "one_agent.db")
+)
+
+
+@tool(approval_mode="never_require")
+def get_delegation_info(
+    delegation_id: Annotated[
+        str,
+        Field(description="Delegation ID (e.g. 'FRA', 'DEU')"),
+    ],
+) -> str:
+    """Look up delegation info including delegates and framework agreements.
+
+    Args:
+        delegation_id: The unique delegation identifier to query.
+
+    Returns:
+        JSON string with keys: id, name, membership_type, delegates,
+        framework_agreements. Returns null-filled structure when not found.
+    """
+    with _Session(_engine) as session:
+        delegation = session.get(Delegation, delegation_id)
+        if delegation is None:
+            return json.dumps({
+                "id": delegation_id,
+                "name": None,
+                "membership_type": None,
+                "delegates": [],
+                "framework_agreements": [],
+            })
+        delegates = [
+            {"id": d.id, "full_name": d.full_name}
+            for d in delegation.delegates
+        ]
+        framework_agreements = [
+            {
+                "id": fa.id,
+                "committee_id": fa.committee_id,
+                "start_date": (
+                    fa.start_date.isoformat() if fa.start_date else None
+                ),
+                "end_date": (
+                    fa.end_date.isoformat() if fa.end_date else None
+                ),
+            }
+            for fa in delegation.framework_agreements
+        ]
+        return json.dumps({
+            "id": delegation.id,
+            "name": delegation.name,
+            "membership_type": delegation.membership_type.value,
+            "delegates": delegates,
+            "framework_agreements": framework_agreements,
+        })
+
+
+@tool(approval_mode="never_require")
+def lookup_delegate(
+    delegate_id: Annotated[
+        str,
+        Field(description="Delegate ID (e.g. 'DEL-2026-0001')"),
+    ],
+) -> str:
+    """Look up a delegate's profile, committees, and document access rights.
+
+    Args:
+        delegate_id: The unique delegate identifier to query.
+
+    Returns:
+        JSON string with keys: id, full_name, delegation_id, committees,
+        access_rights. Returns null-filled structure when not found.
+    """
+    with _Session(_engine) as session:
+        delegate = session.get(Delegate, delegate_id)
+        if delegate is None:
+            return json.dumps({
+                "id": delegate_id,
+                "full_name": None,
+                "delegation_id": None,
+                "committees": [],
+                "access_rights": [],
+            })
+        committees = [
+            {"id": c.id, "name": c.name}
+            for c in delegate.committees
+        ]
+        access_rights = [
+            {
+                "id": dar.id,
+                "committee_id": dar.committee_id,
+                "classification_level": dar.classification_level.value,
+                "approval_status": dar.approval_status.value,
+            }
+            for dar in delegate.document_access_rights
+        ]
+        return json.dumps({
+            "id": delegate.id,
+            "full_name": delegate.full_name,
+            "delegation_id": delegate.delegation_id,
+            "committees": committees,
+            "access_rights": access_rights,
+        })
+
+
+@tool(approval_mode="never_require")
+def get_upcoming_meetings(
+    ctx: FunctionInvocationContext,
+) -> str:
+    """Get upcoming meetings for committees the delegate participates in.
+
+    The delegate identity is injected via FunctionInvocationContext using
+    the ``delegate_id`` key from function_invocation_kwargs.
+
+    Args:
+        ctx: Runtime context providing delegate_id via kwargs injection.
+
+    Returns:
+        JSON array of meetings with keys: id, title, committee_id,
+        meeting_date. Returns empty array when no delegate or no meetings.
+    """
+    delegate_id = ctx.kwargs.get("delegate_id", "")
+    if not delegate_id:
+        return json.dumps([])
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    # Reason: strip tzinfo for SQLite naive-datetime comparison
+    with _Session(_engine) as session:
+        subq = (
+            select(delegate_committees.c.committee_id)
+            .where(delegate_committees.c.delegate_id == delegate_id)
+        )
+        stmt = (
+            select(Meeting)
+            .where(Meeting.committee_id.in_(subq))
+            .where(Meeting.date >= now)
+            .order_by(Meeting.date)
+        )
+        meetings = session.scalars(stmt).all()
+        return json.dumps([
+            {
+                "id": m.id,
+                "title": m.title,
+                "committee_id": m.committee_id,
+                "meeting_date": m.date.isoformat(),
+            }
+            for m in meetings
+        ])
+
+
+@tool(approval_mode="never_require")
+def get_agenda_documents(
+    meeting_id: Annotated[
+        str,
+        Field(description="Meeting ID (e.g. 'MTG-EDU-2026-04')"),
+    ],
+    ctx: FunctionInvocationContext,
+) -> str:
+    """Get agenda documents for a meeting visible to the delegate.
+
+    Visibility is enforced by the business layer via DAR classification
+    checks. The delegate identity is injected via FunctionInvocationContext.
+
+    Args:
+        meeting_id: The meeting identifier whose agenda to query.
+        ctx: Runtime context providing delegate_id via kwargs injection.
+
+    Returns:
+        JSON array of visible documents with keys: id, title,
+        classification, last_modified. Returns empty array when no
+        delegate_id is present in context.
+    """
+    delegate_id = ctx.kwargs.get("delegate_id", "")
+    if not delegate_id:
+        return json.dumps([])
+    with _Session(_engine) as session:
+        documents = get_visible_agenda_documents(
+            delegate_id, meeting_id, session
+        )
+        return json.dumps([
+            {
+                "id": doc.id,
+                "title": doc.title,
+                "classification": doc.classification.value,
+                "last_modified": doc.last_modified.isoformat(),
+            }
+            for doc in documents
+        ])
+
+
+ALL_TOOLS: list[object] = [
+    get_delegation_info,
+    lookup_delegate,
+    get_upcoming_meetings,
+    get_agenda_documents,
+]
