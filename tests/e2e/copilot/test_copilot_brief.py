@@ -1,8 +1,8 @@
-"""Browser tests verifying CopilotKit brief firing, suppression, persona switch, and tool call rendering."""
+"""Browser tests verifying CopilotKit brief firing, suppression,
+persona switch, and tool call rendering."""
 
 import re
 
-import pytest
 from playwright.sync_api import Page
 
 
@@ -44,6 +44,12 @@ def test_persona_switch_resets_thread(page: Page, base_url: str) -> None:
     page.get_by_text("E2E Test Policy Draft").wait_for(timeout=90_000)
 
     page.select_option("select", label=re.compile("Priya Sharma"))
+
+    # Wait for previous thread to clear before checking new thread.
+    page.get_by_text("E2E Test Policy Draft").wait_for(
+        state="hidden", timeout=30_000
+    )
+
     page.locator("[class*='message']").filter(
         has_text=re.compile(".+")
     ).first.wait_for(timeout=90_000)
