@@ -445,3 +445,251 @@ class TestBriefSuppressedNoMeetings:
             result = get_upcoming_meetings(_make_ctx("PST-D1"))
 
         assert json.loads(result) == []
+
+
+# -- Class 4: TestGrounding ------------------------------------------
+
+
+class TestGrounding:
+    """Verify tool output contains only what was seeded in the DB.
+
+    The grounding rule: the agent must never invent documents. These
+    tests confirm that only seeded documents appear in results and
+    that the count is exact.
+    """
+
+    def _seed(self, session: Session) -> None:
+        """Insert delegation, committee, delegate, two docs, meeting.
+
+        Args:
+            session: Active SQLAlchemy session.
+        """
+        session.add(
+            Delegation(
+                id="GRD-DEL",
+                name="Grounding Nation",
+                membership_type=MembershipType.MEMBER,
+            )
+        )
+        session.add(
+            Committee(id="GRD-COM", name="Grounding Committee")
+        )
+        delegate = _make_delegate(
+            "GRD-D1", "Grounding Delegate",
+            "grd@example.com", "Member", "GRD-DEL",
+        )
+        session.add(delegate)
+        session.flush()
+        delegate.committees = [session.get(Committee, "GRD-COM")]
+
+        session.add(
+            Meeting(
+                id="GRD-MTG-1",
+                committee_id="GRD-COM",
+                title="Grounding Meeting",
+                date=_NOW + timedelta(days=5),
+            )
+        )
+        session.add(
+            Document(
+                id="GRD-DOC-1",
+                title="Alpha Report",
+                classification=ClassificationLevel.GENERAL,
+                committee_id="GRD-COM",
+                publication_date=_NOW,
+                last_modified=_NOW,
+            )
+        )
+        session.add(
+            Document(
+                id="GRD-DOC-2",
+                title="Beta Minutes",
+                classification=ClassificationLevel.GENERAL,
+                committee_id="GRD-COM",
+                publication_date=_NOW,
+                last_modified=_NOW,
+            )
+        )
+        session.add(
+            MeetingAgendaItem(
+                id=10,
+                meeting_id="GRD-MTG-1",
+                document_id="GRD-DOC-1",
+                item_order=1,
+            )
+        )
+        session.add(
+            MeetingAgendaItem(
+                id=11,
+                meeting_id="GRD-MTG-1",
+                document_id="GRD-DOC-2",
+                item_order=2,
+            )
+        )
+        session.add(
+            _make_dar(
+                100, "GRD-D1", "GRD-COM",
+                ClassificationLevel.GENERAL,
+            )
+        )
+
+    def test_only_seeded_titles_in_result(
+        self, engine: object
+    ) -> None:
+        """Result contains exactly the two seeded docs, no more.
+
+        Verifies that the tool returns only database content and
+        cannot invent documents such as 'Gamma Policy'.
+        """
+        with Session(engine) as sess:
+            self._seed(sess)
+            sess.commit()
+
+        with patch("agent_app.tools._engine", engine):
+            docs = json.loads(
+                get_agenda_documents(
+                    "GRD-MTG-1", _make_ctx("GRD-D1")
+                )
+            )
+
+        titles = [d["title"] for d in docs]
+        assert "Alpha Report" in titles
+        assert "Beta Minutes" in titles
+        assert "Gamma Policy" not in titles
+        assert "Delta Brief" not in titles
+        assert len(docs) == 2, (
+            f"Expected exactly 2 docs, got {len(docs)}"
+        )
+
+
+# -- Class 5: TestDARVisibilityEnforcement ---------------------------
+
+
+class TestDARVisibilityEnforcement:
+    """Verify DAR enforcement is applied at the tool layer.
+
+    Delegate A holds a RESTRICTED DAR and sees both documents.
+    Delegate B holds no DAR at all and sees nothing.
+    """
+
+    def _seed(self, session: Session) -> None:
+        """Insert delegation, committee, two delegates, two docs.
+
+        Delegate A gets a RESTRICTED DAR; Delegate B gets none.
+
+        Args:
+            session: Active SQLAlchemy session.
+        """
+        session.add(
+            Delegation(
+                id="VIS-DEL",
+                name="Visibility Nation",
+                membership_type=MembershipType.MEMBER,
+            )
+        )
+        session.add(
+            Committee(id="VIS-COM", name="Visibility Committee")
+        )
+        del_a = _make_delegate(
+            "VIS-DEL-A", "Delegate Alpha",
+            "alpha@example.com", "Head", "VIS-DEL",
+        )
+        del_b = _make_delegate(
+            "VIS-DEL-B", "Delegate Beta",
+            "beta@example.com", "Member", "VIS-DEL",
+        )
+        session.add(del_a)
+        session.add(del_b)
+        session.flush()
+        com = session.get(Committee, "VIS-COM")
+        del_a.committees = [com]
+        del_b.committees = [com]
+
+        session.add(
+            Meeting(
+                id="VIS-MTG-1",
+                committee_id="VIS-COM",
+                title="Visibility Meeting",
+                date=_NOW + timedelta(days=7),
+            )
+        )
+        session.add(
+            Document(
+                id="VIS-DOC-R",
+                title="Restricted Document",
+                classification=ClassificationLevel.RESTRICTED,
+                committee_id="VIS-COM",
+                publication_date=_NOW,
+                last_modified=_NOW,
+            )
+        )
+        session.add(
+            Document(
+                id="VIS-DOC-G",
+                title="General Document",
+                classification=ClassificationLevel.GENERAL,
+                committee_id="VIS-COM",
+                publication_date=_NOW,
+                last_modified=_NOW,
+            )
+        )
+        session.add(
+            MeetingAgendaItem(
+                id=20,
+                meeting_id="VIS-MTG-1",
+                document_id="VIS-DOC-R",
+                item_order=1,
+            )
+        )
+        session.add(
+            MeetingAgendaItem(
+                id=21,
+                meeting_id="VIS-MTG-1",
+                document_id="VIS-DOC-G",
+                item_order=2,
+            )
+        )
+        # Only Delegate A receives a DAR; Delegate B gets none
+        session.add(
+            _make_dar(
+                200, "VIS-DEL-A", "VIS-COM",
+                ClassificationLevel.RESTRICTED,
+            )
+        )
+
+    def test_delegate_with_restricted_dar_sees_both(
+        self, engine: object
+    ) -> None:
+        """RESTRICTED DAR grants visibility of GENERAL and RESTRICTED
+        docs."""
+        with Session(engine) as sess:
+            self._seed(sess)
+            sess.commit()
+
+        with patch("agent_app.tools._engine", engine):
+            docs = json.loads(
+                get_agenda_documents(
+                    "VIS-MTG-1", _make_ctx("VIS-DEL-A")
+                )
+            )
+
+        ids = [d["id"] for d in docs]
+        assert "VIS-DOC-R" in ids
+        assert "VIS-DOC-G" in ids
+
+    def test_delegate_without_dar_sees_nothing(
+        self, engine: object
+    ) -> None:
+        """Delegate with no DAR record returns empty list."""
+        with Session(engine) as sess:
+            self._seed(sess)
+            sess.commit()
+
+        with patch("agent_app.tools._engine", engine):
+            docs = json.loads(
+                get_agenda_documents(
+                    "VIS-MTG-1", _make_ctx("VIS-DEL-B")
+                )
+            )
+
+        assert docs == []
