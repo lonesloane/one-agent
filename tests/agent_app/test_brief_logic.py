@@ -18,7 +18,11 @@ from unittest.mock import MagicMock, patch
 from sqlalchemy.orm import Session
 
 from agent_app.agent import BRIEF_LOOKBACK_DAYS
-from agent_app.tools import get_agenda_documents, get_upcoming_meetings
+from agent_app.tools import (
+    get_agenda_documents,
+    get_upcoming_meetings,
+    lookup_delegate,
+)
 from shared.database import (
     ApprovalStatus,
     ClassificationLevel,
@@ -708,3 +712,185 @@ class TestDARVisibilityEnforcement:
             )
 
         assert docs == []
+
+
+# -- Helper for Class 6 ----------------------------------------------
+
+
+def _seed_multi_meeting_fixtures(session: Session) -> None:
+    """Seed two committees, each with an upcoming meeting and document.
+
+    Inserts one delegation, two committees, one delegate assigned to
+    both, one meeting per committee, one GENERAL document per meeting,
+    and GENERAL DARs for both committees.
+
+    Args:
+        session: Active SQLAlchemy session (commit is caller's
+            responsibility).
+    """
+    session.add(
+        Delegation(
+            id="MM-DEL",
+            name="Multi-Meeting Nation",
+            membership_type=MembershipType.MEMBER,
+        )
+    )
+    session.add(Committee(id="MM-COM-1", name="First Committee"))
+    session.add(Committee(id="MM-COM-2", name="Second Committee"))
+    delegate = _make_delegate(
+        "MM-D1", "Multi-Meeting Delegate",
+        "mm@example.com", "Member", "MM-DEL",
+    )
+    session.add(delegate)
+    session.flush()
+    delegate.committees = [
+        session.get(Committee, "MM-COM-1"),
+        session.get(Committee, "MM-COM-2"),
+    ]
+
+    session.add(
+        Meeting(
+            id="MM-MTG-1",
+            committee_id="MM-COM-1",
+            title="First Committee Meeting",
+            date=_NOW + timedelta(days=10),
+        )
+    )
+    session.add(
+        Meeting(
+            id="MM-MTG-2",
+            committee_id="MM-COM-2",
+            title="Second Committee Meeting",
+            date=_NOW + timedelta(days=20),
+        )
+    )
+    session.add(
+        Document(
+            id="MM-DOC-1",
+            title="First Committee Doc",
+            classification=ClassificationLevel.GENERAL,
+            committee_id="MM-COM-1",
+            publication_date=_NOW,
+            last_modified=_NOW,
+        )
+    )
+    session.add(
+        Document(
+            id="MM-DOC-2",
+            title="Second Committee Doc",
+            classification=ClassificationLevel.GENERAL,
+            committee_id="MM-COM-2",
+            publication_date=_NOW,
+            last_modified=_NOW,
+        )
+    )
+    session.add(
+        MeetingAgendaItem(
+            id=30,
+            meeting_id="MM-MTG-1",
+            document_id="MM-DOC-1",
+            item_order=1,
+        )
+    )
+    session.add(
+        MeetingAgendaItem(
+            id=31,
+            meeting_id="MM-MTG-2",
+            document_id="MM-DOC-2",
+            item_order=1,
+        )
+    )
+    session.add(
+        _make_dar(300, "MM-D1", "MM-COM-1",
+                  ClassificationLevel.GENERAL)
+    )
+    session.add(
+        _make_dar(301, "MM-D1", "MM-COM-2",
+                  ClassificationLevel.GENERAL)
+    )
+
+
+# -- Class 6: TestMultipleMeetingsBrief ------------------------------
+
+
+class TestMultipleMeetingsBrief:
+    """Verify a delegate in two committees sees meetings from both.
+
+    When a delegate belongs to two committees each with an upcoming
+    meeting, get_upcoming_meetings must return both, and
+    get_agenda_documents must return at least one doc per meeting.
+    """
+
+    def test_both_committees_return_meetings(
+        self, engine: object
+    ) -> None:
+        """Both committee meetings appear in get_upcoming_meetings."""
+        with Session(engine) as sess:
+            _seed_multi_meeting_fixtures(sess)
+            sess.commit()
+
+        with patch("agent_app.tools._engine", engine):
+            result = get_upcoming_meetings(_make_ctx("MM-D1"))
+
+        ids = [m["id"] for m in json.loads(result)]
+        assert "MM-MTG-1" in ids
+        assert "MM-MTG-2" in ids
+
+    def test_both_meetings_have_documents(
+        self, engine: object
+    ) -> None:
+        """get_agenda_documents returns at least one doc per meeting."""
+        with Session(engine) as sess:
+            _seed_multi_meeting_fixtures(sess)
+            sess.commit()
+
+        with patch("agent_app.tools._engine", engine):
+            docs_1 = json.loads(
+                get_agenda_documents(
+                    "MM-MTG-1", _make_ctx("MM-D1")
+                )
+            )
+            docs_2 = json.loads(
+                get_agenda_documents(
+                    "MM-MTG-2", _make_ctx("MM-D1")
+                )
+            )
+
+        assert len(docs_1) >= 1, "First meeting should have documents"
+        assert len(docs_2) >= 1, "Second meeting should have documents"
+
+
+# -- Class 7: TestDelegateNotFound -----------------------------------
+
+
+class TestDelegateNotFound:
+    """Verify lookup_delegate returns a null-filled struct for unknowns.
+
+    When delegate_id does not exist in the database, the tool must
+    return a well-formed JSON structure with None for scalar fields
+    and empty lists for collection fields.
+    """
+
+    def test_unknown_delegate_returns_null_filled(
+        self, engine: object
+    ) -> None:
+        """Unknown ID yields full_name=None and empty collections."""
+        with patch("agent_app.tools._engine", engine):
+            result = json.loads(lookup_delegate("NOT-EXIST-99"))
+
+        assert result["full_name"] is None
+        assert result["committees"] == []
+        assert result["access_rights"] == []
+
+    def test_null_filled_structure_has_all_keys(
+        self, engine: object
+    ) -> None:
+        """Null-filled result contains all expected top-level keys."""
+        with patch("agent_app.tools._engine", engine):
+            result = json.loads(lookup_delegate("NOT-EXIST-99"))
+
+        expected_keys = {
+            "id", "full_name", "delegation_id",
+            "committees", "access_rights",
+        }
+        assert expected_keys.issubset(result.keys())
