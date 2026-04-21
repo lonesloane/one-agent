@@ -204,6 +204,16 @@ class TestBriefFiresWithNewDocuments:
     last_modified within the past BRIEF_LOOKBACK_DAYS days.
     """
 
+    def _seed(self, session: Session, last_modified: datetime) -> None:
+        """Insert delegate, committee, recent document and meeting."""
+        _seed_delegate_in_committee(
+            session, "BRI-DEL", "BRI-COM", "BRI-D1"
+        )
+        _seed_doc_with_meeting(
+            session, "BRI-COM", "BRI-MTG-1",
+            "BRI-DOC-1", "BRI-D1", last_modified,
+        )
+
     def test_upcoming_meeting_is_returned(
         self, engine: object
     ) -> None:
@@ -234,13 +244,7 @@ class TestBriefFiresWithNewDocuments:
         """Document modified within lookback window is visible."""
         recent = _NOW - timedelta(days=1)
         with Session(engine) as sess:
-            _seed_delegate_in_committee(
-                sess, "BRI-DEL", "BRI-COM", "BRI-D1"
-            )
-            _seed_doc_with_meeting(
-                sess, "BRI-COM", "BRI-MTG-1",
-                "BRI-DOC-1", "BRI-D1", recent,
-            )
+            self._seed(sess, recent)
             sess.commit()
 
         with patch("agent_app.tools._engine", engine):
@@ -257,13 +261,7 @@ class TestBriefFiresWithNewDocuments:
         BRIEF_LOOKBACK_DAYS."""
         recent = _NOW - timedelta(days=1)
         with Session(engine) as sess:
-            _seed_delegate_in_committee(
-                sess, "BRI-DEL", "BRI-COM", "BRI-D1"
-            )
-            _seed_doc_with_meeting(
-                sess, "BRI-COM", "BRI-MTG-1",
-                "BRI-DOC-1", "BRI-D1", recent,
-            )
+            self._seed(sess, recent)
             sess.commit()
 
         with patch("agent_app.tools._engine", engine):
@@ -284,13 +282,7 @@ class TestBriefFiresWithNewDocuments:
         result payload."""
         recent = _NOW - timedelta(days=2)
         with Session(engine) as sess:
-            _seed_delegate_in_committee(
-                sess, "BRI-DEL", "BRI-COM", "BRI-D1"
-            )
-            _seed_doc_with_meeting(
-                sess, "BRI-COM", "BRI-MTG-1",
-                "BRI-DOC-1", "BRI-D1", recent,
-            )
+            self._seed(sess, recent)
             sess.commit()
 
         with patch("agent_app.tools._engine", engine):
