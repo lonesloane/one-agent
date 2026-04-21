@@ -194,6 +194,174 @@ def _make_ctx(delegate_id: str) -> MagicMock:
     return ctx
 
 
+def _seed_grounding_fixtures(session: Session) -> None:
+    """Insert delegation, committee, delegate, two docs, and meeting.
+
+    Seeds data for TestGrounding: delegate GRD-D1 in GRD-COM with two
+    agenda documents (GRD-DOC-1, GRD-DOC-2) and a GENERAL DAR.
+
+    Args:
+        session: Active SQLAlchemy session (commit is caller's
+            responsibility).
+    """
+    session.add(
+        Delegation(
+            id="GRD-DEL",
+            name="Grounding Nation",
+            membership_type=MembershipType.MEMBER,
+        )
+    )
+    session.add(
+        Committee(id="GRD-COM", name="Grounding Committee")
+    )
+    delegate = _make_delegate(
+        "GRD-D1", "Grounding Delegate",
+        "grd@example.com", "Member", "GRD-DEL",
+    )
+    session.add(delegate)
+    session.flush()
+    delegate.committees = [session.get(Committee, "GRD-COM")]
+
+    session.add(
+        Meeting(
+            id="GRD-MTG-1",
+            committee_id="GRD-COM",
+            title="Grounding Meeting",
+            date=_NOW + timedelta(days=5),
+        )
+    )
+    session.add(
+        Document(
+            id="GRD-DOC-1",
+            title="Alpha Report",
+            classification=ClassificationLevel.GENERAL,
+            committee_id="GRD-COM",
+            publication_date=_NOW,
+            last_modified=_NOW,
+        )
+    )
+    session.add(
+        Document(
+            id="GRD-DOC-2",
+            title="Beta Minutes",
+            classification=ClassificationLevel.GENERAL,
+            committee_id="GRD-COM",
+            publication_date=_NOW,
+            last_modified=_NOW,
+        )
+    )
+    session.add(
+        MeetingAgendaItem(
+            id=10,
+            meeting_id="GRD-MTG-1",
+            document_id="GRD-DOC-1",
+            item_order=1,
+        )
+    )
+    session.add(
+        MeetingAgendaItem(
+            id=11,
+            meeting_id="GRD-MTG-1",
+            document_id="GRD-DOC-2",
+            item_order=2,
+        )
+    )
+    session.add(
+        _make_dar(
+            100, "GRD-D1", "GRD-COM",
+            ClassificationLevel.GENERAL,
+        )
+    )
+
+
+def _seed_visibility_fixtures(session: Session) -> None:
+    """Insert delegation, committee, two delegates, two docs, meeting.
+
+    Seeds data for TestDARVisibilityEnforcement: delegate VIS-DEL-A
+    receives a RESTRICTED DAR; delegate VIS-DEL-B receives none.
+
+    Args:
+        session: Active SQLAlchemy session (commit is caller's
+            responsibility).
+    """
+    session.add(
+        Delegation(
+            id="VIS-DEL",
+            name="Visibility Nation",
+            membership_type=MembershipType.MEMBER,
+        )
+    )
+    session.add(
+        Committee(id="VIS-COM", name="Visibility Committee")
+    )
+    del_a = _make_delegate(
+        "VIS-DEL-A", "Delegate Alpha",
+        "alpha@example.com", "Head", "VIS-DEL",
+    )
+    del_b = _make_delegate(
+        "VIS-DEL-B", "Delegate Beta",
+        "beta@example.com", "Member", "VIS-DEL",
+    )
+    session.add(del_a)
+    session.add(del_b)
+    session.flush()
+    com = session.get(Committee, "VIS-COM")
+    del_a.committees = [com]
+    del_b.committees = [com]
+
+    session.add(
+        Meeting(
+            id="VIS-MTG-1",
+            committee_id="VIS-COM",
+            title="Visibility Meeting",
+            date=_NOW + timedelta(days=7),
+        )
+    )
+    session.add(
+        Document(
+            id="VIS-DOC-R",
+            title="Restricted Document",
+            classification=ClassificationLevel.RESTRICTED,
+            committee_id="VIS-COM",
+            publication_date=_NOW,
+            last_modified=_NOW,
+        )
+    )
+    session.add(
+        Document(
+            id="VIS-DOC-G",
+            title="General Document",
+            classification=ClassificationLevel.GENERAL,
+            committee_id="VIS-COM",
+            publication_date=_NOW,
+            last_modified=_NOW,
+        )
+    )
+    session.add(
+        MeetingAgendaItem(
+            id=20,
+            meeting_id="VIS-MTG-1",
+            document_id="VIS-DOC-R",
+            item_order=1,
+        )
+    )
+    session.add(
+        MeetingAgendaItem(
+            id=21,
+            meeting_id="VIS-MTG-1",
+            document_id="VIS-DOC-G",
+            item_order=2,
+        )
+    )
+    # Only Delegate A receives a DAR; Delegate B gets none
+    session.add(
+        _make_dar(
+            200, "VIS-DEL-A", "VIS-COM",
+            ClassificationLevel.RESTRICTED,
+        )
+    )
+
+
 # -- Class 1: TestBriefFiresWithNewDocuments -------------------------
 
 
@@ -459,79 +627,8 @@ class TestGrounding:
     """
 
     def _seed(self, session: Session) -> None:
-        """Insert delegation, committee, delegate, two docs, meeting.
-
-        Args:
-            session: Active SQLAlchemy session.
-        """
-        session.add(
-            Delegation(
-                id="GRD-DEL",
-                name="Grounding Nation",
-                membership_type=MembershipType.MEMBER,
-            )
-        )
-        session.add(
-            Committee(id="GRD-COM", name="Grounding Committee")
-        )
-        delegate = _make_delegate(
-            "GRD-D1", "Grounding Delegate",
-            "grd@example.com", "Member", "GRD-DEL",
-        )
-        session.add(delegate)
-        session.flush()
-        delegate.committees = [session.get(Committee, "GRD-COM")]
-
-        session.add(
-            Meeting(
-                id="GRD-MTG-1",
-                committee_id="GRD-COM",
-                title="Grounding Meeting",
-                date=_NOW + timedelta(days=5),
-            )
-        )
-        session.add(
-            Document(
-                id="GRD-DOC-1",
-                title="Alpha Report",
-                classification=ClassificationLevel.GENERAL,
-                committee_id="GRD-COM",
-                publication_date=_NOW,
-                last_modified=_NOW,
-            )
-        )
-        session.add(
-            Document(
-                id="GRD-DOC-2",
-                title="Beta Minutes",
-                classification=ClassificationLevel.GENERAL,
-                committee_id="GRD-COM",
-                publication_date=_NOW,
-                last_modified=_NOW,
-            )
-        )
-        session.add(
-            MeetingAgendaItem(
-                id=10,
-                meeting_id="GRD-MTG-1",
-                document_id="GRD-DOC-1",
-                item_order=1,
-            )
-        )
-        session.add(
-            MeetingAgendaItem(
-                id=11,
-                meeting_id="GRD-MTG-1",
-                document_id="GRD-DOC-2",
-                item_order=2,
-            )
-        )
-        session.add(
-            _make_dar(
-                100, "GRD-D1", "GRD-COM",
-                ClassificationLevel.GENERAL,
-            )
-        )
+        """Delegate to module-level grounding fixture helper."""
+        _seed_grounding_fixtures(session)
 
     def test_only_seeded_titles_in_result(
         self, engine: object
@@ -573,95 +670,13 @@ class TestDARVisibilityEnforcement:
     """
 
     def _seed(self, session: Session) -> None:
-        """Insert delegation, committee, two delegates, two docs.
-
-        Delegate A gets a RESTRICTED DAR; Delegate B gets none.
-
-        Args:
-            session: Active SQLAlchemy session.
-        """
-        session.add(
-            Delegation(
-                id="VIS-DEL",
-                name="Visibility Nation",
-                membership_type=MembershipType.MEMBER,
-            )
-        )
-        session.add(
-            Committee(id="VIS-COM", name="Visibility Committee")
-        )
-        del_a = _make_delegate(
-            "VIS-DEL-A", "Delegate Alpha",
-            "alpha@example.com", "Head", "VIS-DEL",
-        )
-        del_b = _make_delegate(
-            "VIS-DEL-B", "Delegate Beta",
-            "beta@example.com", "Member", "VIS-DEL",
-        )
-        session.add(del_a)
-        session.add(del_b)
-        session.flush()
-        com = session.get(Committee, "VIS-COM")
-        del_a.committees = [com]
-        del_b.committees = [com]
-
-        session.add(
-            Meeting(
-                id="VIS-MTG-1",
-                committee_id="VIS-COM",
-                title="Visibility Meeting",
-                date=_NOW + timedelta(days=7),
-            )
-        )
-        session.add(
-            Document(
-                id="VIS-DOC-R",
-                title="Restricted Document",
-                classification=ClassificationLevel.RESTRICTED,
-                committee_id="VIS-COM",
-                publication_date=_NOW,
-                last_modified=_NOW,
-            )
-        )
-        session.add(
-            Document(
-                id="VIS-DOC-G",
-                title="General Document",
-                classification=ClassificationLevel.GENERAL,
-                committee_id="VIS-COM",
-                publication_date=_NOW,
-                last_modified=_NOW,
-            )
-        )
-        session.add(
-            MeetingAgendaItem(
-                id=20,
-                meeting_id="VIS-MTG-1",
-                document_id="VIS-DOC-R",
-                item_order=1,
-            )
-        )
-        session.add(
-            MeetingAgendaItem(
-                id=21,
-                meeting_id="VIS-MTG-1",
-                document_id="VIS-DOC-G",
-                item_order=2,
-            )
-        )
-        # Only Delegate A receives a DAR; Delegate B gets none
-        session.add(
-            _make_dar(
-                200, "VIS-DEL-A", "VIS-COM",
-                ClassificationLevel.RESTRICTED,
-            )
-        )
+        """Delegate to module-level visibility fixture helper."""
+        _seed_visibility_fixtures(session)
 
     def test_delegate_with_restricted_dar_sees_both(
         self, engine: object
     ) -> None:
-        """RESTRICTED DAR grants visibility of GENERAL and RESTRICTED
-        docs."""
+        """RESTRICTED DAR grants GENERAL and RESTRICTED doc visibility."""
         with Session(engine) as sess:
             self._seed(sess)
             sess.commit()
