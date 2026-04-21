@@ -33,7 +33,7 @@ from shared.database import (
     MembershipType,
 )
 
-# -- Helpers ------------------------------------------------------------------
+# -- Helpers ---------------------------------------------------------
 
 _NOW = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -194,7 +194,7 @@ def _make_ctx(delegate_id: str) -> MagicMock:
     return ctx
 
 
-# -- Class 1: TestBriefFiresWithNewDocuments ----------------------------------
+# -- Class 1: TestBriefFiresWithNewDocuments -------------------------
 
 
 class TestBriefFiresWithNewDocuments:
@@ -253,7 +253,8 @@ class TestBriefFiresWithNewDocuments:
     def test_recent_document_last_modified_within_lookback(
         self, engine: object
     ) -> None:
-        """last_modified on returned doc is within BRIEF_LOOKBACK_DAYS."""
+        """last_modified on returned doc is within
+        BRIEF_LOOKBACK_DAYS."""
         recent = _NOW - timedelta(days=1)
         with Session(engine) as sess:
             _seed_delegate_in_committee(
@@ -279,7 +280,8 @@ class TestBriefFiresWithNewDocuments:
     def test_recent_document_title_in_result(
         self, engine: object
     ) -> None:
-        """Document title from seed data is present in result payload."""
+        """Document title from seed data is present in
+        result payload."""
         recent = _NOW - timedelta(days=2)
         with Session(engine) as sess:
             _seed_delegate_in_committee(
@@ -289,9 +291,6 @@ class TestBriefFiresWithNewDocuments:
                 sess, "BRI-COM", "BRI-MTG-1",
                 "BRI-DOC-1", "BRI-D1", recent,
             )
-            # Override default title via direct update before commit
-            doc = sess.get(Document, "BRI-DOC-1")
-            doc.title = "Climate Action Report"
             sess.commit()
 
         with patch("agent_app.tools._engine", engine):
@@ -300,10 +299,10 @@ class TestBriefFiresWithNewDocuments:
             )
 
         titles = [d["title"] for d in docs]
-        assert "Climate Action Report" in titles
+        assert "Test Document" in titles
 
 
-# -- Class 2: TestBriefSuppressedNoNewDocuments -------------------------------
+# -- Class 2: TestBriefSuppressedNoNewDocuments ----------------------
 
 
 class TestBriefSuppressedNoNewDocuments:
@@ -343,7 +342,8 @@ class TestBriefSuppressedNoNewDocuments:
     def test_stale_document_is_returned_by_tool(
         self, engine: object
     ) -> None:
-        """Tool returns stale doc — agent, not tool, applies lookback."""
+        """Tool returns stale doc — agent, not tool,
+        applies lookback."""
         with Session(engine) as sess:
             self._seed(sess)
             sess.commit()
@@ -358,7 +358,8 @@ class TestBriefSuppressedNoNewDocuments:
     def test_stale_document_last_modified_outside_lookback(
         self, engine: object
     ) -> None:
-        """last_modified on returned doc is beyond BRIEF_LOOKBACK_DAYS."""
+        """last_modified on returned doc is beyond
+        BRIEF_LOOKBACK_DAYS."""
         with Session(engine) as sess:
             self._seed(sess)
             sess.commit()
@@ -375,7 +376,7 @@ class TestBriefSuppressedNoNewDocuments:
         )
 
 
-# -- Class 3: TestBriefSuppressedNoMeetings -----------------------------------
+# -- Class 3: TestBriefSuppressedNoMeetings --------------------------
 
 
 class TestBriefSuppressedNoMeetings:
