@@ -1,7 +1,7 @@
 "use client";
 
-import { CopilotKit } from "@copilotkit/react-core";
-import "@copilotkit/react-ui/styles.css";
+import { CopilotKitProvider as V2Provider } from "@copilotkit/react-core/v2";
+import "@copilotkit/react-core/v2/styles.css";
 import { ReactNode } from "react";
 
 interface CopilotKitProviderProps {
@@ -12,8 +12,8 @@ export function CopilotKitProvider({
   children,
 }: CopilotKitProviderProps) {
   return (
-    <CopilotKit runtimeUrl="/api/copilotkit" agent="ONEMPReadAgent">
+    <V2Provider runtimeUrl="/api/copilotkit">
       {children}
-    </CopilotKit>
+    </V2Provider>
   );
 }

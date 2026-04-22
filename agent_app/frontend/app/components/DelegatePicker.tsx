@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useCoAgent } from "@copilotkit/react-core";
 
 interface Delegate {
   id: string;
@@ -15,7 +14,9 @@ interface DelegatePickerProps {
   onThreadReset: () => void;
 }
 
-const DELEGATES_URL = "http://localhost:8000/api/delegates";
+const AGENT_BASE =
+  process.env.NEXT_PUBLIC_AGENT_URL ?? "http://localhost:8000";
+const DELEGATES_URL = `${AGENT_BASE}/api/delegates`;
 
 export function DelegatePicker({
   onDelegateChange,
@@ -25,11 +26,6 @@ export function DelegatePicker({
   const [selectedId, setSelectedId] = useState<string>("");
   const [error, setError] = useState<boolean>(false);
   const fetchedRef = useRef(false);
-
-  const { setState } = useCoAgent<{ delegate_id: string }>({
-    name: "ONEMPReadAgent",
-    initialState: { delegate_id: "" },
-  });
 
   useEffect(() => {
     if (fetchedRef.current) return;
@@ -45,7 +41,6 @@ export function DelegatePicker({
         if (data.length > 0) {
           const first = data[0];
           setSelectedId(first.id);
-          setState({ delegate_id: first.id });
           onDelegateChange(first.id);
         }
       })
@@ -57,7 +52,6 @@ export function DelegatePicker({
   function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const newId = e.target.value;
     setSelectedId(newId);
-    setState({ delegate_id: newId });
     onDelegateChange(newId);
     onThreadReset();
   }
