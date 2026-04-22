@@ -10,6 +10,7 @@ import {
 import { CopilotKitCoreRuntimeConnectionStatus } from "@copilotkit/core";
 import "@copilotkit/react-core/v2/styles.css";
 import { DelegatePicker } from "./components/DelegatePicker";
+import styles from "./page.module.css";
 
 function ToolCallBlock({
   name,
@@ -23,7 +24,7 @@ function ToolCallBlock({
   result: string | undefined;
 }) {
   const label =
-    status === "complete" ? `\u2713 ${name}` : `\u23f3 ${name}`;
+    status === "complete" ? `✓ ${name}` : `⏳ ${name}`;
   return (
     <details style={{ fontSize: "0.85em", margin: "4px 0" }}>
       <summary style={{ cursor: "pointer" }}>{label} [{status}]</summary>
@@ -52,10 +53,9 @@ function ChatPane({
   // clone. If this hook is called without threadId, it returns a
   // *different instance* than the chat — runAgent appends messages to
   // the registry agent and the chat view stays empty.
-  const { agent } = useAgent<{ delegate_id: string }>({
+  const { agent } = useAgent({
     agentId: "ONEMPReadAgent",
     threadId,
-    initialState: { delegate_id: "" },
   });
   const { copilotkit } = useCopilotKit();
 
@@ -123,22 +123,29 @@ export default function Home() {
   }
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-      }}
-    >
-      <div style={{ padding: "8px 16px", borderBottom: "1px solid #ddd" }}>
-        <DelegatePicker
-          onDelegateChange={handleDelegateChange}
-          onThreadReset={handleThreadReset}
-        />
-      </div>
-      {selectedDelegateId !== "" && (
-        <ChatPane threadId={threadId} delegateId={selectedDelegateId} />
-      )}
+    <div className={styles.appShell}>
+      <header className={styles.header}>
+        <div className={styles.brand}>
+          <span className={styles.brandMark}>OECD</span>
+          <span className={styles.brandTitle}>ONE-MP Read Agent</span>
+        </div>
+        <div className={styles.personaBar}>
+          <label className={styles.personaLabel} htmlFor="delegate-select">
+            Acting as
+          </label>
+          <DelegatePicker
+            onDelegateChange={handleDelegateChange}
+            onThreadReset={handleThreadReset}
+          />
+        </div>
+      </header>
+      <main className={styles.main}>
+        <div className={styles.container}>
+          {selectedDelegateId !== "" && (
+            <ChatPane threadId={threadId} delegateId={selectedDelegateId} />
+          )}
+        </div>
+      </main>
     </div>
   );
 }

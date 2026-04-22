@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import styles from "./DelegatePicker.module.css";
 
 interface Delegate {
   id: string;
@@ -58,7 +59,7 @@ export function DelegatePicker({
 
   if (error) {
     return (
-      <select disabled style={{ opacity: 0.5 }}>
+      <select id="delegate-select" disabled className={styles.select}>
         <option>Failed to load delegates</option>
       </select>
     );
@@ -66,14 +67,19 @@ export function DelegatePicker({
 
   if (delegates.length === 0) {
     return (
-      <select disabled style={{ opacity: 0.5 }}>
+      <select id="delegate-select" disabled className={styles.select}>
         <option>No delegates available</option>
       </select>
     );
   }
 
   return (
-    <select value={selectedId} onChange={handleChange}>
+    <select
+      id="delegate-select"
+      value={selectedId}
+      onChange={handleChange}
+      className={styles.select}
+    >
       {delegates.map((d) => (
         <option key={d.id} value={d.id}>
           {d.full_name} ({d.delegation_name} — {d.role})
