@@ -104,15 +104,35 @@
 - [ ] Classical app: Confirmation (Screen 8)
 - [ ] Wire up actual delegate + DAR creation using shared business rules
 
-## Phase 3 — Agent App (Read Agent — UC1)
+## Phase 3 — Agent App (Read Agent — UC1) ✓ (2026-04-22)
 > "The Proactive Read Agent" — meeting brief on session start
 
-- [ ] Implement agent tools: `get_delegation_info`, `lookup_delegate`, `get_upcoming_meetings`, `get_agenda_documents` (thin wrappers over shared layer)
-- [ ] Write system prompt encoding ONE MP domain and behavioral rules
-- [ ] Set up `Agent` with `FoundryChatClient` + read tools + `AuditMiddleware`
-- [ ] Implement proactive meeting brief: on session start, greet with upcoming meetings + new documents
-- [ ] Implement streaming for real-time UI feedback
-- [ ] Verify document visibility rules function correctly
+### Phase 3A — Tools and Agent Setup ✓ (2026-04-20)
+- [x] Implement agent tools: `get_delegation_info`, `lookup_delegate`, `get_upcoming_meetings`, `get_agenda_documents` (thin wrappers over shared layer using `@tool` + `FunctionInvocationContext` for identity threading)
+- [x] Write system prompt encoding domain model, access-classification rule, proactive brief sequence, write-guard, grounding rule
+- [x] Set up `Agent` with `FoundryChatClient` + read tools + `AuditMiddleware`
+- [x] 15 new tests in `tests/agent_app/test_tools.py` (202 tests total)
+
+### Phase 3B — FastAPI AG-UI Server ✓ (2026-04-20)
+- [x] FastAPI AG-UI endpoint (`agent_app/server.py`) with `_BoundAgent` identity threading pattern
+- [x] Custom AG-UI POST endpoint bypassing `HttpAgent` threadId reset limitation
+- [x] Lazy agent singleton + `get_engine` DB initialization
+- [x] `/api/delegates` endpoint for persona switcher (JOINed load)
+
+### Phase 3C — CopilotKit Frontend ✓ (2026-04-20)
+- [x] Next.js + CopilotKit frontend (`agent_app/frontend/`)
+- [x] Streaming brief visually confirmed end-to-end
+- [x] Document visibility rules function correctly via `get_agenda_documents` + DAR enforcement
+
+### Phase 3D — Integration Tests and Doc Closure ✓ (2026-04-22)
+- [x] `tests/agent_app/test_brief_logic.py` — brief trigger (new docs within lookback), suppress (stale docs, no meetings), grounding (tool-returned titles only), DAR visibility enforcement, multiple meetings, delegate-not-found edge case
+- [x] ≥ 20 new tests across Phase 3 (15 Phase 3A + 16 Phase 3D = 31 new tests)
+- [x] Full suite green: **203 tests passing**
+- [x] Documentation closure: BACKLOG, DESIGN, DECISIONS updated
+
+### Phase 3E — CopilotKit E2E Playwright Tests ✓ (2026-04-20)
+- [x] 4 Playwright e2e tests in `tests/e2e_agent/` covering brief trigger, suppress, persona switch, tool call blocks
+- [x] Tests require live Azure AI Foundry (excluded from unit test suite)
 
 ## Phase 4 — Agent App (Write Agent — UC2)
 > "The Write Agent with Reasoning" — delegate creation with DAR

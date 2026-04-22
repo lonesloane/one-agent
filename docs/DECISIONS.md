@@ -293,3 +293,17 @@ Single-file database, zero infrastructure. Shared between both apps. Sufficient 
 ### [2025-04] Human-in-the-loop via approval_mode, not custom code
 
 Write tools use `approval_mode="always_require"` — the Agent Framework handles the confirmation flow natively via `user_input_requests`. No custom confirmation UI code needed at the tool layer.
+
+### [2026-04-19] Agent frontend: AG-UI + CopilotKit (OQ-7 resolved)
+
+Use AG-UI protocol with CopilotKit (Next.js) as the agent frontend. The
+FastAPI server (`agent_app/server.py`) exposes a custom AG-UI POST endpoint
+rather than using `HttpAgent` directly — this avoids the `HttpAgent` threadId
+reset limitation that would clear delegate identity on every request. The
+CopilotKit frontend connects via `useCopilotChat` and fires the proactive
+brief via `runAgent` gated on `runtimeConnectionStatus === Connected`.
+Identity threading is handled by `_BoundAgent`, which wraps the agent
+singleton with a per-request `delegate_id` injected through
+`FunctionInvocationContext`. This approach keeps the agent stateless while
+allowing tool calls to resolve the correct delegate without exposing the
+identity parameter in the chat UI.
