@@ -89,7 +89,8 @@ IF conflicts with your human partner's prior decisions:
 
 ```
 IF reviewer suggests "implementing properly":
-  grep codebase for actual usage
+  Use mcp__jcodemunch__find_references to check actual usage across the codebase
+  (fallback: grep codebase for actual usage)
 
   IF unused: "This endpoint isn't called. Remove it (YAGNI)?"
   IF used: Then implement properly

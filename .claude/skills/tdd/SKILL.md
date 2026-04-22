@@ -13,7 +13,9 @@ description: Test-driven development with red-green-refactor loop. Use when user
 
 **Bad tests** are coupled to implementation. They mock internal collaborators, test private methods, or verify through external means (like querying a database directly instead of using the interface). The warning sign: your test breaks when you refactor, but behavior hasn't changed. If you rename an internal function and tests fail, those tests were testing implementation, not behavior.
 
-**Toolchain**: pytest (`@pytest.mark`, `@pytest.fixture`), unittest.mock (`Mock`, `patch`, `MagicMock`), pytest-mock (`mocker` fixture). Verify with `pytest`.
+**Toolchain — Python**: pytest (`@pytest.mark`, `@pytest.fixture`), unittest.mock (`Mock`, `patch`, `MagicMock`), pytest-mock (`mocker` fixture). Verify with `pytest`.
+
+**Toolchain — TypeScript/Next.js**: Vitest or Jest with React Testing Library (`@testing-library/react`, `@testing-library/user-event`). Use `screen` queries in priority order: `getByRole` → `getByLabelText` → `getByText` → `getByTestId`. Verify with `npm test` or `npx vitest`.
 
 See [tests.md](tests.md) for examples and [mocking.md](mocking.md) for mocking guidelines.
 
@@ -42,7 +44,27 @@ RIGHT (vertical):
   ...
 ```
 
-Run `pytest` after each RED->GREEN cycle to confirm exactly one new test turns green.
+Run a **scoped** pytest after each RED->GREEN cycle to confirm exactly one new test turns green. Do **not** run the full suite on every cycle — see "Test Scoping" below.
+
+## Test Scoping (shift-left against suite-thrash)
+
+The full test suite runs many times in a typical task: once per TDD cycle, once at self-review, once per reviewer, once per fix loop, once at the final review. That is wasteful and slow.
+
+**Default scoping for each phase:**
+
+| Phase | What to run | Why |
+|---|---|---|
+| RED → GREEN (tracer bullet) | `pytest path/to/test_file.py::TestClass::test_name` | Confirm exactly one new test flips green |
+| Incremental cycles within a task | `pytest path/to/test_file.py` (or the task's test directory) | Fast feedback on the slice you're building |
+| After refactor | Same task-scoped path + `pytest --lf` | Catch regressions you just introduced |
+| Pre-commit (final implementer gate) | `pytest` (full suite) | **Single authoritative run** per task — record the pass count in the commit message and report |
+| Spec / quality review | **No re-run by default** — trust the committed pass count | See `subagent-driven-development/` reviewer prompts |
+| Fix loop after a bounce | `pytest <failing nodeids>` + `pytest --lf` | Narrow to what actually regressed |
+| Final feature review | `pytest` (full suite, once) | Authoritative end-to-end gate |
+
+**Report format after pre-commit run:** record `N passed, M deselected` plus the explicit nodeids of tests *added in this task*. Reviewers use that list to spot-check claims without re-running everything.
+
+**Use `pytest --lf --ff` in fix loops** to prioritize last-failed tests; this hits pytest's cache and skips what already passed.
 
 ## Workflow
 
@@ -50,6 +72,7 @@ Run `pytest` after each RED->GREEN cycle to confirm exactly one new test turns g
 
 Before writing any code:
 
+- [ ] **Orient with jcodemunch** — use `mcp__jcodemunch__search_symbols` to locate existing classes and functions in scope; use `mcp__jcodemunch__find_references` to understand how the module is already called before designing a new interface
 - [ ] Confirm with user what interface changes are needed
 - [ ] Confirm with user which behaviors to test (prioritize)
 - [ ] Identify opportunities for [deep modules](deep-modules.md) (small interface, deep implementation)

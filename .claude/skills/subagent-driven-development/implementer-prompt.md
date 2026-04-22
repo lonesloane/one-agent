@@ -2,8 +2,18 @@
 
 Use this template when dispatching an implementer subagent.
 
+**Choose the subagent type based on the task's primary language/layer:**
+
+| Task involves | Use |
+|---|---|
+| Python backend, Flask, FastAPI, tests, DB, CLI | `python-coder` |
+| Next.js, React, TypeScript, CSS, frontend tests | `ui-developer` |
+
+If a task spans both layers, split it or use the agent that owns the
+primary logic change.
+
 ```
-Agent tool (subagent_type: "python-coder"):
+Agent tool (subagent_type: "python-coder" | "ui-developer"):
   description: "Implement Task N: [task name]"
   prompt: |
     You are implementing Task N: [task name]
@@ -98,6 +108,27 @@ Agent tool (subagent_type: "python-coder"):
     - Did I follow TDD if required?
     - Are tests comprehensive?
 
+    **Test execution (scoped — see `.claude/skills/tdd/SKILL.md` §Test Scoping):**
+    - During red→green cycles: run only the new test (`pytest <file>::<test>`)
+    - Between cycles within the task: run the task-scoped file/dir
+    - **Pre-commit: run the FULL suite exactly once.** This is the authoritative run.
+      Record the result (e.g., `203 passed`) and the nodeids of tests newly added
+      in this task — reviewers will rely on this instead of re-running.
+    - In fix loops after a reviewer bounce: `pytest <failing nodeids>` + `pytest --lf`,
+      then full suite only at the next pre-commit.
+
+    **Formatter / linter gate (MANDATORY before commit):**
+    - Python changes: run `ruff format . && ruff check --fix .` from the
+      project root. Commit only if both succeed with no remaining errors.
+      If a rule cannot be auto-fixed, fix it manually in code — never
+      defer formatter-owned concerns to the reviewer.
+    - Frontend changes (if present): run the project's lint/format scripts
+      (e.g. `npm run lint`, or `prettier --write` if configured). If no
+      such script exists, skip — do not install new tooling unasked.
+    - This is a shift-left gate. Reviewers will not enumerate style
+      violations; they will bounce the commit back if the formatter
+      wasn't run. Save the round-trip by running it yourself.
+
     If you find issues during self-review, fix them now before reporting.
 
     ## Report Format
@@ -105,7 +136,12 @@ Agent tool (subagent_type: "python-coder"):
     When done, report:
     - **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
     - What you implemented (or what you attempted, if blocked)
-    - What you tested and test results
+    - **Test results (pre-commit full-suite run):** exact pass/fail/deselected counts
+      (e.g. `213 passed, 0 failed, 2 deselected in 14.82s`)
+    - **New tests added in this task (nodeids):** explicit list, e.g.
+      `tests/classical_app/test_wizard_rollback.py::test_rollback_removes_draft`
+      — reviewers will use this list to spot-check behavior without re-running the full suite
+    - **Commit SHA(s)** for the work
     - Files changed
     - Self-review findings (if any)
     - Any issues or concerns

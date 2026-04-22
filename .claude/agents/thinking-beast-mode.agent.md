@@ -139,9 +139,14 @@ Carefully read the issue and think hard about a plan to address it.
 
 ## 4. Codebase Investigation
 
-- Explore relevant files and directories.
-- Search for key functions, classes, or variables related to the issue.
-- Read and understand relevant code snippets.
+Use jcodemunch as the primary tool for all code exploration before falling back to raw file reads:
+
+- Use `mcp__jcodemunch__search_symbols` to find functions, classes, and variables by name.
+- Use `mcp__jcodemunch__find_references` to trace how symbols are used across the codebase.
+- Use `mcp__jcodemunch__get_call_hierarchy` to map control flow and understand execution paths.
+- Use `mcp__jcodemunch__get_context_bundle` to pull all relevant context around a symbol in one call.
+- Use `mcp__jcodemunch__get_blast_radius` to assess the impact of any change before making it.
+- Only fall back to `Grep` / `Glob` / `Read` when jcodemunch does not cover the need.
 - Identify the root cause of the problem.
 - Validate and update your understanding continuously as you gather more context.
 

@@ -33,12 +33,14 @@ During implementation, keep the user informed of meaningful progress and surface
 
 ## Code Exploration
 
-Before writing or modifying code, understand the existing codebase efficiently:
+Before writing or modifying code, understand the existing codebase efficiently using jcodemunch as the primary tool:
 
-- Use `Grep` to find relevant functions, classes, and methods by name or pattern.
-- Use `Glob` to locate files by path patterns.
-- Use `Read` with targeted line ranges to inspect specific implementations without loading entire files.
-- Use `Grep` to discover how a function or class is used across the codebase before changing its signature.
+- Use `mcp__jcodemunch__search_symbols` to find functions, classes, and methods by name.
+- Use `mcp__jcodemunch__find_references` to discover all call sites before changing a function's signature.
+- Use `mcp__jcodemunch__get_call_hierarchy` to understand how code flows through the system.
+- Use `mcp__jcodemunch__get_file_outline` to get a structural overview of a file before reading it in full.
+- Use `mcp__jcodemunch__get_context_bundle` to gather all relevant context around a symbol at once.
+- Fall back to `Grep` / `Glob` / `Read` only when jcodemunch does not cover the need (e.g. raw text search, reading non-indexed files).
 
 ---
 
@@ -123,7 +125,7 @@ These coding principles are mandatory:
 Before presenting your final implementation, verify:
 - [ ] TDD skill was loaded and the red → green → refactor loop was followed
 - [ ] All new/modified code has corresponding tests that pass
-- [ ] PEP 8 naming conventions are followed throughout
+- [ ] **Ran `ruff format . && ruff check --fix .` from project root with no remaining errors before committing** (mandatory — reviewers will not enumerate style violations; they will bounce the commit)
 - [ ] No secrets or sensitive values are hardcoded
 - [ ] Exceptions are explicit and never silently swallowed
 - [ ] Type annotations are present on all new functions and methods

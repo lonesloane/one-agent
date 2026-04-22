@@ -2,17 +2,25 @@
 
 ## 🧱 Code Structure & Modularity
 
-### PEP 8
+### Style & Formatting (automated)
 
-Follow the PEP 8 style guide.
+**Python style is enforced by `ruff` — see `[tool.ruff]` in `pyproject.toml`
+for the single source of truth** (line length, import order, blank lines,
+quotes, etc.).
 
-- **Indentation**: Use 4 spaces per indentation level. Avoid tabs.
-- **Maximum Line Length**: Limit all lines to a maximum of 79 characters (72 for
-  docstrings/comments).
-- **Blank Lines**: Use two blank lines to separate top-level function and class
-  definitions. Use one blank line to separate method definitions inside a class.
-  Use blank lines sparingly within functions to indicate logical sections.
-- Use PEP 484 type hints. Use the version that uses `dict` instead of `typing.Dict`.
+Before committing, always run:
+
+```bash
+ruff format . && ruff check --fix .
+```
+
+This is a shift-left gate. Code reviewers **must not re-litigate** anything
+ruff owns (line length, blank lines, quote style, import order, trailing
+commas, naming-case conventions, simple pyupgrade rewrites). If style drift
+is detected, the reviewer's only acceptable response is "run ruff" — not an
+enumerated list of violations.
+
+Use PEP 484 type hints (`dict[str, int]`, not `typing.Dict[str, int]`).
 
 ### File and Function Limits
 
@@ -69,14 +77,13 @@ def calculate_discount(
     """
 ```
 
-### Naming Conventions
+### Naming Intent
 
-- **Variables and functions**: `snake_case`
-- **Classes**: `PascalCase`
-- **Constants**: `UPPER_SNAKE_CASE`
-- **Private attributes/methods**: `_leading_underscore`
-- **Type aliases**: `PascalCase`
-- **Enum values**: `UPPER_SNAKE_CASE`
+Case conventions (`snake_case`, `PascalCase`, `UPPER_SNAKE_CASE`) are enforced
+by `ruff` (rule set `N`). What reviewers *should* evaluate is **naming intent**
+— whether a name reflects domain meaning clearly. Cryptic abbreviations,
+misleading names, or names that describe *how* rather than *what* are
+semantic concerns and remain in-scope for human/LLM review.
 
 ## 🚨 Error Handling
 
@@ -232,6 +239,27 @@ deploy development
 5. Create PR → Review → Merge to main
 
 ---
+
+## Code Exploration Policy
+Always use jCodemunch-MCP tools — never fall back to Read, Grep, Glob, or Bash for code exploration.
+- Before reading a file: use get_file_outline or get_file_content
+- Before searching: use search_symbols or search_text
+- Before exploring structure: use get_file_tree or get_repo_outline
+- Call resolve_repo with the current directory first; if not indexed, call index_folder.
+
+## Agent Framework & CopilotKit Policy
+Before writing any code in `agent_app/` that uses Microsoft Agent Framework or
+CopilotKit APIs, **query Context7 first** for the relevant topic. Never assume
+API signatures or configuration from training data — these are preview/bleeding-
+edge packages that change frequently.
+
+| Library | Context7 ID |
+|---|---|
+| Microsoft Agent Framework | `/websites/learn_microsoft_en-us_agent-framework` |
+| CopilotKit | `/copilotkit/copilotkit` |
+
+Examples of when to query: tool decorator options, `add_agent_framework_fastapi_endpoint`
+signature, `HttpAgent` / `threadId` reset, streaming event types, middleware API.
 
 _This document is a living guide. Update it as the project evolves and new
 patterns emerge._

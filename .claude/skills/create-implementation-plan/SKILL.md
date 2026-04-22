@@ -31,6 +31,18 @@ Plans must consist of discrete, atomic phases containing executable tasks. Each 
 - All task descriptions must include specific file paths, function names, and exact implementation details
 - No task should require human interpretation or decision-making
 
+## Codebase Exploration Before Planning
+
+Before drafting any task, use jcodemunch to ground the plan in the actual codebase:
+
+- `mcp__jcodemunch__get_file_outline` — inspect file structure to identify exact locations to modify
+- `mcp__jcodemunch__search_symbols` — locate functions, classes, and constants by name to reference them precisely
+- `mcp__jcodemunch__find_references` — identify all callers of interfaces being changed (drives impact estimation)
+- `mcp__jcodemunch__get_dependency_graph` — understand module dependencies before deciding where new code belongs
+- `mcp__jcodemunch__get_context_bundle` — pull all context around a symbol in one call when writing task descriptions
+
+This ensures task descriptions contain real file paths, real line numbers, and real function names — not guesses.
+
 ## AI-Optimized Implementation Standards
 
 - Use explicit, unambiguous language with zero interpretation required

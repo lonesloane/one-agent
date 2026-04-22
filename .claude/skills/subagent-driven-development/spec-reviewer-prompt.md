@@ -55,6 +55,25 @@ Agent tool (subagent_type: "general-purpose"):
 
     **Verify by reading code, not by trusting report.**
 
+    ## Test Execution Policy
+
+    **Do NOT re-run the full pytest suite.** The implementer ran it at pre-commit
+    and reported pass counts. Your job is spec compliance, not re-proving green.
+
+    You MAY run the **newly-added test nodeids** from the implementer's report
+    if — and only if — you need to verify a specific behavioral claim (e.g. the
+    implementer says "rollback removes draft" and you want to confirm the test
+    actually asserts that).
+
+    You MUST escalate (not silently re-run the suite) if any of these hold:
+    - The implementer's report is missing pass counts or nodeids.
+    - The diff deletes or weakens existing tests.
+    - The claimed counts look inconsistent with the diff (e.g. "213 passed" but
+      no new tests added for a task that required them).
+
+    In those cases, flag it as a ❌ issue — do not try to paper over it by
+    running the suite yourself.
+
     Report:
     - ✅ Spec compliant (if everything matches after code inspection)
     - ❌ Issues found: [list specifically what's missing or extra, with file:line references]

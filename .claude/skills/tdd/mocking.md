@@ -2,6 +2,8 @@
 
 **Rule**: Mock boundaries you don't own — external services, third-party clients, databases in unit tests. Do **not** mock classes you own within the same module.
 
+The rule is the same for Python and TypeScript — only the tools differ.
+
 ## unittest.mock / pytest-mock Setup
 
 ```python
@@ -36,12 +38,28 @@ def test_confirms_order_when_payment_succeeds(mocker):
 
 ## What to Mock
 
+**Python**
+
 | Mock this                             | Don't mock this                        |
 |---------------------------------------|----------------------------------------|
 | HTTP clients, REST clients            | Your own services and domain logic     |
 | Message brokers (Kafka, queues)       | Value objects and dataclasses          |
 | External SDKs (payment, email)        | Simple collaborators you can construct |
 | Slow I/O in unit tests                | In-memory fakes you can build          |
+
+**TypeScript / React**
+
+| Mock this                             | Don't mock this                        |
+|---------------------------------------|----------------------------------------|
+| `fetch` / API route calls             | Your own hooks and components          |
+| Browser APIs (`window`, `navigator`)  | React context providers you own        |
+| Third-party SDKs (analytics, auth)    | Child components under test            |
+| `next/router`, `next/navigation`      | Simple state derived from props        |
+
+Use `vi.mock` (Vitest) or `jest.mock` for module-level mocks; use
+`msw` (Mock Service Worker) to intercept `fetch` at the network layer
+instead of patching `fetch` directly — it's more realistic and
+survives implementation changes.
 
 ## Avoid Over-Mocking
 

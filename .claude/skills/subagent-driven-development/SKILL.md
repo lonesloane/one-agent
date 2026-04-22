@@ -9,6 +9,12 @@ Execute plan by dispatching fresh subagent per task, with two-stage review after
 
 **Why subagents:** You delegate tasks to specialized agents with isolated context. By precisely crafting their instructions and context, you ensure they stay focused and succeed at their task. They should never inherit your session's context or history — you construct exactly what they need. This also preserves your own context for coordination work.
 
+**Use jcodemunch before dispatching:** Before writing an implementer prompt, use jcodemunch to gather the precise context the subagent will need — file outlines, symbol locations, call sites — so the prompt contains real paths and signatures rather than vague descriptions:
+- `mcp__jcodemunch__get_file_outline` — identify exact locations to modify
+- `mcp__jcodemunch__search_symbols` — find function/class names to reference in the prompt
+- `mcp__jcodemunch__find_references` — list callers affected by interface changes
+- `mcp__jcodemunch__get_context_bundle` — pull full context around a symbol in one call
+
 **Core principle:** Fresh subagent per task + two-stage review (spec then quality) = high quality, fast iteration
 
 ## When to Use
