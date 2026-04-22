@@ -45,7 +45,7 @@ Side-by-side, they make the case without a slide deck.
 | Model (dev) | Local Ollama (`phi-4-mini`, `mistral-small`) via `OllamaChatClient` |
 | Model (fallback) | `gpt-4o` or `gpt-4.1` if mini-tier fails tool selection |
 | Classical frontend | Flask + Jinja2 + Bootstrap 5 |
-| Agent frontend | Next.js + Vercel AI SDK (streaming) |
+| Agent frontend | Next.js + CopilotKit (AG-UI protocol) |
 | Database | SQLite (shared) |
 | Business KB | MCP server (mcp SDK) + ChromaDB + git-backed markdown |
 | Session/audit | `AgentSession` serialized to SQLite |
