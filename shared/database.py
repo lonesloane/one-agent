@@ -469,6 +469,7 @@ def get_engine(db_path: str) -> Engine:
     return create_engine(
         f"sqlite:///{db_path}",
         echo=False,
+        connect_args={"check_same_thread": False},
     )
 
 

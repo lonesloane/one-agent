@@ -8,6 +8,7 @@ from shared.database import (
     Delegate,
     Committee,
     Document,
+    DocumentAccessRight,
     Meeting,
     MeetingAgendaItem,
     MembershipType,
@@ -261,3 +262,47 @@ def test_approval_status_contains_required_values():
     }
 
     assert required_statuses.issubset(approval_statuses)
+
+
+def test_document_access_right_retroactive_default(session: Session):
+    """
+    Test DocumentAccessRight.retroactive defaults to False.
+
+    Persist a DAR without setting retroactive. Reload from DB.
+    Assert retroactive == False.
+    """
+    delegation = Delegation(
+        id="FRA",
+        name="France",
+        membership_type=MembershipType.MEMBER,
+    )
+    committee = Committee(
+        id="EDU",
+        name="Education Committee",
+    )
+    delegate = Delegate(
+        id="DEL-2026-0001",
+        full_name="Alice Dupont",
+        email="alice@example.com",
+        function="Representative",
+        delegation_id="FRA",
+        accreditation_date=datetime(2026, 1, 15),
+    )
+    session.add_all([delegation, committee, delegate])
+    session.flush()
+
+    dar = DocumentAccessRight(
+        delegate_id="DEL-2026-0001",
+        committee_id="EDU",
+        classification_level=ClassificationLevel.GENERAL,
+        approval_status=ApprovalStatus.AUTO_APPROVED,
+        created_at=datetime(2026, 1, 15),
+        created_by="DEL-2026-0001",
+    )
+    session.add(dar)
+    session.flush()
+
+    retrieved = session.query(DocumentAccessRight).filter_by(
+        delegate_id="DEL-2026-0001"
+    ).first()
+    assert retrieved.retroactive is False
