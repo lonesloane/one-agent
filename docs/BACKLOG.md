@@ -93,16 +93,34 @@
 - [x] **TASK-029**: Manual UI check (SKIPPED — requires Flask dev server + browser)
 - [x] **TASK-030**: Update BACKLOG.md and DESIGN.md with Phase 2A completion
 
-### Phase 2B–2D — Write Flows (upcoming)
-- [ ] Extend `shared/seed_data.py` — add write-flow demo scenarios (incremental, does not rebuild Phase 1 data)
-- [ ] Classical app: Delegation list (Screen 2)
-- [ ] Classical app: Delegation detail with delegate list (Screen 3)
-- [ ] Classical app: Add Delegate Step 1 — Personal info (Screen 4)
-- [ ] Classical app: Add Delegate Step 2 — Committee selection (Screen 5)
-- [ ] Classical app: Add Delegate Step 3 — Document Access Rights (Screen 6)
-- [ ] Classical app: Add Delegate Step 4 — Review & Submit (Screen 7)
-- [ ] Classical app: Confirmation (Screen 8)
-- [ ] Wire up actual delegate + DAR creation using shared business rules
+### Phase 2B — Read Pages + Editor Permissions ✓ (2026-04-18)
+- [x] Classical app: Delegation list (Screen 2) — accessible to all personas
+- [x] Classical app: Delegation detail with delegate roster (Screen 3)
+- [x] `@editor_of_delegation_required` decorator — guards all write-wizard entry points
+- [x] `is_editor_of_delegation` Jinja global — controls "Add New Delegate" button visibility
+- [x] 403 template extended with optional `reason` variable
+- [x] Editor badge in delegate picker — visually distinguishes DELEGATION_EDITOR personas
+- [x] Routes package scaffold + permissions helper (`classical_app/permissions.py`)
+- [x] 128 tests passing (110 Phase 1+2A + 18 new Phase 2B)
+
+### Phase 2C — Add Delegate Wizard ✓ (2026-04-19)
+- [x] Classical app: Add Delegate Step 1 — Personal info (Screen 4)
+- [x] Classical app: Add Delegate Step 2 — Committee selection (Screen 5)
+- [x] Classical app: Add Delegate Step 3 — Document Access Rights (Screen 6)
+- [x] Classical app: Add Delegate Step 4 — Review & Submit (Screen 7)
+- [x] Wire up delegate + DAR creation through `compute_default_access_level` + `determine_approval_route`
+- [x] 172 tests passing (merged to main at 27cb21b)
+
+### Phase 2D — Tests, Demo Dry-Run & Doc Closure ✓ (2026-04-19)
+- [x] Test inventory audit (2A/2B/2C net-new: 70 tests; REQ-001 met)
+- [x] `tests/classical_app/test_wizard_session.py` — back-preserves-data, step-skip redirect
+- [x] `tests/classical_app/test_wizard_approval_routing.py` — monkeypatch spy, US-5 matrix ×6, preselect
+- [x] `tests/classical_app/test_wizard_permissions.py` — button visibility ×3, editor-of-other 403
+- [x] `tests/classical_app/test_wizard_rollback.py` — transactional rollback row-count assertion
+- [x] `tests/shared/test_database.py` extended — `retroactive` column default=False
+- [x] Full suite green: **188 tests passing** (102 Phase 1 baseline + 86 net-new Phase 2)
+- [x] `docs/DEMO_PHASE2.md` — golden-path demo dry-run script (6 scenarios, all 3 approval routes)
+- [x] Documentation closure: BACKLOG, DESIGN, OPEN_QUESTIONS, DECISIONS updated
 
 ## Phase 3 — Agent App (Read Agent — UC1) ✓ (2026-04-22)
 > "The Proactive Read Agent" — meeting brief on session start

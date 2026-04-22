@@ -294,16 +294,50 @@ Single-file database, zero infrastructure. Shared between both apps. Sufficient 
 
 Write tools use `approval_mode="always_require"` — the Agent Framework handles the confirmation flow natively via `user_input_requests`. No custom confirmation UI code needed at the tool layer.
 
+### [2026-04-19] Phase 2 closure — classical write flows complete; OQ-9 resolved for Phase 2
+
+Phase 2 (classical app write flows) is complete. All four sub-phases (2A schema, 2B read
+pages + permissions, 2C add-delegate wizard, 2D tests + demo + docs) have been merged to
+`main`. 188 tests passing (86 net-new since Phase 1B baseline of 102).
+
+**What shipped:**
+- 8-screen add-delegate wizard: delegation picker → delegation detail → Steps 1–4
+  (personal info, committee selection, document access rights, review & submit) →
+  confirmation screen.
+- Permission gating: `@editor_of_delegation_required` decorator guards all write entry
+  points; `is_editor_of_delegation` Jinja global controls the "Add New Delegate" button.
+- DAR business rules wired end-to-end: `compute_default_access_level` pre-selects Step 3
+  defaults; `determine_approval_route` sets `approval_status` on each created DAR.
+- All three approval routes reachable via the wizard: AUTO_APPROVED (GENERAL,
+  non-retroactive), PENDING_DELEGATION_HEAD (RESTRICTED, non-retroactive),
+  PENDING_SECRETARIAT (CONFIDENTIAL non-retroactive; or any level retroactive).
+- Transactional rollback on commit failure — no partial writes.
+
+**OQ-9 resolution (delegation head approval workflow):**
+Status flag only for Phase 2. `DocumentAccessRight.approval_status` carries the routing
+outcome; no notification, no approval inbox, no approver UI. Full approver UX is deferred
+to Phase 4. This is intentional scope control — the contrast tool needs to show routing
+outcomes, not implement the approval workflow itself.
+
 ### [2026-04-19] Agent frontend: AG-UI + CopilotKit (OQ-7 resolved)
 
-Use AG-UI protocol with CopilotKit (Next.js) as the agent frontend. The
-FastAPI server (`agent_app/server.py`) exposes a custom AG-UI POST endpoint
-rather than using `HttpAgent` directly — this avoids the `HttpAgent` threadId
-reset limitation that would clear delegate identity on every request. The
-CopilotKit frontend connects via `useCopilotChat` and fires the proactive
-brief via `runAgent` gated on `runtimeConnectionStatus === Connected`.
-Identity threading is handled by `_BoundAgent`, which wraps the agent
-singleton with a per-request `delegate_id` injected through
-`FunctionInvocationContext`. This approach keeps the agent stateless while
-allowing tool calls to resolve the correct delegate without exposing the
-identity parameter in the chat UI.
+The agent frontend (Phase 3+) uses **AG-UI** as the communication protocol between the
+Python agent and the browser, with **CopilotKit** as the React UI layer. This replaces
+the earlier candidate of Next.js + Vercel AI SDK.
+
+**Rationale:**
+- `approval_mode="always_require"` on write tools maps directly to AG-UI's built-in
+  Human-in-the-Loop protocol — no custom confirmation UI code needed (critical for Phase 4).
+- `agent.run(stream=True)` and `@tool` wrappers map natively to SSE and AG-UI backend
+  tool events; zero custom streaming code.
+- CopilotKit provides polished streaming chat, collapsible tool call visualization, and
+  approval dialogs out of the box — the demo "wow factor" without reinventing the wheel.
+- The Microsoft Agent Framework ships a native Python AG-UI adapter
+  (`agent-framework-ag-ui`), making the integration a first-class pattern rather than
+  a custom bridge.
+
+**Architecture:** FastAPI AG-UI endpoint (`agent_app/server.py`) + CopilotKit Next.js
+frontend (`agent_app/frontend/`), both inside the monorepo.
+
+**Caveat:** `agent-framework-ag-ui` is a preview package (`--pre`). Pin to the first
+working version and monitor for breaking changes.

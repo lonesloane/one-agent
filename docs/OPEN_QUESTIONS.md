@@ -29,15 +29,28 @@ Questions deferred from design, tracked here until resolved.
 **Context**: Adding an MCP KB round-trip increases pressure on model quality — the model must correctly decide *when* to query the KB, interpret confidence signals, and then select the right backend tool. Mini-tier models (`gpt-4o-mini`, `gpt-4.1-mini`) must be validated specifically on KB-guided tool selection, not just plain tool use.
 **Update (2026-04-06)**: Phase 0a harness infrastructure is complete. Plain tool selection (without KB) is being evaluated first. KB-guided evaluation will be added once a base model is selected.
 
-### OQ-7: Agent frontend technology choice
+### OQ-7: Agent frontend technology choice ✓ Resolved (2026-04-19)
 **Relevant phase**: Phase 3
 **Context**: The brainstorming docs suggest Next.js + Vercel AI SDK for the agent frontend (streaming, tool call display). Is this confirmed, or should a simpler alternative (e.g., a terminal/CLI interface) suffice for the PoC demo?
+**Decision**: AG-UI (FastAPI backend) + CopilotKit (React frontend). AG-UI is a
+standardized protocol with native Microsoft Agent Framework support; `approval_mode`
+maps directly to AG-UI Human-in-the-Loop, and `@tool` / `agent.run(stream=True)` map
+to backend tools and SSE with no custom wiring. CopilotKit provides polished streaming
+chat, tool call visualization, and approval dialogs out of the box. Frontend lives in
+`agent_app/frontend/` inside the monorepo. See `docs/DECISIONS.md` and
+`docs/prd-phase3-read-agent.md`.
 
 ### OQ-8: Test data generation strategy ✓ Resolved (2026-04-12)
 **Relevant phase**: Phase 1
 **Context**: Test data must cover all demo scenarios (member + partner delegations, Framework Agreements, various meeting/document states, delegate login history). Manual crafting vs. scripted generation? What level of realism is needed for stakeholder demos?
 **Decision**: Hardcoded Python in `shared/seed_data.py` (no Faker, no JSON fixtures) with domain-realistic content (OECD-flavored delegation names, real-ish committee names, document titles that sound like OECD output). One-liner placeholder summaries are acceptable — full briefing-language summaries are out of scope. See `docs/DECISIONS.md`.
 
-### OQ-9: Delegation head approval workflow implementation
+### OQ-9: Delegation head approval workflow implementation ✓ Resolved-for-Phase-2 (2026-04-19)
 **Relevant phase**: Phase 4
 **Context**: Restricted DAR creation routes to "pending delegation head approval." How is this modeled in the PoC? A status flag only (no actual notification), or a minimal approval UI?
+**Decision (Phase 2)**: Status flag only — `DocumentAccessRight.approval_status` is set to
+`PENDING_DELEGATION_HEAD` (or `PENDING_SECRETARIAT` for retroactive/Confidential requests).
+No notification, no approval inbox, no approver UI is implemented in Phase 2. The confirmation
+screen displays the resulting status to the submitting editor. Full approver UX (inbox view,
+approve/reject actions, notification emails) is deferred to Phase 4. OQ-1 (full RBAC model)
+remains open.
