@@ -111,21 +111,3 @@ a {
   outline-offset: 1px;
 }
 
-/* ── Send / control button icon ─────────────────────────────────── */
-/* The inline send control is .copilotKitInputControlButton — it has a
-   transparent background and renders as an icon-only button. The icon
-   color is already driven by --copilot-kit-primary-color set above, so
-   it will be OECD blue automatically. We add explicit :hover to use
-   --color-primary-hover rather than the CopilotKit default color-mix. */
-.copilotKitInputControlButton:not([disabled]):hover {
-  color: var(--color-primary-hover);
-}
-
-/* ── "Powered by" / disclaimer area ────────────────────────────── */
-/* .poweredBy has !important overrides in the upstream CSS (hardcoded
-   rgb(214,214,214)). We override with our muted token at higher
-   specificity to satisfy criterion #4 without touching page.tsx. */
-.copilotKitChat .poweredBy {
-  color: var(--color-text-muted) !important;
-  background: var(--color-surface) !important;
-}
