@@ -1,0 +1,128 @@
+/* ── ToolCallBlock — expandable tool-call accordion (P3) ──────────
+   Token-only styles — no hex values. All colours via globals.css :root.
+   ─────────────────────────────────────────────────────────────────── */
+
+/* ── Outer <details> wrapper ──────────────────────────────────────── */
+
+.block {
+  margin: var(--space-1) 0;
+  font-size: 13px;
+  background: transparent;
+  border-left: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.block[open] {
+  border-left-color: var(--color-primary);
+  background: var(--color-tool-bg);
+  padding-left: var(--space-2);
+}
+
+/* ── <summary> row ────────────────────────────────────────────────── */
+
+.summary {
+  list-style: none;
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  user-select: none;
+}
+
+/* Suppress native WebKit disclosure triangle */
+.summary::-webkit-details-marker {
+  display: none;
+}
+
+/* ── Chevron icon ─────────────────────────────────────────────────── */
+
+.chevron {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  transition: transform 0.15s;
+  /* default: pointing right (collapsed state) */
+}
+
+/* Rotate chevron when block is open.
+   CSS modules hash .block and .chevron but leave [open] literal,
+   so this selector resolves correctly in the browser. */
+.block[open] > .summary .chevron {
+  transform: rotate(90deg);
+}
+
+/* ── Tool name ────────────────────────────────────────────────────── */
+
+.name {
+  font-weight: 600;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--color-text);
+}
+
+/* ── Status pill ──────────────────────────────────────────────────── */
+
+.statusPill {
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Complete: light blue-tint background with primary text.
+   Decision: tinted variant chosen over solid primary to avoid
+   visual competition with the primary-coloured user bubbles
+   added in P2. Keeps the pill readable without dominating
+   the chat chrome. */
+.statusComplete {
+  background: rgba(0, 96, 169, 0.12);
+  color: var(--color-primary);
+}
+
+/* Executing / inProgress: muted warm tint */
+.statusExecuting,
+.statusInProgress {
+  background: rgba(90, 101, 120, 0.12);
+  color: var(--color-text-muted);
+}
+
+/* ── Expanded body ────────────────────────────────────────────────── */
+
+.body {
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ── Params + result <pre> blocks ─────────────────────────────────── */
+
+.paramsBlock,
+.resultBlock {
+  margin: 0;
+  padding: var(--space-2);
+  background: var(--color-tool-bg);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--color-text);
+  overflow-x: auto;
+  /* pre (not pre-wrap): long lines scroll rather than wrap */
+  white-space: pre;
+  line-height: 1.5;
+}
+
+/* ── Result label ─────────────────────────────────────────────────── */
+
+.resultLabel {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin-bottom: 2px;
+}
