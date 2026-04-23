@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 # Reason: pytest does not auto-load .env; without this, FOUNDRY_PROJECT_ENDPOINT
 # is absent from os.environ and missing from the uvicorn subprocess env.
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
+load_dotenv(Path(__file__).parent.parent.parent / "agent_app" / ".env")
 
 from shared.database import (
     ClassificationLevel,
@@ -56,8 +56,13 @@ def _evict_nextjs_server(frontend_dir: Path) -> None:
             if stale_pid:
                 os.kill(stale_pid, signal.SIGKILL)
                 time.sleep(0.3)
-        except (json.JSONDecodeError, KeyError, ProcessLookupError,
-                PermissionError, OSError):
+        except (
+            json.JSONDecodeError,
+            KeyError,
+            ProcessLookupError,
+            PermissionError,
+            OSError,
+        ):
             pass
         try:
             lock_path.unlink()
@@ -275,9 +280,7 @@ def nextjs_server(
             text=True,
         )
         if result.returncode != 0:
-            raise RuntimeError(
-                f"npm install failed:\n{result.stderr}"
-            )
+            raise RuntimeError(f"npm install failed:\n{result.stderr}")
 
     # Reason: Next.js 16 Turbopack locks per-project; stale registrations
     # block new instances even on a different port.
@@ -305,9 +308,7 @@ def nextjs_server(
         deadline = time.time() + 120
         while time.time() < deadline:
             try:
-                urllib.request.urlopen(
-                    f"http://localhost:{nextjs_port}"
-                )
+                urllib.request.urlopen(f"http://localhost:{nextjs_port}")
                 break
             except urllib.error.HTTPError:
                 # Reason: HTTPError means server responded — it is up.
@@ -360,7 +361,9 @@ def _dump_on_failure(request, page):
                     f"=== {resp.url} ({resp.status}) ===\n{resp.text()}"
                 )
             except Exception as read_err:  # noqa: BLE001
-                sse_bodies.append(f"=== {resp.url} READ FAILED: {read_err} ===")
+                sse_bodies.append(
+                    f"=== {resp.url} READ FAILED: {read_err} ==="
+                )
 
     page.on("console", on_console)
     page.on("response", on_response)
