@@ -110,13 +110,15 @@ one-agent-poc/                 # Project root
 └── one_agent.db               # SQLite (shared, Phase 1+)
 ```
 
-> **Current state (2026-04-22)**: Phase 3 complete — read agent (UC1) live.
+> **Current state (2026-04-23)**: Phase 3 complete + Phase 3.5 UI polish merged.
 > The ONE-MP Read Agent delivers proactive session briefs via AG-UI + CopilotKit.
 > The `agent_app/` package contains: `agent.py` (system prompt + `create_agent()`),
 > `tools.py` (four `@tool` wrappers: `lookup_delegate`, `get_delegation_info`,
 > `get_upcoming_meetings`, `get_agenda_documents`), `middleware.py` (AuditMiddleware),
 > and `server.py` (FastAPI AG-UI endpoint). The CopilotKit Next.js frontend
-> (`agent_app/frontend/`) connects via AG-UI protocol. Identity threading uses
+> (`agent_app/frontend/`) connects via AG-UI protocol and wears an OECD-corporate
+> visual theme (P1 shell + tokens, P2 chat theming, P3 tool-call accordion —
+> merged cf1fa2c / 1f170ca / 03cfcb1). Identity threading uses
 > `FunctionInvocationContext` to inject `delegate_id` invisibly into every tool call.
 > **203 tests passing** (187 baseline + 16 new Phase 3D unit tests; 4 e2e agent
 > tests excluded — require live Azure AI Foundry). Phase 4 (write agent, UC2) is next.

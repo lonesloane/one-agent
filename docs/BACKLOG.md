@@ -152,6 +152,26 @@
 - [x] 4 Playwright e2e tests in `tests/e2e_agent/` covering brief trigger, suppress, persona switch, tool call blocks
 - [x] Tests require live Azure AI Foundry (excluded from unit test suite)
 
+## Phase 3.5 — Agent UI Polish (OECD-corporate) ✓ (2026-04-23) — [plan](../plan/feature-ui-polish-phase4-oecd-1.md)
+> Post-Phase 3 visual pass: tokens, shell, chat theming, tool-call accordion
+
+### P1 — App shell + OECD design tokens ✓ (2026-04-22, merged cf1fa2c)
+- [x] Design tokens in `app/globals.css` (`--color-primary` #0060A9, `--color-bg`, `--color-surface`, radii, shadows, spacing scale)
+- [x] App shell in `app/page.tsx` + `page.module.css` — OECD blue header, "Acting as" persona bar, centered 900px card
+- [x] DelegatePicker CSS module + focus ring
+- [x] Side-effect fix: `useAgent<T>` generic + `initialState` removed (dead in v2)
+
+### P2 — CopilotKit chat theming ✓ (2026-04-23, merged 1f170ca)
+- [x] Override `--copilot-kit-*` CSS vars scoped to `.copilotKitChat` (primary, contrast, background, separator, muted, input bg)
+- [x] Assistant bubble: border + surface bg; user bubble: OECD blue + white
+- [x] Input focus-within ring
+- [x] Reviewer caught 2 dead v2 selectors (`.copilotKitInputControlButton`, `.poweredBy`) — removed
+
+### P3 — Tool-call accordion restyle ✓ (2026-04-23, merged 03cfcb1)
+- [x] `ToolCallBlock` extracted to own file + CSS module (matches DelegatePicker pattern)
+- [x] Chevron rotates on open, monospace name, status pill, border-left primary accent
+- [x] `<pre>` blocks in `--color-tool-bg` with horizontal scroll
+
 ## Phase 4 — Agent App (Write Agent — UC2)
 > "The Write Agent with Reasoning" — delegate creation with DAR
 
