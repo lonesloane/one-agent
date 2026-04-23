@@ -57,3 +57,76 @@ a {
   color: inherit;
   text-decoration: none;
 }
+
+/* ── OECD theming for embedded CopilotChat (P2) ──────────────────
+   Scope: .copilotKitChat is the root element emitted by <CopilotChat>.
+   All CopilotKit CSS custom properties cascade from this single anchor,
+   covering .copilotKitMessages, .copilotKitInput, bubbles, buttons, etc.
+   Using .copilotKitChat (not :root) avoids polluting any other
+   CopilotKit instances that might be added in future phases.
+   ──────────────────────────────────────────────────────────────── */
+
+.copilotKitChat {
+  /* Map CopilotKit semantic tokens → OECD design tokens */
+  --copilot-kit-primary-color: var(--color-primary);
+  --copilot-kit-contrast-color: var(--color-primary-contrast);
+  --copilot-kit-background-color: var(--color-surface);
+  --copilot-kit-input-background-color: var(--color-surface);
+  --copilot-kit-secondary-color: var(--color-surface);
+  --copilot-kit-secondary-contrast-color: var(--color-text);
+  --copilot-kit-separator-color: var(--color-border);
+  --copilot-kit-muted-color: var(--color-text-muted);
+
+  /* Override the CopilotKit v2 Tailwind token used for disclaimer text.
+     The disclaimer uses cpk:text-muted-foreground → var(--muted-foreground).
+     Pointing it at our muted token ensures OECD typography without a hex value. */
+  --muted-foreground: var(--color-text-muted);
+}
+
+/* ── User bubble ────────────────────────────────────────────────── */
+/* Default radius is 15px (bubble-chat style). OECD uses sharper corners. */
+.copilotKitMessage.copilotKitUserMessage {
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* ── Assistant bubble ───────────────────────────────────────────── */
+/* Default: transparent bg, no border, left-aligned, padding-left: 0.
+   Adding surface bg + border makes the response visually distinct from
+   the card background while keeping max-width: 100% and auto right-margin. */
+.copilotKitMessage.copilotKitAssistantMessage {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  padding-left: var(--space-3);
+}
+
+/* ── Input bar: focus ring ──────────────────────────────────────── */
+/* Default: border uses --copilot-kit-separator-color; no focus style.
+   We add an OECD-blue outline on :focus-within so keyboard users
+   get a clear affordance. outline is preferred over box-shadow for
+   accessibility (not clipped by overflow:hidden on parent). */
+.copilotKitInput:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+/* ── Send / control button icon ─────────────────────────────────── */
+/* The inline send control is .copilotKitInputControlButton — it has a
+   transparent background and renders as an icon-only button. The icon
+   color is already driven by --copilot-kit-primary-color set above, so
+   it will be OECD blue automatically. We add explicit :hover to use
+   --color-primary-hover rather than the CopilotKit default color-mix. */
+.copilotKitInputControlButton:not([disabled]):hover {
+  color: var(--color-primary-hover);
+}
+
+/* ── "Powered by" / disclaimer area ────────────────────────────── */
+/* .poweredBy has !important overrides in the upstream CSS (hardcoded
+   rgb(214,214,214)). We override with our muted token at higher
+   specificity to satisfy criterion #4 without touching page.tsx. */
+.copilotKitChat .poweredBy {
+  color: var(--color-text-muted) !important;
+  background: var(--color-surface) !important;
+}
