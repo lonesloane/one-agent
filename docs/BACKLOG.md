@@ -173,17 +173,30 @@
 - [x] `<pre>` blocks in `--color-tool-bg` with horizontal scroll
 
 ## Phase 4 — Agent App (Write Agent — UC2)
-> "The Write Agent with Reasoning" — delegate creation with DAR
+> "The Write Agent with Reasoning" — delegate creation with DAR + approver flow (option B, see DECISIONS 2026-04-24)
 
+### Create side (delegate editor persona)
 - [ ] Implement write tools: `create_delegate`, `create_document_access_rights` (with `approval_mode="always_require"`)
 - [ ] Agent reasons through DAR business rules (membership type -> access level -> approval routing)
-- [ ] Human-in-the-loop confirmation flow via `user_input_requests`
+- [ ] Human-in-the-loop confirmation flow via AG-UI `user_input_requests`
 - [ ] Audit trail captures full chain of reasoning and approvals
 - [ ] Test: member delegate creation (General + Restricted access)
 - [ ] Test: partner delegate creation (General only)
 - [ ] Test: partner + Framework Agreement (elevated access)
 - [ ] Test: Confidential access request (secretariat approval)
 - [ ] Test: retroactive access request (secretariat approval)
+
+### Approver side (delegation head / secretariat persona) — OQ-9 resolution
+- [ ] Seed a delegation-head persona (role=DELEGATION_HEAD) and a secretariat persona
+- [ ] Extend `/api/delegates` to include approver personas in picker
+- [ ] Read tool `list_pending_dars(approver_id)` — scoped by approver role + delegation
+- [ ] Write tool `approve_dar(dar_id, reason?)` with `approval_mode="always_require"`
+- [ ] Write tool `reject_dar(dar_id, reason)` with `approval_mode="always_require"`
+- [ ] Status propagation → `APPROVED` / `REJECTED`; document visibility via existing `is_document_visible`
+- [ ] Test: delegation head approves PENDING_DELEGATION_HEAD → delegate sees doc
+- [ ] Test: secretariat approves PENDING_SECRETARIAT (Confidential + retroactive routes)
+- [ ] Test: reject flow (status → REJECTED, doc stays invisible)
+- [ ] Test: approver cannot act on DARs outside their scope
 
 ## Phase 5 — MCP Knowledge Base
 > Business rules as a queryable MCP server

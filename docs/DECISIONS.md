@@ -319,6 +319,29 @@ outcome; no notification, no approval inbox, no approver UI. Full approver UX is
 to Phase 4. This is intentional scope control — the contrast tool needs to show routing
 outcomes, not implement the approval workflow itself.
 
+### [2026-04-24] Phase 4 approver workflow — agent-centric (OQ-9 resolved)
+
+OQ-9 (delegation-head approval workflow) resolved for Phase 4 with option B:
+approver persona acts through the agent. No classical app inbox screen, no email
+notifications — both out of scope.
+
+**Scope:**
+- Persona switch in delegate picker — delegation editors AND delegation heads selectable
+- New read tool `list_pending_dars(approver_id)` — returns DARs awaiting the current
+  approver per their scope (delegation head sees only PENDING_DELEGATION_HEAD for their
+  delegation; secretariat sees PENDING_SECRETARIAT)
+- New write tools `approve_dar(dar_id, reason?)` and `reject_dar(dar_id, reason)` with
+  `approval_mode="always_require"` — AG-UI HITL dialog confirms the action
+- Status propagation: `PENDING_*` → `APPROVED` / `REJECTED`; approved DARs surface via
+  existing `is_document_visible` logic
+- Audit via existing `AuditMiddleware` — approvals captured in the trace
+
+**Rationale:** Demonstrates the AG-UI HITL protocol end-to-end — the write agent proposes
+an action, the approver sees a confirmation dialog, decides, and the system reacts. This
+is the most on-theme story for the PoC ("agent handles the whole workflow including
+approval"). Approver inbox in the classical app is deliberately skipped so the contrast
+stays sharp: classical = editor-side only, agent = full loop.
+
 ### [2026-04-19] Agent frontend: AG-UI + CopilotKit (OQ-7 resolved)
 
 The agent frontend (Phase 3+) uses **AG-UI** as the communication protocol between the

@@ -45,12 +45,17 @@ chat, tool call visualization, and approval dialogs out of the box. Frontend liv
 **Context**: Test data must cover all demo scenarios (member + partner delegations, Framework Agreements, various meeting/document states, delegate login history). Manual crafting vs. scripted generation? What level of realism is needed for stakeholder demos?
 **Decision**: Hardcoded Python in `shared/seed_data.py` (no Faker, no JSON fixtures) with domain-realistic content (OECD-flavored delegation names, real-ish committee names, document titles that sound like OECD output). One-liner placeholder summaries are acceptable — full briefing-language summaries are out of scope. See `docs/DECISIONS.md`.
 
-### OQ-9: Delegation head approval workflow implementation ✓ Resolved-for-Phase-2 (2026-04-19)
+### OQ-9: Delegation head approval workflow implementation ✓ Resolved (2026-04-24)
 **Relevant phase**: Phase 4
 **Context**: Restricted DAR creation routes to "pending delegation head approval." How is this modeled in the PoC? A status flag only (no actual notification), or a minimal approval UI?
-**Decision (Phase 2)**: Status flag only — `DocumentAccessRight.approval_status` is set to
-`PENDING_DELEGATION_HEAD` (or `PENDING_SECRETARIAT` for retroactive/Confidential requests).
-No notification, no approval inbox, no approver UI is implemented in Phase 2. The confirmation
-screen displays the resulting status to the submitting editor. Full approver UX (inbox view,
-approve/reject actions, notification emails) is deferred to Phase 4. OQ-1 (full RBAC model)
-remains open.
+**Phase 2 decision (2026-04-19)**: Status flag only — `DocumentAccessRight.approval_status` is
+set (`PENDING_DELEGATION_HEAD`, `PENDING_SECRETARIAT`, `AUTO_APPROVED`). No notification, no
+approval inbox, no approver UI. Deferred to Phase 4.
+**Phase 4 decision (2026-04-24)**: Agent-centric approver flow. Switch delegate picker to a
+delegation-head persona; agent surfaces pending DARs in conversation and offers approve/reject
+via a write tool `approve_dar` (or `reject_dar`) with `approval_mode="always_require"` HITL
+confirmation. New read tool `list_pending_dars` scoped to current approver identity. No
+classical app inbox screen (out of scope). No email notifications (out of scope). Status
+propagates: `PENDING_*` → `APPROVED`/`REJECTED`, and approved DARs become visible to the
+delegate per existing `is_document_visible` logic. Full audit via existing `AuditMiddleware`.
+OQ-1 (full RBAC model) remains open.
