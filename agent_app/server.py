@@ -108,7 +108,7 @@ def _fix_tool_call_ordering(
     call_to_asst: dict[str, int] = {}
     for i, msg in enumerate(messages):
         if msg.get("role") == "assistant":
-            for tc in msg.get("tool_calls") or []:
+            for tc in msg.get("tool_calls") or msg.get("toolCalls") or []:
                 if isinstance(tc, dict) and tc.get("id"):
                     call_to_asst[str(tc["id"])] = i
 
