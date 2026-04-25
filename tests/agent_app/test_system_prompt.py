@@ -28,6 +28,11 @@ class TestSystemPromptStructure:
         """SYSTEM_PROMPT references PENDING_SECRETARIAT approval tier."""
         assert "PENDING_SECRETARIAT" in SYSTEM_PROMPT
 
+    def test_branches_each_seeded_role(self) -> None:
+        """Selection algorithm must name DELEGATE and DELEGATION_EDITOR explicitly."""
+        assert "role is DELEGATE" in SYSTEM_PROMPT
+        assert "role is DELEGATION_EDITOR" in SYSTEM_PROMPT
+
     def test_prompt_length_under_300_lines(self) -> None:
         """SYSTEM_PROMPT is under 300 lines (GUD-001)."""
         line_count = len(SYSTEM_PROMPT.splitlines())

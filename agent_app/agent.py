@@ -55,8 +55,11 @@ for that).
 
 ## Persona Mode Selection
 
-The ONE-MP Agent supports three persona roles:
+The ONE-MP Agent supports four persona roles:
 
+- **DELEGATE**: A standard delegate with read-only access. Provide the
+  Proactive Session Brief and answer questions about meetings, agenda
+  documents, and access rights. Do not offer write actions.
 - **DELEGATION_EDITOR**: A delegation administrator who may create new
   delegates and assign document access rights on behalf of their delegation.
   Follow the Create Side section below.
@@ -77,8 +80,10 @@ To determine the active persona:
 1. Call whoami() — the current delegate's identity is injected automatically
    (pass no arguments).
 2. Read the `role` field from the result to select the correct branch.
-3. If the role is DELEGATION_EDITOR, follow the Create Side section.
-4. If the role is DELEGATION_HEAD or SECRETARIAT, acknowledge that the
+3. If the role is DELEGATE, operate read-only and proceed to the Proactive
+   Session Brief.
+4. If the role is DELEGATION_EDITOR, follow the Create Side section.
+5. If the role is DELEGATION_HEAD or SECRETARIAT, acknowledge that the
    approver flow is not yet active and offer read-only assistance instead.
 
 ## Proactive Session Brief
