@@ -63,7 +63,7 @@ Spec: `docs/prd-phase4-write-agent.md` §2 (US-1 AC: HITL dialogs), §4
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Query Context7 `/copilotkit/copilotkit` for: (a) how `function_approval_request` interrupt events are rendered in v2; (b) whether `useCopilotAction` with `renderAndWaitForResponse` or a dedicated HITL hook is the correct API; (c) what props/options are required. FINDING-4C-002 confirmed `V2Provider` alone is insufficient — this task determines the exact implementation path before any code is written. | | |
+| TASK-001 | Query Context7 `/copilotkit/copilotkit` for: (a) how `function_approval_request` interrupt events are rendered in v2; (b) whether `useCopilotAction` with `renderAndWaitForResponse` or a dedicated HITL hook is the correct API; (c) what props/options are required. FINDING-4C-002 confirmed `V2Provider` alone is insufficient — this task determines the exact implementation path before any code is written. | ✅ | 2026-04-25 |
 
 ### Implementation Phase 2 — Implement HITL frontend wiring
 
