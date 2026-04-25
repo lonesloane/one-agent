@@ -90,8 +90,8 @@ Spec: `docs/BACKLOG.md` § Phase 4C dry-run findings — BUG-4C-001.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-007 | Start backend: `uvicorn agent_app.server:app --port 8001 --reload`. Start frontend: `cd agent_app/frontend && npm run dev` (port 3000). Pick a `DELEGATION_EDITOR` persona, wait for the brief to complete. Send a follow-up message ("What documents are new?"). Confirm: no `RUN_ERROR` event in the SSE stream; the chat pane shows an agent reply. | | |
-| TASK-008 | Send a delegate-creation request ("Create a new delegate named Test User, email test@example.com, in delegation FRA, role DELEGATE."). Confirm the agent follows up with HITL tool-call step (approval dialog or prompt, depending on CopilotKit v2 rendering). Record whether FINDING-4C-002 (no `useHumanInTheLoop` hook) also needs action or auto-renders. | | |
+| TASK-007 | Start backend: `uvicorn agent_app.server:app --port 8001 --reload`. Start frontend: `cd agent_app/frontend && npm run dev` (port 3000). Pick a `DELEGATION_EDITOR` persona, wait for the brief to complete. Send a follow-up message ("What documents are new?"). Confirm: no `RUN_ERROR` event in the SSE stream; the chat pane shows an agent reply. | ✅ | 2026-04-25 |
+| TASK-008 | Send a delegate-creation request ("Create a new delegate named Test User, email test@example.com, in delegation FRA, role DELEGATE."). Confirm the agent follows up with HITL tool-call step (approval dialog or prompt, depending on CopilotKit v2 rendering). Record whether FINDING-4C-002 (no `useHumanInTheLoop` hook) also needs action or auto-renders. | ✅ | 2026-04-25 |
 | TASK-009 | ✅ | 2026-04-25 | Update `docs/BACKLOG.md` § "Phase 4C dry-run findings": mark BUG-4C-001 resolved with fix summary (`_fix_tool_call_ordering` in `server.py`); update FINDING-4C-002 with verification result from TASK-008. |
 
 ## 3. Alternatives
