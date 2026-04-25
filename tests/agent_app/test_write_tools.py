@@ -172,6 +172,11 @@ class TestCreateDelegate:
         assert "BOGUS" in data["error"]
         assert data["delegation_id"] == "BOGUS"
 
+        # No Delegate row must have been inserted despite the error path
+        with Session(engine) as sess:
+            count = sess.query(Delegate).count()
+        assert count == 1  # only the seeded editor remains
+
 
 # ---------------------------------------------------------------------------
 # Class 2: TestCreateDocumentAccessRights
@@ -374,3 +379,43 @@ class TestRollbackOnError:
         with Session(engine) as sess:
             count = sess.query(DocumentAccessRight).count()
         assert count == 0
+
+    def test_create_delegate_commit_error_leaves_no_delegate_row(
+        self, engine: object
+    ) -> None:
+        """When session.commit raises SQLAlchemyError, no Delegate row is persisted."""
+        with Session(engine) as sess:
+            sess.add(_make_delegation("FRA", MembershipType.MEMBER))
+            sess.add(
+                _make_delegate(
+                    "DEL-2026-0001", "FRA", DelegateRole.DELEGATION_EDITOR
+                )
+            )
+            sess.commit()
+
+        seeded_count: int
+        with Session(engine) as sess:
+            seeded_count = sess.query(Delegate).count()
+
+        ctx = _make_editor_ctx("DEL-2026-0001")
+
+        # Patch commit AFTER seeding so the seed itself is not disrupted.
+        with (
+            patch.object(
+                Session, "commit", side_effect=SQLAlchemyError("forced")
+            ),
+            patch("agent_app.tools._engine", engine),
+            pytest.raises(SQLAlchemyError),
+        ):
+            create_delegate(
+                full_name="Should Not Persist",
+                email="ghost@example.com",
+                function="Ghost",
+                delegation_id="FRA",
+                ctx=ctx,
+            )
+
+        # Delegate count must be unchanged after the forced rollback
+        with Session(engine) as sess:
+            count = sess.query(Delegate).count()
+        assert count == seeded_count
