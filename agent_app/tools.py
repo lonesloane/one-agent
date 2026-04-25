@@ -350,15 +350,13 @@ def create_delegate(
     Returns:
         JSON string with keys: id, full_name, delegation_id, role on success.
         JSON error structure ``{"error": ..., "delegation_id": ...}`` when the
-        target delegation does not exist or a permission check fails.
+        target delegation does not exist or the role value is invalid.
+
+    Raises:
+        PermissionError: If the calling delegate is not a DELEGATION_EDITOR.
     """
     with _Session(_engine) as session:
-        try:
-            _assert_editor(ctx, session)
-        except PermissionError as exc:
-            return json.dumps(
-                {"error": str(exc), "delegation_id": delegation_id}
-            )
+        _assert_editor(ctx, session)
 
         delegation = session.get(Delegation, delegation_id)
         if delegation is None:
