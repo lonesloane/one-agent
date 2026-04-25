@@ -288,7 +288,7 @@ def _assert_editor(
         PermissionError: If no delegate_id is present in context or if the
             delegate's role is not DELEGATION_EDITOR.
     """
-    delegate_id = ctx.kwargs.get("delegate_id", "")
+    delegate_id = ctx.kwargs.get("delegate_id", "") if ctx is not None else ""
     if not delegate_id:
         raise PermissionError(
             "Only delegation editors can create delegates/DARs"
@@ -328,7 +328,6 @@ def create_delegate(
                 "Role for the new delegate: 'DELEGATE' or 'DELEGATION_EDITOR'. "
                 "Defaults to 'DELEGATE'."
             ),
-            default="DELEGATE",
         ),
     ] = "DELEGATE",
     ctx: FunctionInvocationContext = None,
