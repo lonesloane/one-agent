@@ -8,16 +8,22 @@ from typing import Annotated
 from agent_framework import FunctionInvocationContext, tool
 from pydantic import Field
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session as _Session
 
 from classical_app.routes.wizard_helpers import (
     _generate_delegate_id as _next_delegate_id,
 )
-from shared.business_rules import get_visible_agenda_documents
+from shared.business_rules import (
+    compute_default_access_level,
+    determine_approval_route,
+    get_visible_agenda_documents,
+)
 from shared.database import (
     Delegate,
     DelegateRole,
     Delegation,
+    DocumentAccessRight,
     Meeting,
     delegate_committees,
     get_engine,
@@ -405,10 +411,109 @@ def create_delegate(
         )
 
 
+# Reason: approval_mode="always_require" enforces HITL confirmation for all
+# write operations that mutate the database.
+@tool(approval_mode="always_require")
+def create_document_access_rights(
+    delegate_id: Annotated[
+        str, Field(description="Target delegate ID (DEL-YYYY-NNNN)")
+    ],
+    committee_id: Annotated[
+        str, Field(description="Committee ID, e.g. 'EDU'")
+    ],
+    retroactive: Annotated[
+        bool,
+        Field(
+            description="Whether access applies to past documents",
+            default=False,
+        ),
+    ] = False,
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Create a Document Access Right for a delegate in a committee.
+
+    Requires the calling session delegate to hold the DELEGATION_EDITOR role.
+    Derives ``classification_level`` via ``compute_default_access_level`` and
+    ``approval_status`` via ``determine_approval_route`` — never hard-codes
+    routing logic.
+
+    Args:
+        delegate_id: Target delegate to grant access to.
+        committee_id: Committee for which access is requested.
+        retroactive: If True, access applies to past documents; routes to
+            secretariat approval regardless of classification.
+        ctx: Runtime context providing delegate_id via kwargs injection.
+
+    Returns:
+        JSON string with keys: id, delegate_id, committee_id,
+        classification_level, approval_status, retroactive on success.
+        JSON error structure ``{"error": ..., "delegate_id": ...}`` when the
+        target delegate does not exist.
+
+    Raises:
+        PermissionError: If the calling delegate is not a DELEGATION_EDITOR.
+        SQLAlchemyError: Re-raised after rollback if any DB operation fails.
+    """
+    with _Session(_engine) as session:
+        _assert_editor(ctx, session)
+
+        delegate = session.get(Delegate, delegate_id)
+        if delegate is None:
+            return json.dumps(
+                {
+                    "error": f"Delegate '{delegate_id}' not found",
+                    "delegate_id": delegate_id,
+                }
+            )
+
+        delegation = session.get(Delegation, delegate.delegation_id)
+        framework_agreements = list(delegation.framework_agreements)
+
+        level = compute_default_access_level(
+            delegation.membership_type, committee_id, framework_agreements
+        )
+        status = determine_approval_route(level, retroactive)
+
+        # Reason: strip tzinfo to match SQLite naive-datetime convention used
+        # throughout the codebase.
+        now = datetime.now(UTC).replace(tzinfo=None)
+        editor_id = ctx.kwargs.get("delegate_id", "")
+
+        dar = DocumentAccessRight(
+            delegate_id=delegate_id,
+            committee_id=committee_id,
+            classification_level=level,
+            retroactive=retroactive,
+            approval_status=status,
+            created_at=now,
+            created_by=editor_id,
+        )
+        try:
+            session.add(dar)
+            session.flush()
+            session.commit()
+        except SQLAlchemyError:
+            session.rollback()
+            raise
+
+        return json.dumps(
+            {
+                "id": dar.id,
+                "delegate_id": delegate_id,
+                "committee_id": committee_id,
+                "classification_level": level.value,
+                "approval_status": status.value,
+                "retroactive": retroactive,
+            }
+        )
+
+
 ALL_TOOLS: list[object] = [
     get_delegation_info,
     lookup_delegate,
     whoami,
     get_upcoming_meetings,
     get_agenda_documents,
+    create_delegate,
+    create_document_access_rights,
 ]

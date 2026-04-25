@@ -82,10 +82,10 @@ Spec: `docs/prd-phase4-write-agent.md` §3 (Tool Requirements) and §4
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-004 | Add helper `_next_dar_id(session)` mirroring `DAR-YYYY-XXXX` pattern. | | |
-| TASK-005 | Implement `create_document_access_rights(delegate_id, committee_id, retroactive, ctx)` decorated with `@tool(approval_mode="always_require")`. Loads target delegate + delegation + framework_agreements; computes `classification_level = compute_default_access_level(...)`; derives `approval_status = determine_approval_route(classification_level, retroactive)`; inserts `DocumentAccessRight` row; commit; return JSON including derived fields. | | |
-| TASK-006 | Wrap the DB work in try/except: on any `SQLAlchemyError` call `session.rollback()` and re-raise. | | |
-| TASK-007 | Extend `ALL_TOOLS` list at bottom of `agent_app/tools.py` to include `create_delegate` + `create_document_access_rights`. | | |
+| TASK-004 | Add helper `_next_dar_id(session)` mirroring `DAR-YYYY-XXXX` pattern. | ✅ DROPPED | 2026-04-25 |
+| TASK-005 | Implement `create_document_access_rights(delegate_id, committee_id, retroactive, ctx)` decorated with `@tool(approval_mode="always_require")`. Loads target delegate + delegation + framework_agreements; computes `classification_level = compute_default_access_level(...)`; derives `approval_status = determine_approval_route(classification_level, retroactive)`; inserts `DocumentAccessRight` row; commit; return JSON including derived fields. | ✅ | 2026-04-25 |
+| TASK-006 | Wrap the DB work in try/except: on any `SQLAlchemyError` call `session.rollback()` and re-raise. | ✅ | 2026-04-25 |
+| TASK-007 | Extend `ALL_TOOLS` list at bottom of `agent_app/tools.py` to include `create_delegate` + `create_document_access_rights`. | ✅ | 2026-04-25 |
 
 ### Implementation Phase 3 — Unit tests
 
