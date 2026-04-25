@@ -2,7 +2,7 @@
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated
 
 from agent_framework import FunctionInvocationContext, tool
@@ -19,9 +19,7 @@ from shared.database import (
     get_engine,
 )
 
-_engine = get_engine(
-    os.environ.get("DATABASE_PATH", "one_agent.db")
-)
+_engine = get_engine(os.environ.get("DATABASE_PATH", "one_agent.db"))
 
 
 @tool(approval_mode="never_require")
@@ -43,13 +41,15 @@ def get_delegation_info(
     with _Session(_engine) as session:
         delegation = session.get(Delegation, delegation_id)
         if delegation is None:
-            return json.dumps({
-                "id": delegation_id,
-                "name": None,
-                "membership_type": None,
-                "delegates": [],
-                "framework_agreements": [],
-            })
+            return json.dumps(
+                {
+                    "id": delegation_id,
+                    "name": None,
+                    "membership_type": None,
+                    "delegates": [],
+                    "framework_agreements": [],
+                }
+            )
         delegates = [
             {"id": d.id, "full_name": d.full_name}
             for d in delegation.delegates
@@ -61,19 +61,63 @@ def get_delegation_info(
                 "start_date": (
                     fa.start_date.isoformat() if fa.start_date else None
                 ),
-                "end_date": (
-                    fa.end_date.isoformat() if fa.end_date else None
-                ),
+                "end_date": (fa.end_date.isoformat() if fa.end_date else None),
             }
             for fa in delegation.framework_agreements
         ]
-        return json.dumps({
-            "id": delegation.id,
-            "name": delegation.name,
-            "membership_type": delegation.membership_type.value,
-            "delegates": delegates,
-            "framework_agreements": framework_agreements,
-        })
+        return json.dumps(
+            {
+                "id": delegation.id,
+                "name": delegation.name,
+                "membership_type": delegation.membership_type.value,
+                "delegates": delegates,
+                "framework_agreements": framework_agreements,
+            }
+        )
+
+
+def _serialize_delegate_profile(session: _Session, delegate_id: str) -> str:
+    """Serialize a delegate's profile, committees, and DARs to JSON.
+
+    Args:
+        session: Active SQLAlchemy session.
+        delegate_id: The delegate ID to look up.
+
+    Returns:
+        JSON string with keys: id, full_name, delegation_id, committees,
+        access_rights. Returns null-filled structure when delegate_id is
+        missing from the DB.
+    """
+    delegate = session.get(Delegate, delegate_id)
+    if delegate is None:
+        return json.dumps(
+            {
+                "id": delegate_id or None,
+                "full_name": None,
+                "delegation_id": None,
+                "committees": [],
+                "access_rights": [],
+            }
+        )
+    committees = [{"id": c.id, "name": c.name} for c in delegate.committees]
+    access_rights = [
+        {
+            "id": dar.id,
+            "committee_id": dar.committee_id,
+            "classification_level": dar.classification_level.value,
+            "approval_status": dar.approval_status.value,
+        }
+        for dar in delegate.document_access_rights
+    ]
+    return json.dumps(
+        {
+            "id": delegate.id,
+            "full_name": delegate.full_name,
+            "delegation_id": delegate.delegation_id,
+            "committees": committees,
+            "access_rights": access_rights,
+        }
+    )
 
 
 @tool(approval_mode="never_require")
@@ -85,6 +129,9 @@ def lookup_delegate(
 ) -> str:
     """Look up a delegate's profile, committees, and document access rights.
 
+    Use this tool only for explicit by-id lookups of *other* delegates.
+    To get the current session's delegate, use ``whoami`` instead.
+
     Args:
         delegate_id: The unique delegate identifier to query.
 
@@ -93,35 +140,42 @@ def lookup_delegate(
         access_rights. Returns null-filled structure when not found.
     """
     with _Session(_engine) as session:
-        delegate = session.get(Delegate, delegate_id)
-        if delegate is None:
-            return json.dumps({
-                "id": delegate_id,
+        return _serialize_delegate_profile(session, delegate_id)
+
+
+# Reason: FunctionInvocationContext params are excluded from the
+# model-visible tool schema; delegate_id stays invisible to the model.
+@tool(approval_mode="never_require")
+def whoami(ctx: FunctionInvocationContext) -> str:
+    """Return the current session delegate's profile.
+
+    The delegate identity is injected via FunctionInvocationContext using
+    the ``delegate_id`` key from function_invocation_kwargs (mirrors the
+    ``get_upcoming_meetings`` pattern). This tool exists so the model can
+    confirm the current delegate's name without having to know — or
+    hallucinate — the delegate_id.
+
+    Args:
+        ctx: Runtime context providing delegate_id via kwargs injection.
+
+    Returns:
+        JSON string with keys: id, full_name, delegation_id, committees,
+        access_rights. Returns null-filled structure when no delegate_id
+        is present in context.
+    """
+    delegate_id = ctx.kwargs.get("delegate_id", "")
+    if not delegate_id:
+        return json.dumps(
+            {
+                "id": None,
                 "full_name": None,
                 "delegation_id": None,
                 "committees": [],
                 "access_rights": [],
-            })
-        committees = [
-            {"id": c.id, "name": c.name}
-            for c in delegate.committees
-        ]
-        access_rights = [
-            {
-                "id": dar.id,
-                "committee_id": dar.committee_id,
-                "classification_level": dar.classification_level.value,
-                "approval_status": dar.approval_status.value,
             }
-            for dar in delegate.document_access_rights
-        ]
-        return json.dumps({
-            "id": delegate.id,
-            "full_name": delegate.full_name,
-            "delegation_id": delegate.delegation_id,
-            "committees": committees,
-            "access_rights": access_rights,
-        })
+        )
+    with _Session(_engine) as session:
+        return _serialize_delegate_profile(session, delegate_id)
 
 
 # Reason: FunctionInvocationContext params are excluded from the
@@ -146,12 +200,11 @@ def get_upcoming_meetings(
     if not delegate_id:
         return json.dumps([])
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     # Reason: strip tzinfo for SQLite naive-datetime comparison
     with _Session(_engine) as session:
-        subq = (
-            select(delegate_committees.c.committee_id)
-            .where(delegate_committees.c.delegate_id == delegate_id)
+        subq = select(delegate_committees.c.committee_id).where(
+            delegate_committees.c.delegate_id == delegate_id
         )
         stmt = (
             select(Meeting)
@@ -160,15 +213,17 @@ def get_upcoming_meetings(
             .order_by(Meeting.date)
         )
         meetings = session.scalars(stmt).all()
-        return json.dumps([
-            {
-                "id": m.id,
-                "title": m.title,
-                "committee_id": m.committee_id,
-                "meeting_date": m.date.isoformat(),
-            }
-            for m in meetings
-        ])
+        return json.dumps(
+            [
+                {
+                    "id": m.id,
+                    "title": m.title,
+                    "committee_id": m.committee_id,
+                    "meeting_date": m.date.isoformat(),
+                }
+                for m in meetings
+            ]
+        )
 
 
 @tool(approval_mode="never_require")
@@ -200,20 +255,23 @@ def get_agenda_documents(
         documents = get_visible_agenda_documents(
             delegate_id, meeting_id, session
         )
-        return json.dumps([
-            {
-                "id": doc.id,
-                "title": doc.title,
-                "classification": doc.classification.value,
-                "last_modified": doc.last_modified.isoformat(),
-            }
-            for doc in documents
-        ])
+        return json.dumps(
+            [
+                {
+                    "id": doc.id,
+                    "title": doc.title,
+                    "classification": doc.classification.value,
+                    "last_modified": doc.last_modified.isoformat(),
+                }
+                for doc in documents
+            ]
+        )
 
 
 ALL_TOOLS: list[object] = [
     get_delegation_info,
     lookup_delegate,
+    whoami,
     get_upcoming_meetings,
     get_agenda_documents,
 ]
