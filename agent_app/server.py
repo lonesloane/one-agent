@@ -7,18 +7,18 @@ from typing import Any
 from ag_ui.core import RunErrorEvent
 from ag_ui.encoder import EventEncoder
 from agent_framework import Agent
-from agent_framework_ag_ui import AGUIRequest, AgentFrameworkAgent
+from agent_framework_ag_ui import AgentFrameworkAgent, AGUIRequest
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from loguru import logger
 from pydantic import BaseModel
 from sqlalchemy import select
-from sqlalchemy.orm import Session as _Session, joinedload
+from sqlalchemy.orm import Session as _Session
+from sqlalchemy.orm import joinedload
 
 from agent_app.agent import create_agent
-from shared.database import Delegate, Delegation, get_engine
-
+from shared.database import Delegate, get_engine
 
 _DB_PATH: str = os.environ.get("DATABASE_PATH", "one_agent.db")
 _db_engine = get_engine(_DB_PATH)
@@ -78,6 +78,44 @@ class _BoundAgent:
             "delegate_id": self._delegate_id,
         }
         return self._agent.run(messages, **kwargs)
+
+
+def _fix_tool_call_ordering(
+    messages: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Reorder messages so every assistant tool-call message precedes its tool-result messages.
+
+    CopilotKit v2 may reconstruct conversation history with tool results before
+    the assistant message that requested them. AgentFrameworkAgent._sanitize_tool_history
+    drops out-of-order results rather than fixing the order, leaving dangling tool_call
+    IDs that Foundry rejects with 400 (BUG-4C-001).
+
+    Args:
+        messages: Raw AG-UI message list from request body.
+
+    Returns:
+        Reordered list where each assistant message precedes its tool-result messages.
+    """
+    call_to_asst: dict[str, int] = {}
+    for i, msg in enumerate(messages):
+        if msg.get("role") == "assistant":
+            for tc in msg.get("tool_calls") or []:
+                if isinstance(tc, dict) and tc.get("id"):
+                    call_to_asst[str(tc["id"])] = i
+
+    result: list[dict[str, Any]] = []
+    skip: set[int] = set()
+    for i, msg in enumerate(messages):
+        if i in skip:
+            continue
+        if msg.get("role") == "tool":
+            cid = str(msg.get("tool_call_id") or msg.get("toolCallId") or "")
+            asst_idx = call_to_asst.get(cid, -1)
+            if asst_idx > i:
+                result.append(messages[asst_idx])
+                skip.add(asst_idx)
+        result.append(msg)
+    return result
 
 
 def _get_agent() -> Agent:
@@ -144,6 +182,10 @@ async def agent_endpoint(request_body: AGUIRequest) -> StreamingResponse:
         )
 
     input_data: dict[str, Any] = request_body.model_dump(exclude_none=True)
+    if "messages" in input_data:
+        input_data["messages"] = _fix_tool_call_ordering(
+            input_data["messages"]
+        )
     bound = _BoundAgent(_get_agent(), delegate_id)
     protocol_runner = AgentFrameworkAgent(agent=bound)
 
