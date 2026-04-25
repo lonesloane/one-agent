@@ -7,6 +7,7 @@ import {
   useCopilotKit,
   useDefaultRenderTool,
 } from "@copilotkit/react-core/v2";
+import { useHumanInTheLoop } from "@copilotkit/react-core";
 import { CopilotKitCoreRuntimeConnectionStatus } from "@copilotkit/core";
 import "@copilotkit/react-core/v2/styles.css";
 import { DelegatePicker } from "./components/DelegatePicker";
@@ -41,6 +42,162 @@ function ChatPane({
         result={result}
       />
     ),
+  });
+
+  useHumanInTheLoop({
+    name: "create_delegate",
+    description: "Create a new delegate in a delegation",
+    parameters: [
+      { name: "full_name", type: "string", description: "Full name of the new delegate" },
+      { name: "email", type: "string", description: "Email address of the new delegate" },
+      { name: "function", type: "string", description: "Function or job title of the new delegate" },
+      { name: "delegation_id", type: "string", description: "Delegation ID the delegate belongs to (e.g. 'FRA')" },
+      { name: "role", type: "string", description: "Role for the new delegate: 'DELEGATE' or 'DELEGATION_EDITOR'. Defaults to 'DELEGATE'." },
+    ],
+    render: (props) => {
+      if (props.status === "inProgress") {
+        return (
+          <div className={styles.approvalCard}>
+            <div className={styles.approvalHeading}>Approval required — create_delegate</div>
+            <p className={styles.approvalStatus}>Preparing…</p>
+            {Object.keys(props.args).length > 0 && (
+              <dl className={styles.approvalArgs}>
+                {Object.entries(props.args).map(([k, v]) => (
+                  <div key={k} className={styles.approvalArgRow}>
+                    <dt className={styles.approvalArgKey}>{k}</dt>
+                    <dd className={styles.approvalArgVal}>{String(v)}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            <div className={styles.approvalActions}>
+              <button className={styles.approveBtn} disabled>Approve</button>
+              <button className={styles.denyBtn} disabled>Deny</button>
+            </div>
+          </div>
+        );
+      }
+
+      if (props.status === "executing") {
+        return (
+          <div className={styles.approvalCard}>
+            <div className={styles.approvalHeading}>Approval required — create_delegate</div>
+            <dl className={styles.approvalArgs}>
+              {Object.entries(props.args).map(([k, v]) => (
+                <div key={k} className={styles.approvalArgRow}>
+                  <dt className={styles.approvalArgKey}>{k}</dt>
+                  <dd className={styles.approvalArgVal}>{String(v)}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className={styles.approvalActions}>
+              <button
+                className={styles.approveBtn}
+                onClick={() => props.respond({ approved: true })}
+              >
+                Approve
+              </button>
+              <button
+                className={styles.denyBtn}
+                onClick={() => props.respond({ approved: false })}
+              >
+                Deny
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // status === "complete"
+      const wasApproved = props.result?.approved === true || props.result === true;
+      return (
+        <div className={styles.approvalCard}>
+          <div className={styles.approvalHeading}>
+            create_delegate — {wasApproved ? "approved" : "denied"}
+          </div>
+          {props.result !== undefined && (
+            <pre className={styles.approvalResult}>{JSON.stringify(props.result, null, 2)}</pre>
+          )}
+        </div>
+      );
+    },
+  });
+
+  useHumanInTheLoop({
+    name: "create_document_access_rights",
+    description: "Create a document access right for a delegate",
+    parameters: [
+      { name: "delegate_id", type: "string", description: "Target delegate ID (DEL-YYYY-NNNN)" },
+      { name: "committee_id", type: "string", description: "Committee ID, e.g. 'EDU'" },
+      { name: "retroactive", type: "boolean", description: "Whether access applies to past documents" },
+    ],
+    render: (props) => {
+      if (props.status === "inProgress") {
+        return (
+          <div className={styles.approvalCard}>
+            <div className={styles.approvalHeading}>Approval required — create_document_access_rights</div>
+            <p className={styles.approvalStatus}>Preparing…</p>
+            {Object.keys(props.args).length > 0 && (
+              <dl className={styles.approvalArgs}>
+                {Object.entries(props.args).map(([k, v]) => (
+                  <div key={k} className={styles.approvalArgRow}>
+                    <dt className={styles.approvalArgKey}>{k}</dt>
+                    <dd className={styles.approvalArgVal}>{String(v)}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            <div className={styles.approvalActions}>
+              <button className={styles.approveBtn} disabled>Approve</button>
+              <button className={styles.denyBtn} disabled>Deny</button>
+            </div>
+          </div>
+        );
+      }
+
+      if (props.status === "executing") {
+        return (
+          <div className={styles.approvalCard}>
+            <div className={styles.approvalHeading}>Approval required — create_document_access_rights</div>
+            <dl className={styles.approvalArgs}>
+              {Object.entries(props.args).map(([k, v]) => (
+                <div key={k} className={styles.approvalArgRow}>
+                  <dt className={styles.approvalArgKey}>{k}</dt>
+                  <dd className={styles.approvalArgVal}>{String(v)}</dd>
+                </div>
+              ))}
+            </dl>
+            <div className={styles.approvalActions}>
+              <button
+                className={styles.approveBtn}
+                onClick={() => props.respond({ approved: true })}
+              >
+                Approve
+              </button>
+              <button
+                className={styles.denyBtn}
+                onClick={() => props.respond({ approved: false })}
+              >
+                Deny
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // status === "complete"
+      const wasApproved = props.result?.approved === true || props.result === true;
+      return (
+        <div className={styles.approvalCard}>
+          <div className={styles.approvalHeading}>
+            create_document_access_rights — {wasApproved ? "approved" : "denied"}
+          </div>
+          {props.result !== undefined && (
+            <pre className={styles.approvalResult}>{JSON.stringify(props.result, null, 2)}</pre>
+          )}
+        </div>
+      );
+    },
   });
 
   useEffect(() => {

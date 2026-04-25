@@ -86,3 +86,106 @@
   flex-grow: 1;
   min-height: 0;
 }
+
+/* ── HITL approval card ────────────────────────────────────────── */
+
+.approvalCard {
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 6px);
+  padding: var(--space-4, 1rem);
+  background: var(--color-surface, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3, 0.75rem);
+}
+
+.approvalHeading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary, #111827);
+}
+
+.approvalStatus {
+  font-size: 13px;
+  color: var(--color-text-secondary, #6b7280);
+  margin: 0;
+}
+
+.approvalArgs {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1, 0.25rem);
+}
+
+.approvalArgRow {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-2, 0.5rem);
+  align-items: baseline;
+}
+
+.approvalArgKey {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+
+.approvalArgVal {
+  font-size: 13px;
+  color: var(--color-text-primary, #111827);
+  font-family: var(--font-mono, monospace);
+  margin: 0;
+  word-break: break-all;
+}
+
+.approvalActions {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-2, 0.5rem);
+}
+
+.approveBtn {
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  border-radius: var(--radius-sm, 4px);
+  border: none;
+  background: var(--color-primary, #003f8a);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.approveBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.denyBtn {
+  padding: var(--space-2, 0.5rem) var(--space-4, 1rem);
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-border, #d1d5db);
+  background: transparent;
+  color: var(--color-text-primary, #111827);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.denyBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.approvalResult {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  background: var(--color-bg, #f9fafb);
+  border-radius: var(--radius-sm, 4px);
+  padding: var(--space-3, 0.75rem);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
