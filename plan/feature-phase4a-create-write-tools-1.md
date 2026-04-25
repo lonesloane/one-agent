@@ -3,7 +3,7 @@ goal: Phase 4A — create-side write tools (create_delegate, create_document_acc
 version: 1.0
 date_created: 2026-04-24
 owner: Stephane
-status: 'Planned'
+status: 'Done'
 tags: [feature, phase4, agent, write-tools, hitl]
 ---
 
@@ -93,12 +93,12 @@ Spec: `docs/prd-phase4-write-agent.md` §3 (Tool Requirements) and §4
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-008 | Create `tests/agent_app/test_write_tools.py`. Use the function-scoped engine fixture pattern from `tests/agent_app/test_tools.py` (`monkeypatch agent_app.tools._engine`). | | |
-| TASK-009 | Add `TestCreateDelegate`: happy path (editor creates delegate → row present); non-editor caller (role=DELEGATION_HEAD fixture) raises `PermissionError`; unknown delegation returns structured JSON error. | | |
-| TASK-010 | Add `TestCreateDocumentAccessRights` parametrised over the 5 PRD scenarios: (member General), (member Restricted), (partner General no-FA), (partner+FA → Restricted), (Confidential retroactive → PENDING_SECRETARIAT). Assert both `classification_level` and `approval_status` on the returned JSON AND on the persisted row. | | |
-| TASK-011 | Add `TestHITLEnforcement`: introspect both tool objects' `approval_mode` attribute; assert it equals `"always_require"`. This guards against accidental regression. | | |
-| TASK-012 | Add `TestRollbackOnError`: monkeypatch `session.commit` to raise; assert no `DocumentAccessRight` row persists and the original exception surfaces. | | |
-| TASK-013 | Run full suite: `pytest` — all Phase 3 + 4A tests green. | | |
+| TASK-008 | Create `tests/agent_app/test_write_tools.py`. Use the function-scoped engine fixture pattern from `tests/agent_app/test_tools.py` (`monkeypatch agent_app.tools._engine`). | ✅ | 2026-04-25 |
+| TASK-009 | Add `TestCreateDelegate`: happy path (editor creates delegate → row present); non-editor caller (role=DELEGATION_HEAD fixture) raises `PermissionError`; unknown delegation returns structured JSON error. | ✅ | 2026-04-25 |
+| TASK-010 | Add `TestCreateDocumentAccessRights` parametrised over the 5 PRD scenarios: (member General), (member Restricted), (partner General no-FA), (partner+FA → Restricted), (Confidential retroactive → PENDING_SECRETARIAT). Assert both `classification_level` and `approval_status` on the returned JSON AND on the persisted row. | ✅ | 2026-04-25 |
+| TASK-011 | Add `TestHITLEnforcement`: introspect both tool objects' `approval_mode` attribute; assert it equals `"always_require"`. This guards against accidental regression. | ✅ | 2026-04-25 |
+| TASK-012 | Add `TestRollbackOnError`: monkeypatch `session.commit` to raise; assert no `DocumentAccessRight` row persists and the original exception surfaces. | ✅ | 2026-04-25 |
+| TASK-013 | Run full suite: `pytest` — all Phase 3 + 4A tests green. | ✅ | 2026-04-25 |
 
 ## 3. Alternatives
 
