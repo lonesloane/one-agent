@@ -199,6 +199,17 @@
 - [ ] Test: retroactive access request (secretariat approval)
 - [ ] Tighten prompt for create→DAR sequencing (smoke surfaced model issuing both calls in parallel with stale `delegate_id`)
 
+### Phase 4C dry-run findings
+
+**BUG-4C-001** ✅ RESOLVED — Tool-result / tool-call message misordering causes Foundry 400 on follow-up turns.
+- Root cause: CopilotKit v2 reconstructs conversation history with `role:"tool"` messages before the `role:"assistant"` message that requested them. `_sanitize_tool_history` in `agent_framework_ag_ui` drops the out-of-order results, leaving dangling tool_call IDs that Foundry rejects with `400 — No tool output found for function call <id>`.
+- Fix: `_fix_tool_call_ordering` added to `agent_app/server.py`; called in `agent_endpoint` after `model_dump` before `_BoundAgent` construction. O(n) two-pass algorithm: first pass builds `call_id → assistant_index` map; second pass splices each assistant message before its first preceding tool result, guarded with `asst_idx not in skip` to avoid duplication when multiple tool results share one assistant.
+- Tests: 8-case unit suite in `tests/agent_app/test_server.py` (Cases A–H); 251 total tests green.
+
+**FINDING-4C-002** — HITL dialog rendering via CopilotKit v2 `V2Provider` not yet verified in browser.
+- Pending manual dry-run (TASK-007/008): start backend `uvicorn agent_app.server:app --port 8001`, start frontend `npm run dev`, pick DELEGATION_EDITOR, send follow-up message, then attempt delegate creation to reach HITL step.
+- If `V2Provider` auto-renders `function_approval_request` without `useHumanInTheLoop`, Phase 4C is complete. Otherwise a separate plan item is needed before Phase 4D.
+
 ### Approver side (delegation head / secretariat persona) — OQ-9 resolution
 - [ ] Seed a delegation-head persona (role=DELEGATION_HEAD) and a secretariat persona
 - [ ] Extend `/api/delegates` to include approver personas in picker
