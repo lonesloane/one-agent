@@ -199,6 +199,19 @@
 - [ ] Test: retroactive access request (secretariat approval)
 - [ ] Tighten prompt for create→DAR sequencing (smoke surfaced model issuing both calls in parallel with stale `delegate_id`)
 
+### Phase 4C dry-run findings
+
+**BUG-4C-001** ✅ RESOLVED — Tool-result / tool-call message misordering causes Foundry 400 on follow-up turns.
+- Root cause: CopilotKit v2 reconstructs conversation history with `role:"tool"` messages before the `role:"assistant"` message that requested them. `_sanitize_tool_history` in `agent_framework_ag_ui` drops the out-of-order results, leaving dangling tool_call IDs that Foundry rejects with `400 — No tool output found for function call <id>`.
+- Fix: `_fix_tool_call_ordering` added to `agent_app/server.py`; called in `agent_endpoint` after `model_dump` before `_BoundAgent` construction. O(n) two-pass algorithm: first pass builds `call_id → assistant_index` map; second pass splices each assistant message before its first preceding tool result, guarded with `asst_idx not in skip` to avoid duplication when multiple tool results share one assistant.
+- Tests: 8-case unit suite in `tests/agent_app/test_server.py` (Cases A–H); 251 total tests green.
+
+**FINDING-4C-002** ❌ CONFIRMED — CopilotKit v2 `V2Provider` does NOT auto-render `function_approval_request` HITL dialogs.
+- Dry-run result (2026-04-25): DELEGATION_EDITOR persona, brief loaded, follow-up message ("What documents are new?") succeeded ✅. Delegate-creation request triggered `create_delegate_access_request` with `approval_mode="always_require"` — backend fired `RUN_FINISHED` with `interrupt` payload correctly, but frontend showed nothing. No approval dialog rendered.
+- Downstream symptom: subsequent turns send history with unanswered `tool_calls` entry → Foundry 400 `No tool output found for function call <id>`. This is a distinct failure mode from BUG-4C-001 (missing result vs. misordered result — `_fix_tool_call_ordering` cannot help here).
+- ASSUMPTION-001 in `plan/feature-phase4c-create-frontend-hitl-1.md` is **invalidated**: `V2Provider` does not pick up `always_require` schemas automatically without explicit hook wiring.
+- **Required before Phase 4D**: frontend HITL wiring — query Context7 `/copilotkit/copilotkit` for the correct v2 hook/component that renders `function_approval_request` events. Plan `feature-phase4c-create-frontend-hitl-1.md` must be revised from "validation only" to "implementation + validation" (CON-001 may need relaxing if a new component is required). Execute this plan before `feature-phase4d-create-integration-tests-1.md`.
+
 ### Approver side (delegation head / secretariat persona) — OQ-9 resolution
 - [ ] Seed a delegation-head persona (role=DELEGATION_HEAD) and a secretariat persona
 - [ ] Extend `/api/delegates` to include approver personas in picker
