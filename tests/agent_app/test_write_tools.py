@@ -144,6 +144,33 @@ class TestCreateDelegate:
                 ctx=ctx,
             )
 
+    def test_editor_cross_delegation_raises_permission_error(
+        self, engine: object
+    ) -> None:
+        """Editor in FRA cannot create a delegate in DEU — raises PermissionError."""
+        with Session(engine) as sess:
+            sess.add(_make_delegation("FRA"))
+            sess.add(_make_delegation("DEU"))
+            sess.add(
+                _make_delegate(
+                    "DEL-2026-0001", "FRA", DelegateRole.DELEGATION_EDITOR
+                )
+            )
+            sess.commit()
+
+        ctx = _make_editor_ctx("DEL-2026-0001")
+        with (
+            patch("agent_app.tools._engine", engine),
+            pytest.raises(PermissionError),
+        ):
+            create_delegate(
+                full_name="Intruder",
+                email="intruder@example.com",
+                function="Spy",
+                delegation_id="DEU",
+                ctx=ctx,
+            )
+
     def test_unknown_delegation_returns_error_json(
         self, engine: object
     ) -> None:
@@ -238,6 +265,36 @@ class TestCreateDocumentAccessRights:
     Each test parametrizes over the 4 achievable DAR routing scenarios and
     asserts both the JSON return value and the persisted database row.
     """
+
+    def test_editor_cross_delegation_raises_permission_error(
+        self, engine: object
+    ) -> None:
+        """Editor in FRA cannot create a DAR for a delegate in DEU."""
+        with Session(engine) as sess:
+            sess.add(Committee(id="EDU", name="Education"))
+            sess.add(_make_delegation("FRA"))
+            sess.add(_make_delegation("DEU"))
+            sess.add(
+                _make_delegate(
+                    "DEL-2026-0001", "FRA", DelegateRole.DELEGATION_EDITOR
+                )
+            )
+            sess.add(
+                _make_delegate("DEL-2026-0002", "DEU", DelegateRole.DELEGATE)
+            )
+            sess.commit()
+
+        ctx = _make_editor_ctx("DEL-2026-0001")
+        with (
+            patch("agent_app.tools._engine", engine),
+            pytest.raises(PermissionError),
+        ):
+            create_document_access_rights(
+                delegate_id="DEL-2026-0002",
+                committee_id="EDU",
+                retroactive=False,
+                ctx=ctx,
+            )
 
     @pytest.mark.parametrize(
         "membership_type,has_active_fa,retroactive,exp_level,exp_status",

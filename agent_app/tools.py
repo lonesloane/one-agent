@@ -358,10 +358,11 @@ def create_delegate(
         target delegation does not exist or the role value is invalid.
 
     Raises:
-        PermissionError: If the calling delegate is not a DELEGATION_EDITOR.
+        PermissionError: If the calling delegate is not a DELEGATION_EDITOR or
+            attempts to create a delegate in a different delegation.
     """
     with _Session(_engine) as session:
-        _assert_editor(ctx, session)
+        editor = _assert_editor(ctx, session)
 
         delegation = session.get(Delegation, delegation_id)
         if delegation is None:
@@ -370,6 +371,13 @@ def create_delegate(
                     "error": f"Delegation '{delegation_id}' not found",
                     "delegation_id": delegation_id,
                 }
+            )
+
+        # Reason: editors may only create resources within their own delegation;
+        # cross-delegation writes are a privilege escalation vector.
+        if editor.delegation_id != delegation_id:
+            raise PermissionError(
+                "Editors can only create resources within their own delegation"
             )
 
         try:
@@ -451,7 +459,8 @@ def create_document_access_rights(
         target delegate does not exist.
 
     Raises:
-        PermissionError: If the calling delegate is not a DELEGATION_EDITOR.
+        PermissionError: If the calling delegate is not a DELEGATION_EDITOR or
+            attempts to create a DAR for a delegate in a different delegation.
         SQLAlchemyError: Re-raised after rollback if any DB operation fails.
     """
     with _Session(_engine) as session:
@@ -464,6 +473,13 @@ def create_document_access_rights(
                     "error": f"Delegate '{delegate_id}' not found",
                     "delegate_id": delegate_id,
                 }
+            )
+
+        # Reason: editors may only create resources within their own delegation;
+        # cross-delegation writes are a privilege escalation vector.
+        if editor.delegation_id != delegate.delegation_id:
+            raise PermissionError(
+                "Editors can only create resources within their own delegation"
             )
 
         delegation = session.get(Delegation, delegate.delegation_id)
