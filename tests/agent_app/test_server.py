@@ -86,17 +86,23 @@ def test_multiple_tools_per_assistant_correct_order() -> None:
 
 
 def test_multiple_misordered_pairs_fixed() -> None:
-    """Two independent (tool, assistant) pairs are each reordered."""
+    """Two independent misordered pairs are fixed by call-id, not position.
+
+    Input intentionally crosses call-ids: tool(c2) appears before asst(c1),
+    so a positional adjacent-swap algorithm produces the wrong result.
+    Expected: asst(c2) precedes tool(c2); asst(c1) precedes tool(c1).
+    """
     user = _make_user()
     asst1 = _make_assistant(["c1"])
-    tool1 = _make_tool_result("c1")
     asst2 = _make_assistant(["c2"])
+    tool1 = _make_tool_result("c1")
     tool2 = _make_tool_result("c2")
 
-    # CopilotKit v2 pattern: each tool result appears before its owning assistant
-    result = _fix_tool_call_ordering([user, tool1, asst1, tool2, asst2])
+    # tool(c2) sits before asst(c1); tool(c1) sits before asst(c2)
+    result = _fix_tool_call_ordering([user, tool2, asst1, tool1, asst2])
 
-    assert result == [user, asst1, tool1, asst2, tool2]
+    # asst(c2) must be spliced before tool(c2); asst(c1) is already correct
+    assert result == [user, asst2, tool2, asst1, tool1]
 
 
 # ---------------------------------------------------------------------------
@@ -121,3 +127,20 @@ def test_orphan_tool_message_preserved() -> None:
 def test_empty_list_returns_empty() -> None:
     """Empty input produces empty output."""
     assert _fix_tool_call_ordering([]) == []
+
+
+# ---------------------------------------------------------------------------
+# Case G — camelCase toolCallId fallback (AG-UI variant)
+# ---------------------------------------------------------------------------
+
+
+def test_camel_case_tool_call_id_fallback() -> None:
+    """tool_call_id may arrive as camelCase toolCallId in some AG-UI payloads."""
+    asst = _make_assistant(["c1"])
+    # Use camelCase key instead of snake_case
+    tool_camel = {"role": "tool", "toolCallId": "c1", "content": "result"}
+    user = _make_user()
+
+    result = _fix_tool_call_ordering([user, tool_camel, asst])
+
+    assert result == [user, asst, tool_camel]
