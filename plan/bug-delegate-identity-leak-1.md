@@ -79,8 +79,8 @@ content matches Alice while the greeting does not.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-004 | In `agent_app/agent.py::SYSTEM_PROMPT`, replace step 1 of "Proactive Session Brief" (lines 56-58). New text: `"1. Call whoami() to confirm the current delegate's identity and full name. The delegate identity is injected automatically into the session context."` Remove the now-stale phrase about `current_delegate_id`. | | |
-| TASK-005 | In `agent_app/agent.py::SYSTEM_PROMPT`, add a one-line note after the access-classification rule clarifying `lookup_delegate(delegate_id)` is for *other* delegates, not the current one. Suggested wording: `"Use lookup_delegate(delegate_id) only when the user asks about a different delegate by ID; never use it to look up the current delegate (use whoami() for that)."` | | |
+| TASK-004 | In `agent_app/agent.py::SYSTEM_PROMPT`, replace step 1 of "Proactive Session Brief" (lines 56-58). New text: `"1. Call whoami() to confirm the current delegate's identity and full name. The delegate identity is injected automatically into the session context."` Remove the now-stale phrase about `current_delegate_id`. | ✅ | 2026-04-25 |
+| TASK-005 | In `agent_app/agent.py::SYSTEM_PROMPT`, add a one-line note after the access-classification rule clarifying `lookup_delegate(delegate_id)` is for *other* delegates, not the current one. Suggested wording: `"Use lookup_delegate(delegate_id) only when the user asks about a different delegate by ID; never use it to look up the current delegate (use whoami() for that)."` | ✅ | 2026-04-25 |
 
 ### Implementation Phase 3 — tests
 
