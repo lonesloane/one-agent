@@ -90,6 +90,12 @@ def _fix_tool_call_ordering(
     drops out-of-order results rather than fixing the order, leaving dangling tool_call
     IDs that Foundry rejects with 400 (BUG-4C-001).
 
+    Note:
+        Assumes the misorder is a contiguous group: the tool-result message
+        appears immediately before its owning assistant message with no unrelated
+        messages interspersed. Dry-run observation confirms this is the consistent
+        CopilotKit v2 pattern (ASSUMPTION-001).
+
     Args:
         messages: Raw AG-UI message list from request body.
 
