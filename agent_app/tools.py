@@ -94,9 +94,10 @@ def _serialize_delegate_profile(session: _Session, delegate_id: str) -> str:
         delegate_id: The delegate ID to look up.
 
     Returns:
-        JSON string with keys: id, full_name, delegation_id, committees,
-        access_rights. Returns null-filled structure when delegate_id is
-        missing from the DB.
+        JSON string with keys: id, full_name, delegation_id, role,
+        committees, access_rights. The ``role`` key holds the string value
+        of the ``DelegateRole`` enum (e.g. "DELEGATE", "DELEGATION_EDITOR").
+        Returns null-filled structure when delegate_id is missing from the DB.
     """
     delegate = session.get(Delegate, delegate_id)
     if delegate is None:
@@ -105,6 +106,7 @@ def _serialize_delegate_profile(session: _Session, delegate_id: str) -> str:
                 "id": delegate_id or None,
                 "full_name": None,
                 "delegation_id": None,
+                "role": None,
                 "committees": [],
                 "access_rights": [],
             }
@@ -124,6 +126,7 @@ def _serialize_delegate_profile(session: _Session, delegate_id: str) -> str:
             "id": delegate.id,
             "full_name": delegate.full_name,
             "delegation_id": delegate.delegation_id,
+            "role": delegate.role.value,
             "committees": committees,
             "access_rights": access_rights,
         }
@@ -146,8 +149,10 @@ def lookup_delegate(
         delegate_id: The unique delegate identifier to query.
 
     Returns:
-        JSON string with keys: id, full_name, delegation_id, committees,
-        access_rights. Returns null-filled structure when not found.
+        JSON string with keys: id, full_name, delegation_id, role,
+        committees, access_rights. The ``role`` key holds the string value
+        of the ``DelegateRole`` enum (e.g. "DELEGATE", "DELEGATION_EDITOR").
+        Returns null-filled structure when not found.
     """
     with _Session(_engine) as session:
         return _serialize_delegate_profile(session, delegate_id)
@@ -169,9 +174,10 @@ def whoami(ctx: FunctionInvocationContext) -> str:
         ctx: Runtime context providing delegate_id via kwargs injection.
 
     Returns:
-        JSON string with keys: id, full_name, delegation_id, committees,
-        access_rights. Returns null-filled structure when no delegate_id
-        is present in context.
+        JSON string with keys: id, full_name, delegation_id, role,
+        committees, access_rights. The ``role`` key holds the string value
+        of the ``DelegateRole`` enum (e.g. "DELEGATE", "DELEGATION_EDITOR").
+        Returns null-filled structure when no delegate_id is present in context.
     """
     delegate_id = ctx.kwargs.get("delegate_id", "")
     if not delegate_id:
@@ -180,6 +186,7 @@ def whoami(ctx: FunctionInvocationContext) -> str:
                 "id": None,
                 "full_name": None,
                 "delegation_id": None,
+                "role": None,
                 "committees": [],
                 "access_rights": [],
             }
