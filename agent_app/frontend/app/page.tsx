@@ -33,6 +33,14 @@ function ChatPane({
   });
   const { copilotkit } = useCopilotKit();
 
+  // Reason: guard against double-submission; reset when thread resets.
+  const [delegateSubmitted, setDelegateSubmitted] = useState(false);
+  const [darSubmitted, setDarSubmitted] = useState(false);
+  useEffect(() => {
+    setDelegateSubmitted(false);
+    setDarSubmitted(false);
+  }, [threadId]);
+
   useDefaultRenderTool({
     render: ({ name, status, parameters, result }) => (
       <ToolCallBlock
@@ -71,8 +79,8 @@ function ChatPane({
               </dl>
             )}
             <div className={styles.approvalActions}>
-              <button className={styles.approveBtn} disabled>Approve</button>
-              <button className={styles.denyBtn} disabled>Deny</button>
+              <button type="button" aria-label="Approve create_delegate" className={styles.approveBtn} disabled>Approve</button>
+              <button type="button" aria-label="Deny create_delegate" className={styles.denyBtn} disabled>Deny</button>
             </div>
           </div>
         );
@@ -92,14 +100,20 @@ function ChatPane({
             </dl>
             <div className={styles.approvalActions}>
               <button
+                type="button"
+                aria-label="Approve create_delegate"
                 className={styles.approveBtn}
-                onClick={() => props.respond({ approved: true })}
+                disabled={delegateSubmitted}
+                onClick={() => { setDelegateSubmitted(true); props.respond({ approved: true }); }}
               >
                 Approve
               </button>
               <button
+                type="button"
+                aria-label="Deny create_delegate"
                 className={styles.denyBtn}
-                onClick={() => props.respond({ approved: false })}
+                disabled={delegateSubmitted}
+                onClick={() => { setDelegateSubmitted(true); props.respond({ approved: false }); }}
               >
                 Deny
               </button>
@@ -148,8 +162,8 @@ function ChatPane({
               </dl>
             )}
             <div className={styles.approvalActions}>
-              <button className={styles.approveBtn} disabled>Approve</button>
-              <button className={styles.denyBtn} disabled>Deny</button>
+              <button type="button" aria-label="Approve create_document_access_rights" className={styles.approveBtn} disabled>Approve</button>
+              <button type="button" aria-label="Deny create_document_access_rights" className={styles.denyBtn} disabled>Deny</button>
             </div>
           </div>
         );
@@ -169,14 +183,20 @@ function ChatPane({
             </dl>
             <div className={styles.approvalActions}>
               <button
+                type="button"
+                aria-label="Approve create_document_access_rights"
                 className={styles.approveBtn}
-                onClick={() => props.respond({ approved: true })}
+                disabled={darSubmitted}
+                onClick={() => { setDarSubmitted(true); props.respond({ approved: true }); }}
               >
                 Approve
               </button>
               <button
+                type="button"
+                aria-label="Deny create_document_access_rights"
                 className={styles.denyBtn}
-                onClick={() => props.respond({ approved: false })}
+                disabled={darSubmitted}
+                onClick={() => { setDarSubmitted(true); props.respond({ approved: false }); }}
               >
                 Deny
               </button>
