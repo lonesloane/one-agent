@@ -6,8 +6,8 @@ import {
   useAgent,
   useCopilotKit,
   useDefaultRenderTool,
+  useHumanInTheLoop,
 } from "@copilotkit/react-core/v2";
-import { useHumanInTheLoop } from "@copilotkit/react-core";
 import { CopilotKitCoreRuntimeConnectionStatus } from "@copilotkit/core";
 import "@copilotkit/react-core/v2/styles.css";
 import { DelegatePicker } from "./components/DelegatePicker";
@@ -34,11 +34,9 @@ function ChatPane({
   const { copilotkit } = useCopilotKit();
 
   // Reason: guard against double-submission; reset when thread resets.
-  const [delegateSubmitted, setDelegateSubmitted] = useState(false);
-  const [darSubmitted, setDarSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   useEffect(() => {
-    setDelegateSubmitted(false);
-    setDarSubmitted(false);
+    setSubmitted(false);
   }, [threadId]);
 
   useDefaultRenderTool({
@@ -52,35 +50,30 @@ function ChatPane({
     ),
   });
 
+  // Reason: agent_framework_ag_ui translates approval_mode="always_require"
+  // tool calls into a synthetic "confirm_changes" TOOL_CALL_* event sequence.
+  // The frontend must intercept this synthetic tool — not the original Python
+  // tool names — to avoid duplicate tool name errors on the backend.
+  // Args shape: { function_name, function_call_id, function_arguments, steps }
+  // Response shape: { accepted: bool, steps: [] } — required by
+  // _is_confirm_changes_response in agent_framework_ag_ui._agent_run.
   useHumanInTheLoop({
-    name: "create_delegate",
-    description: "Create a new delegate in a delegation",
-    parameters: [
-      { name: "full_name", type: "string", description: "Full name of the new delegate" },
-      { name: "email", type: "string", description: "Email address of the new delegate" },
-      { name: "function", type: "string", description: "Function or job title of the new delegate" },
-      { name: "delegation_id", type: "string", description: "Delegation ID the delegate belongs to (e.g. 'FRA')" },
-      { name: "role", type: "string", description: "Role for the new delegate: 'DELEGATE' or 'DELEGATION_EDITOR'. Defaults to 'DELEGATE'." },
-    ],
+    name: "confirm_changes",
+    description: "Approval dialog for write operations requiring HITL confirmation",
     render: (props) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyArgs = props.args as any;
+      const toolName: string = anyArgs?.function_name ?? "unknown tool";
+      const toolArgs: Record<string, unknown> = anyArgs?.function_arguments ?? {};
+
       if (props.status === "inProgress") {
         return (
           <div className={styles.approvalCard}>
-            <div className={styles.approvalHeading}>Approval required — create_delegate</div>
+            <div className={styles.approvalHeading}>Approval required — {toolName}</div>
             <p className={styles.approvalStatus}>Preparing…</p>
-            {Object.keys(props.args).length > 0 && (
-              <dl className={styles.approvalArgs}>
-                {Object.entries(props.args).map(([k, v]) => (
-                  <div key={k} className={styles.approvalArgRow}>
-                    <dt className={styles.approvalArgKey}>{k}</dt>
-                    <dd className={styles.approvalArgVal}>{String(v)}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
             <div className={styles.approvalActions}>
-              <button type="button" aria-label="Approve create_delegate" className={styles.approveBtn} disabled>Approve</button>
-              <button type="button" aria-label="Deny create_delegate" className={styles.denyBtn} disabled>Deny</button>
+              <button type="button" aria-label={`Approve ${toolName}`} className={styles.approveBtn} disabled>Approve</button>
+              <button type="button" aria-label={`Deny ${toolName}`} className={styles.denyBtn} disabled>Deny</button>
             </div>
           </div>
         );
@@ -89,31 +82,39 @@ function ChatPane({
       if (props.status === "executing") {
         return (
           <div className={styles.approvalCard}>
-            <div className={styles.approvalHeading}>Approval required — create_delegate</div>
+            <div className={styles.approvalHeading}>Approval required — {toolName}</div>
             <dl className={styles.approvalArgs}>
-              {Object.entries(props.args).map(([k, v]) => (
+              {Object.entries(toolArgs).map(([k, v]) => (
                 <div key={k} className={styles.approvalArgRow}>
                   <dt className={styles.approvalArgKey}>{k}</dt>
-                  <dd className={styles.approvalArgVal}>{String(v)}</dd>
+                  <dd className={styles.approvalArgVal}>
+                    {typeof v === "object" ? JSON.stringify(v) : String(v)}
+                  </dd>
                 </div>
               ))}
             </dl>
             <div className={styles.approvalActions}>
               <button
                 type="button"
-                aria-label="Approve create_delegate"
+                aria-label={`Approve ${toolName}`}
                 className={styles.approveBtn}
-                disabled={delegateSubmitted}
-                onClick={() => { setDelegateSubmitted(true); props.respond({ approved: true }); }}
+                disabled={submitted}
+                onClick={() => {
+                  setSubmitted(true);
+                  props.respond({ accepted: true, steps: [] });
+                }}
               >
                 Approve
               </button>
               <button
                 type="button"
-                aria-label="Deny create_delegate"
+                aria-label={`Deny ${toolName}`}
                 className={styles.denyBtn}
-                disabled={delegateSubmitted}
-                onClick={() => { setDelegateSubmitted(true); props.respond({ approved: false }); }}
+                disabled={submitted}
+                onClick={() => {
+                  setSubmitted(true);
+                  props.respond({ accepted: false, steps: [] });
+                }}
               >
                 Deny
               </button>
@@ -123,98 +124,13 @@ function ChatPane({
       }
 
       // status === "complete"
-      const wasApproved = props.result?.approved === true || props.result === true;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const wasAccepted = (props.result as any)?.accepted === true;
       return (
         <div className={styles.approvalCard}>
           <div className={styles.approvalHeading}>
-            create_delegate — {wasApproved ? "approved" : "denied"}
+            {toolName} — {wasAccepted ? "approved" : "denied"}
           </div>
-          {props.result !== undefined && (
-            <pre className={styles.approvalResult}>{JSON.stringify(props.result, null, 2)}</pre>
-          )}
-        </div>
-      );
-    },
-  });
-
-  useHumanInTheLoop({
-    name: "create_document_access_rights",
-    description: "Create a document access right for a delegate",
-    parameters: [
-      { name: "delegate_id", type: "string", description: "Target delegate ID (DEL-YYYY-NNNN)" },
-      { name: "committee_id", type: "string", description: "Committee ID, e.g. 'EDU'" },
-      { name: "retroactive", type: "boolean", description: "Whether access applies to past documents" },
-    ],
-    render: (props) => {
-      if (props.status === "inProgress") {
-        return (
-          <div className={styles.approvalCard}>
-            <div className={styles.approvalHeading}>Approval required — create_document_access_rights</div>
-            <p className={styles.approvalStatus}>Preparing…</p>
-            {Object.keys(props.args).length > 0 && (
-              <dl className={styles.approvalArgs}>
-                {Object.entries(props.args).map(([k, v]) => (
-                  <div key={k} className={styles.approvalArgRow}>
-                    <dt className={styles.approvalArgKey}>{k}</dt>
-                    <dd className={styles.approvalArgVal}>{String(v)}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-            <div className={styles.approvalActions}>
-              <button type="button" aria-label="Approve create_document_access_rights" className={styles.approveBtn} disabled>Approve</button>
-              <button type="button" aria-label="Deny create_document_access_rights" className={styles.denyBtn} disabled>Deny</button>
-            </div>
-          </div>
-        );
-      }
-
-      if (props.status === "executing") {
-        return (
-          <div className={styles.approvalCard}>
-            <div className={styles.approvalHeading}>Approval required — create_document_access_rights</div>
-            <dl className={styles.approvalArgs}>
-              {Object.entries(props.args).map(([k, v]) => (
-                <div key={k} className={styles.approvalArgRow}>
-                  <dt className={styles.approvalArgKey}>{k}</dt>
-                  <dd className={styles.approvalArgVal}>{String(v)}</dd>
-                </div>
-              ))}
-            </dl>
-            <div className={styles.approvalActions}>
-              <button
-                type="button"
-                aria-label="Approve create_document_access_rights"
-                className={styles.approveBtn}
-                disabled={darSubmitted}
-                onClick={() => { setDarSubmitted(true); props.respond({ approved: true }); }}
-              >
-                Approve
-              </button>
-              <button
-                type="button"
-                aria-label="Deny create_document_access_rights"
-                className={styles.denyBtn}
-                disabled={darSubmitted}
-                onClick={() => { setDarSubmitted(true); props.respond({ approved: false }); }}
-              >
-                Deny
-              </button>
-            </div>
-          </div>
-        );
-      }
-
-      // status === "complete"
-      const wasApproved = props.result?.approved === true || props.result === true;
-      return (
-        <div className={styles.approvalCard}>
-          <div className={styles.approvalHeading}>
-            create_document_access_rights — {wasApproved ? "approved" : "denied"}
-          </div>
-          {props.result !== undefined && (
-            <pre className={styles.approvalResult}>{JSON.stringify(props.result, null, 2)}</pre>
-          )}
         </div>
       );
     },
