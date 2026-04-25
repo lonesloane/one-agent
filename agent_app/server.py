@@ -1,6 +1,7 @@
 """ONE-MP AG-UI FastAPI server — SSE endpoint and /api/delegates route."""
 
 import os
+from collections import OrderedDict
 from collections.abc import AsyncGenerator
 from typing import Any
 
@@ -20,9 +21,45 @@ from sqlalchemy.orm import joinedload
 from agent_app.agent import create_agent
 from shared.database import Delegate, get_engine
 
+
+class _ApprovalRegistry(OrderedDict):
+    """OrderedDict that normalises approval-registry keys to call_id only.
+
+    Reason: AgentFrameworkAgent registers approval requests under
+    ``{foundry_conv_id}:{call_id}`` (set *after* the first Foundry token
+    arrives), but validates them under ``{ui_thread_id}:{call_id}`` (set
+    *before* streaming starts from the UI's threadId).  The two prefixes
+    never match, so every approval is rejected as "no matching pending
+    approval request" (BUG-4C-003).
+
+    By stripping the prefix on every access we make both operations hit
+    the same underlying entry.  OpenAI call_ids (``call_<base64>``) never
+    contain ``:``, so the split is unambiguous.  ``OrderedDict`` is
+    preserved so the LRU eviction in ``_evict_oldest_approvals`` still
+    works without modification.
+    """
+
+    @staticmethod
+    def _key(k: str) -> str:
+        return k.split(":", 1)[-1] if ":" in k else k
+
+    def __setitem__(self, key: str, value: str) -> None:
+        super().__setitem__(self._key(key), value)
+
+    def __getitem__(self, key: str) -> str:
+        return super().__getitem__(self._key(key))
+
+    def __contains__(self, key: object) -> bool:
+        return super().__contains__(self._key(str(key)))
+
+    def __delitem__(self, key: str) -> None:
+        super().__delitem__(self._key(key))
+
+
 _DB_PATH: str = os.environ.get("DATABASE_PATH", "one_agent.db")
 _db_engine = get_engine(_DB_PATH)
 _agent: Agent | None = None
+_protocol_runner: AgentFrameworkAgent | None = None
 
 _CORS_ORIGINS: list[str] = os.environ.get(
     "CORS_ORIGINS", "http://localhost:3000"
@@ -139,6 +176,36 @@ def _get_agent() -> Agent:
     return _agent
 
 
+def _get_protocol_runner(delegate_id: str) -> AgentFrameworkAgent:
+    """Return the module-level AgentFrameworkAgent singleton.
+
+    The singleton is created on first call and reused across requests so
+    that ``_pending_approvals`` (populated when a ``function_approval_request``
+    event streams) survives the HITL round-trip to the approval POST.  A fresh
+    instance per request would lose the registry, causing approval validation
+    to fail and the approved tool call to be silently dropped (BUG-4C-002).
+
+    The per-request ``delegate_id`` is threaded in by updating ``.agent``
+    before each run; this is safe because FastAPI dispatches requests
+    sequentially within a single Uvicorn worker and the runner is not shared
+    across concurrent event-generator coroutines.
+
+    Args:
+        delegate_id: Identity of the acting delegate for this request.
+
+    Returns:
+        Singleton AgentFrameworkAgent with updated bound agent.
+    """
+    global _protocol_runner
+    bound = _BoundAgent(_get_agent(), delegate_id)
+    if _protocol_runner is None:
+        _protocol_runner = AgentFrameworkAgent(agent=bound)
+        _protocol_runner._pending_approvals = _ApprovalRegistry()
+    else:
+        _protocol_runner.agent = bound
+    return _protocol_runner
+
+
 @app.get("/api/delegates", response_model=list[DelegateOut])
 async def get_delegates() -> list[DelegateOut]:
     """Return all delegates sorted alphabetically by full_name.
@@ -195,8 +262,7 @@ async def agent_endpoint(request_body: AGUIRequest) -> StreamingResponse:
         input_data["messages"] = _fix_tool_call_ordering(
             input_data["messages"]
         )
-    bound = _BoundAgent(_get_agent(), delegate_id)
-    protocol_runner = AgentFrameworkAgent(agent=bound)
+    protocol_runner = _get_protocol_runner(delegate_id)
 
     async def event_generator() -> AsyncGenerator[str, None]:
         encoder = EventEncoder()

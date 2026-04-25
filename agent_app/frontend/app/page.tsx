@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CopilotChat,
   useAgent,
@@ -35,8 +35,14 @@ function ChatPane({
 
   // Reason: guard against double-submission; reset when thread resets.
   const [submitted, setSubmitted] = useState(false);
+  // Reason: runtimeConnectionStatus cycles Connected→running→Connected on every
+  // RUN_FINISHED.  Without a guard, the brief-start effect re-fires after each
+  // completed run (including the HITL approval run), sending a spurious "start"
+  // message that aborts the HITL before the user can click Approve.
+  const hasStartedRef = useRef(false);
   useEffect(() => {
     setSubmitted(false);
+    hasStartedRef.current = false;
   }, [threadId]);
 
   useDefaultRenderTool({
@@ -151,7 +157,16 @@ function ChatPane({
         CopilotKitCoreRuntimeConnectionStatus.Connected) {
       return;
     }
+    // Reason: runtimeConnectionStatus transitions back to Connected after
+    // every completed run.  Without this guard every RUN_FINISHED would
+    // re-fire the effect and append a new "start" message to the thread,
+    // which aborts any active HITL approval before the user can respond.
+    if (hasStartedRef.current) {
+      return;
+    }
     const timer = setTimeout(async () => {
+      if (hasStartedRef.current) return;
+      hasStartedRef.current = true;
       agent.setState({ delegate_id: delegateId });
       agent.addMessage({
         id: crypto.randomUUID(),
