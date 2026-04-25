@@ -144,3 +144,22 @@ def test_camel_case_tool_call_id_fallback() -> None:
     result = _fix_tool_call_ordering([user, tool_camel, asst])
 
     assert result == [user, asst, tool_camel]
+
+
+# ---------------------------------------------------------------------------
+# Case H — multiple tool results before a shared assistant, no duplicate
+# ---------------------------------------------------------------------------
+
+
+def test_multi_tool_results_before_shared_assistant_no_duplicate() -> None:
+    """When N tool results all precede their single shared assistant,
+    the assistant appears exactly once and precedes all its results."""
+    user = _make_user()
+    asst = _make_assistant(["c1", "c2"])
+    tool1 = _make_tool_result("c1")
+    tool2 = _make_tool_result("c2")
+
+    result = _fix_tool_call_ordering([user, tool1, tool2, asst])
+
+    assert result == [user, asst, tool1, tool2]
+    assert result.count(asst) == 1

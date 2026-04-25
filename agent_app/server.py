@@ -91,10 +91,10 @@ def _fix_tool_call_ordering(
     IDs that Foundry rejects with 400 (BUG-4C-001).
 
     Note:
-        Assumes the misorder is a contiguous group: the tool-result message
-        appears immediately before its owning assistant message with no unrelated
-        messages interspersed. Dry-run observation confirms this is the consistent
-        CopilotKit v2 pattern (ASSUMPTION-001).
+        The algorithm is index-based, so it correctly handles both adjacent and
+        non-contiguous misorderings. Dry-run observation confirms the consistent
+        CopilotKit v2 pattern is `[tool, assistant]` pairs (ASSUMPTION-001),
+        but the implementation is not limited to that shape.
 
     Args:
         messages: Raw AG-UI message list from request body.
@@ -117,7 +117,7 @@ def _fix_tool_call_ordering(
         if msg.get("role") == "tool":
             cid = str(msg.get("tool_call_id") or msg.get("toolCallId") or "")
             asst_idx = call_to_asst.get(cid, -1)
-            if asst_idx > i:
+            if asst_idx > i and asst_idx not in skip:
                 result.append(messages[asst_idx])
                 skip.add(asst_idx)
         result.append(msg)
