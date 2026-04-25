@@ -59,10 +59,10 @@ Spec: `docs/prd-phase4-write-agent.md` §3 (System Prompt Requirements),
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | In `agent_app/agent.py` add `## Persona Mode Selection` section to `SYSTEM_PROMPT`. Text: enumerate `DELEGATION_EDITOR`, `DELEGATION_HEAD`, `SECRETARIAT`; state that the current persona's role is available via the `role` field of `lookup_delegate(current_delegate_id)`; instruct the agent to branch create-side vs approver-side off that role. Note that approver-side detail is specified later. | | |
-| TASK-002 | Add `## Create Side (Delegation Editor)` section: elicitation steps, DAR rules, routing rules, HITL guard, failure-reporting rule ("If a write tool returns an error, surface the message and do not retry"). | | |
-| TASK-003 | Replace the Phase 3 `## Write Guard` block ("This agent has no write tools") with a new `## HITL Write Guard` block permitting write tools but mandating explicit HITL confirmation language. | | |
-| TASK-004 | Re-read `BRIEF_LOOKBACK_DAYS` constant — unchanged. | | |
+| TASK-001 | In `agent_app/agent.py` add `## Persona Mode Selection` section to `SYSTEM_PROMPT`. Text: enumerate `DELEGATION_EDITOR`, `DELEGATION_HEAD`, `SECRETARIAT`; state that the current persona's role is available via the `role` field of `lookup_delegate(current_delegate_id)`; instruct the agent to branch create-side vs approver-side off that role. Note that approver-side detail is specified later. | ✅ | 2026-04-25 |
+| TASK-002 | Add `## Create Side (Delegation Editor)` section: elicitation steps, DAR rules, routing rules, HITL guard, failure-reporting rule ("If a write tool returns an error, surface the message and do not retry"). | ✅ | 2026-04-25 |
+| TASK-003 | Replace the Phase 3 `## Write Guard` block ("This agent has no write tools") with a new `## HITL Write Guard` block permitting write tools but mandating explicit HITL confirmation language. | ✅ | 2026-04-25 |
+| TASK-004 | Re-read `BRIEF_LOOKBACK_DAYS` constant — unchanged. | ✅ | 2026-04-25 |
 
 ### Implementation Phase 2 — End-to-end smoke
 
