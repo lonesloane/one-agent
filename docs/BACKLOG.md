@@ -175,16 +175,29 @@
 ## Phase 4 — Agent App (Write Agent — UC2)
 > "The Write Agent with Reasoning" — delegate creation with DAR + approver flow (option B, see DECISIONS 2026-04-24)
 
-### Create side (delegate editor persona)
-- [ ] Implement write tools: `create_delegate`, `create_document_access_rights` (with `approval_mode="always_require"`)
-- [ ] Agent reasons through DAR business rules (membership type -> access level -> approval routing)
-- [ ] Human-in-the-loop confirmation flow via AG-UI `user_input_requests`
-- [ ] Audit trail captures full chain of reasoning and approvals
+### Phase 4A — Write Tools ✓ (2026-04-25, merged 8280471) — [plan](../plan/completed/feature-phase4a-create-write-tools-1.md)
+- [x] Implement write tools `create_delegate` + `create_document_access_rights` with `approval_mode="always_require"`
+- [x] FunctionInvocationContext editor identity threading; same-delegation constraint enforced at tool boundary
+- [x] Explicit rollback in `create_delegate` (REQ-005 symmetry); unknown-delegation no-side-effect tests
+- [x] 195 tests passing
+
+### Phase 4B — Server Wiring + System Prompt ✓ (2026-04-25, merged 6fb4fed) — [plan](../plan/feature-phase4b-create-server-prompt-1.md)
+- [x] SYSTEM_PROMPT extended: `## Persona Mode Selection`, `## Create Side (Delegation Editor)`, `## HITL Write Guard`
+- [x] Selection algorithm names every seeded role (DELEGATE, DELEGATION_EDITOR) explicitly + disclaimer for deferred approver roles
+- [x] `_serialize_delegate_profile` exposes `role` via `DelegateRole.value`; `whoami` short-circuit also returns `role: None`
+- [x] Prompt regression test (`tests/agent_app/test_system_prompt.py`, 7 tests guarding required sections + role branches)
+- [x] Live SSE smoke against `uvicorn agent_app.server:app`: HITL approval-request event fires before any DB write
+- [x] 243 tests passing
+
+### Create side — remaining
+- [ ] **Phase 4C** — Frontend HITL dialog rendering (CopilotKit `always_require` out-of-box, verify in browser)
+- [ ] **Phase 4D** — Integration tests (5 DAR scenarios) + create-side doc closure
 - [ ] Test: member delegate creation (General + Restricted access)
 - [ ] Test: partner delegate creation (General only)
 - [ ] Test: partner + Framework Agreement (elevated access)
 - [ ] Test: Confidential access request (secretariat approval)
 - [ ] Test: retroactive access request (secretariat approval)
+- [ ] Tighten prompt for create→DAR sequencing (smoke surfaced model issuing both calls in parallel with stale `delegate_id`)
 
 ### Approver side (delegation head / secretariat persona) — OQ-9 resolution
 - [ ] Seed a delegation-head persona (role=DELEGATION_HEAD) and a secretariat persona
