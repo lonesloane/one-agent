@@ -186,6 +186,7 @@ def whoami(ctx: FunctionInvocationContext) -> str:
                 "id": None,
                 "full_name": None,
                 "delegation_id": None,
+                "role": None,
                 "committees": [],
                 "access_rights": [],
             }

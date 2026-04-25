@@ -273,6 +273,7 @@ class TestWhoami:
         assert data["delegation_id"] is None
         assert data["committees"] == []
         assert data["access_rights"] == []
+        assert data["role"] is None
 
     def test_returns_role_field_as_enum_string(self, engine: object) -> None:
         """whoami() result includes a 'role' key with the DelegateRole enum string."""
