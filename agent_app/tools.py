@@ -1,4 +1,4 @@
-"""ONE-MP Read Agent — DB-backed tool wrappers."""
+"""ONE-MP Agent — DB-backed tool wrappers (read + write)."""
 
 import json
 import os
@@ -10,9 +10,13 @@ from pydantic import Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session as _Session
 
+from classical_app.routes.wizard_helpers import (
+    _generate_delegate_id as _next_delegate_id,
+)
 from shared.business_rules import get_visible_agenda_documents
 from shared.database import (
     Delegate,
+    DelegateRole,
     Delegation,
     Meeting,
     delegate_committees,
@@ -265,6 +269,142 @@ def get_agenda_documents(
                 }
                 for doc in documents
             ]
+        )
+
+
+def _assert_editor(
+    ctx: FunctionInvocationContext, session: _Session
+) -> Delegate:
+    """Verify the current delegate holds the DELEGATION_EDITOR role.
+
+    Args:
+        ctx: Runtime context providing delegate_id via kwargs injection.
+        session: Active SQLAlchemy session.
+
+    Returns:
+        The loaded Delegate ORM object for the current session.
+
+    Raises:
+        PermissionError: If no delegate_id is present in context or if the
+            delegate's role is not DELEGATION_EDITOR.
+    """
+    delegate_id = ctx.kwargs.get("delegate_id", "")
+    if not delegate_id:
+        raise PermissionError(
+            "Only delegation editors can create delegates/DARs"
+        )
+    delegate = session.get(Delegate, delegate_id)
+    if delegate is None or delegate.role != DelegateRole.DELEGATION_EDITOR:
+        raise PermissionError(
+            "Only delegation editors can create delegates/DARs"
+        )
+    return delegate
+
+
+# Reason: approval_mode="always_require" enforces HITL confirmation for all
+# write operations that mutate the database.
+@tool(approval_mode="always_require")
+def create_delegate(
+    full_name: Annotated[
+        str, Field(description="Full name of the new delegate")
+    ],
+    email: Annotated[
+        str, Field(description="Email address of the new delegate")
+    ],
+    function: Annotated[
+        str,
+        Field(description="Function or job title of the new delegate"),
+    ],
+    delegation_id: Annotated[
+        str,
+        Field(
+            description="Delegation ID the delegate belongs to (e.g. 'FRA')"
+        ),
+    ],
+    role: Annotated[
+        str,
+        Field(
+            description=(
+                "Role for the new delegate: 'DELEGATE' or 'DELEGATION_EDITOR'. "
+                "Defaults to 'DELEGATE'."
+            ),
+            default="DELEGATE",
+        ),
+    ] = "DELEGATE",
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Create a new delegate within a delegation.
+
+    Requires the calling session delegate to hold the DELEGATION_EDITOR role.
+    Generates the next sequential DEL-YYYY-NNNN ID automatically and sets
+    accreditation_date to the current UTC timestamp.
+
+    Args:
+        full_name: Full name of the delegate to create.
+        email: Email address for the new delegate.
+        function: Function or job title (required by schema).
+        delegation_id: Parent delegation identifier.
+        role: DelegateRole value string; defaults to ``"DELEGATE"``.
+        ctx: Runtime context providing delegate_id via kwargs injection.
+
+    Returns:
+        JSON string with keys: id, full_name, delegation_id, role on success.
+        JSON error structure ``{"error": ..., "delegation_id": ...}`` when the
+        target delegation does not exist or a permission check fails.
+    """
+    with _Session(_engine) as session:
+        try:
+            _assert_editor(ctx, session)
+        except PermissionError as exc:
+            return json.dumps(
+                {"error": str(exc), "delegation_id": delegation_id}
+            )
+
+        delegation = session.get(Delegation, delegation_id)
+        if delegation is None:
+            return json.dumps(
+                {
+                    "error": f"Delegation '{delegation_id}' not found",
+                    "delegation_id": delegation_id,
+                }
+            )
+
+        try:
+            delegate_role = DelegateRole(role)
+        except ValueError:
+            return json.dumps(
+                {
+                    "error": (
+                        f"Invalid role '{role}'. "
+                        f"Must be one of: {[r.value for r in DelegateRole]}"
+                    ),
+                    "delegation_id": delegation_id,
+                }
+            )
+
+        new_id = _next_delegate_id(session)
+        # Reason: strip tzinfo to match SQLite naive-datetime convention used
+        # throughout the codebase (mirrors get_upcoming_meetings pattern).
+        now = datetime.now(UTC).replace(tzinfo=None)
+        new_delegate = Delegate(
+            id=new_id,
+            full_name=full_name,
+            email=email,
+            function=function,
+            delegation_id=delegation_id,
+            accreditation_date=now,
+            role=delegate_role,
+        )
+        session.add(new_delegate)
+        session.commit()
+
+        return json.dumps(
+            {
+                "id": new_id,
+                "full_name": full_name,
+                "delegation_id": delegation_id,
+                "role": delegate_role.value,
+            }
         )
 
 
