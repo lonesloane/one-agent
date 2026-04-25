@@ -360,6 +360,7 @@ def create_delegate(
     Raises:
         PermissionError: If the calling delegate is not a DELEGATION_EDITOR or
             attempts to create a delegate in a different delegation.
+        SQLAlchemyError: Re-raised after rollback if any DB operation fails.
     """
     with _Session(_engine) as session:
         editor = _assert_editor(ctx, session)
@@ -406,8 +407,12 @@ def create_delegate(
             accreditation_date=now,
             role=delegate_role,
         )
-        session.add(new_delegate)
-        session.commit()
+        try:
+            session.add(new_delegate)
+            session.commit()
+        except SQLAlchemyError:
+            session.rollback()
+            raise
 
         return json.dumps(
             {
