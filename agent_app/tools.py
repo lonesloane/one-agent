@@ -1,4 +1,4 @@
-"""ONE-MP Read Agent — DB-backed tool wrappers."""
+"""ONE-MP Agent — DB-backed tool wrappers (read + write)."""
 
 import json
 import os
@@ -8,12 +8,22 @@ from typing import Annotated
 from agent_framework import FunctionInvocationContext, tool
 from pydantic import Field
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session as _Session
 
-from shared.business_rules import get_visible_agenda_documents
+from classical_app.routes.wizard_helpers import (
+    _generate_delegate_id as _next_delegate_id,
+)
+from shared.business_rules import (
+    compute_default_access_level,
+    determine_approval_route,
+    get_visible_agenda_documents,
+)
 from shared.database import (
     Delegate,
+    DelegateRole,
     Delegation,
+    DocumentAccessRight,
     Meeting,
     delegate_committees,
     get_engine,
@@ -268,10 +278,271 @@ def get_agenda_documents(
         )
 
 
+def _assert_editor(
+    ctx: FunctionInvocationContext, session: _Session
+) -> Delegate:
+    """Verify the current delegate holds the DELEGATION_EDITOR role.
+
+    Args:
+        ctx: Runtime context providing delegate_id via kwargs injection.
+        session: Active SQLAlchemy session.
+
+    Returns:
+        The loaded Delegate ORM object for the current session.
+
+    Raises:
+        PermissionError: If no delegate_id is present in context or if the
+            delegate's role is not DELEGATION_EDITOR.
+    """
+    delegate_id = ctx.kwargs.get("delegate_id", "") if ctx is not None else ""
+    if not delegate_id:
+        raise PermissionError(
+            "Only delegation editors can create delegates/DARs"
+        )
+    delegate = session.get(Delegate, delegate_id)
+    if delegate is None or delegate.role != DelegateRole.DELEGATION_EDITOR:
+        raise PermissionError(
+            "Only delegation editors can create delegates/DARs"
+        )
+    return delegate
+
+
+# Reason: approval_mode="always_require" enforces HITL confirmation for all
+# write operations that mutate the database.
+@tool(approval_mode="always_require")
+def create_delegate(
+    full_name: Annotated[
+        str, Field(description="Full name of the new delegate")
+    ],
+    email: Annotated[
+        str, Field(description="Email address of the new delegate")
+    ],
+    function: Annotated[
+        str,
+        Field(description="Function or job title of the new delegate"),
+    ],
+    delegation_id: Annotated[
+        str,
+        Field(
+            description="Delegation ID the delegate belongs to (e.g. 'FRA')"
+        ),
+    ],
+    role: Annotated[
+        str,
+        Field(
+            description=(
+                "Role for the new delegate: 'DELEGATE' or 'DELEGATION_EDITOR'. "
+                "Defaults to 'DELEGATE'."
+            ),
+        ),
+    ] = "DELEGATE",
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Create a new delegate within a delegation.
+
+    Requires the calling session delegate to hold the DELEGATION_EDITOR role.
+    Generates the next sequential DEL-YYYY-NNNN ID automatically and sets
+    accreditation_date to the current UTC timestamp.
+
+    Args:
+        full_name: Full name of the delegate to create.
+        email: Email address for the new delegate.
+        function: Function or job title (required by schema).
+        delegation_id: Parent delegation identifier.
+        role: DelegateRole value string; defaults to ``"DELEGATE"``.
+        ctx: Runtime context providing delegate_id via kwargs injection.
+
+    Returns:
+        JSON string with keys: id, full_name, delegation_id, role on success.
+        JSON error structure ``{"error": ..., "delegation_id": ...}`` when the
+        target delegation does not exist or the role value is invalid.
+
+    Raises:
+        PermissionError: If the calling delegate is not a DELEGATION_EDITOR or
+            attempts to create a delegate in a different delegation.
+        SQLAlchemyError: Re-raised after rollback if any DB operation fails.
+    """
+    with _Session(_engine) as session:
+        editor = _assert_editor(ctx, session)
+
+        delegation = session.get(Delegation, delegation_id)
+        if delegation is None:
+            return json.dumps(
+                {
+                    "error": f"Delegation '{delegation_id}' not found",
+                    "delegation_id": delegation_id,
+                }
+            )
+
+        # Reason: editors may only create resources within their own delegation;
+        # cross-delegation writes are a privilege escalation vector.
+        if editor.delegation_id != delegation_id:
+            raise PermissionError(
+                "Editors can only create resources within their own delegation"
+            )
+
+        try:
+            delegate_role = DelegateRole(role)
+        except ValueError:
+            return json.dumps(
+                {
+                    "error": (
+                        f"Invalid role '{role}'. "
+                        f"Must be one of: {[r.value for r in DelegateRole]}"
+                    ),
+                    "delegation_id": delegation_id,
+                }
+            )
+
+        new_id = _next_delegate_id(session)
+        # Reason: strip tzinfo to match SQLite naive-datetime convention used
+        # throughout the codebase (mirrors get_upcoming_meetings pattern).
+        now = datetime.now(UTC).replace(tzinfo=None)
+        new_delegate = Delegate(
+            id=new_id,
+            full_name=full_name,
+            email=email,
+            function=function,
+            delegation_id=delegation_id,
+            accreditation_date=now,
+            role=delegate_role,
+        )
+        try:
+            session.add(new_delegate)
+            session.commit()
+        except SQLAlchemyError:
+            session.rollback()
+            raise
+
+        return json.dumps(
+            {
+                "id": new_id,
+                "full_name": full_name,
+                "delegation_id": delegation_id,
+                "role": delegate_role.value,
+            }
+        )
+
+
+# Reason: approval_mode="always_require" enforces HITL confirmation for all
+# write operations that mutate the database.
+@tool(approval_mode="always_require")
+def create_document_access_rights(
+    delegate_id: Annotated[
+        str, Field(description="Target delegate ID (DEL-YYYY-NNNN)")
+    ],
+    committee_id: Annotated[
+        str, Field(description="Committee ID, e.g. 'EDU'")
+    ],
+    retroactive: Annotated[
+        bool,
+        Field(
+            description="Whether access applies to past documents",
+            default=False,
+        ),
+    ] = False,
+    ctx: FunctionInvocationContext = None,
+) -> str:
+    """Create a Document Access Right for a delegate in a committee.
+
+    Requires the calling session delegate to hold the DELEGATION_EDITOR role.
+    Derives ``classification_level`` via ``compute_default_access_level`` and
+    ``approval_status`` via ``determine_approval_route`` — never hard-codes
+    routing logic.
+
+    Args:
+        delegate_id: Target delegate to grant access to.
+        committee_id: Committee for which access is requested.
+        retroactive: If True, access applies to past documents; routes to
+            secretariat approval regardless of classification.
+        ctx: Runtime context providing delegate_id via kwargs injection.
+
+    Returns:
+        JSON string with keys: id, delegate_id, committee_id,
+        classification_level, approval_status, retroactive on success.
+        JSON error structure ``{"error": ..., "delegate_id": ...}`` when the
+        target delegate does not exist.
+
+    Raises:
+        PermissionError: If the calling delegate is not a DELEGATION_EDITOR or
+            attempts to create a DAR for a delegate in a different delegation.
+        SQLAlchemyError: Re-raised after rollback if any DB operation fails.
+    """
+    with _Session(_engine) as session:
+        editor = _assert_editor(ctx, session)
+
+        delegate = session.get(Delegate, delegate_id)
+        if delegate is None:
+            return json.dumps(
+                {
+                    "error": f"Delegate '{delegate_id}' not found",
+                    "delegate_id": delegate_id,
+                }
+            )
+
+        # Reason: editors may only create resources within their own delegation;
+        # cross-delegation writes are a privilege escalation vector.
+        if editor.delegation_id != delegate.delegation_id:
+            raise PermissionError(
+                "Editors can only create resources within their own delegation"
+            )
+
+        delegation = session.get(Delegation, delegate.delegation_id)
+        if delegation is None:
+            return json.dumps(
+                {
+                    "error": f"Delegation '{delegate.delegation_id}' not found",
+                    "delegate_id": delegate_id,
+                }
+            )
+        framework_agreements = list(delegation.framework_agreements)
+
+        level = compute_default_access_level(
+            delegation.membership_type, committee_id, framework_agreements
+        )
+        status = determine_approval_route(level, retroactive)
+
+        # Reason: strip tzinfo to match SQLite naive-datetime convention used
+        # throughout the codebase.
+        now = datetime.now(UTC).replace(tzinfo=None)
+
+        dar = DocumentAccessRight(
+            delegate_id=delegate_id,
+            committee_id=committee_id,
+            classification_level=level,
+            retroactive=retroactive,
+            approval_status=status,
+            created_at=now,
+            created_by=editor.id,
+        )
+        try:
+            session.add(dar)
+            # Reason: flush() populates dar.id from the autoincrement sequence so the
+            # JSON response can include it before the session closes.
+            session.flush()
+            session.commit()
+        except SQLAlchemyError:
+            session.rollback()
+            raise
+
+        return json.dumps(
+            {
+                "id": dar.id,
+                "delegate_id": delegate_id,
+                "committee_id": committee_id,
+                "classification_level": level.value,
+                "approval_status": status.value,
+                "retroactive": retroactive,
+            }
+        )
+
+
 ALL_TOOLS: list[object] = [
     get_delegation_info,
     lookup_delegate,
     whoami,
     get_upcoming_meetings,
     get_agenda_documents,
+    create_delegate,
+    create_document_access_rights,
 ]
