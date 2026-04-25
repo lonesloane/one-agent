@@ -274,6 +274,36 @@ class TestWhoami:
         assert data["committees"] == []
         assert data["access_rights"] == []
 
+    def test_returns_role_field_as_enum_string(self, engine: object) -> None:
+        """whoami() result includes a 'role' key with the DelegateRole enum string."""
+        with Session(engine) as sess:
+            sess.add(
+                Delegation(
+                    id="DEU",
+                    name="Germany",
+                    membership_type=MembershipType.MEMBER,
+                )
+            )
+            delegate = Delegate(
+                id="DEL-T99",
+                full_name="Editor User",
+                email="editor@test.com",
+                function="Editor",
+                delegation_id="DEU",
+                accreditation_date=datetime(2026, 1, 1),
+                role=DelegateRole.DELEGATION_EDITOR,
+            )
+            sess.add(delegate)
+            sess.commit()
+
+        ctx = MagicMock()
+        ctx.kwargs = {"delegate_id": "DEL-T99"}
+        with patch("agent_app.tools._engine", engine):
+            result = whoami(ctx)
+
+        data = json.loads(result)
+        assert data["role"] == "DELEGATION_EDITOR"
+
 
 # -- Class 4: TestGetUpcomingMeetings -----------------------------------------
 

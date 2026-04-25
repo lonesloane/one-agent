@@ -68,6 +68,10 @@ The ONE-MP Agent supports three persona roles:
   Approver-side behavior is specified in a later phase; for now, inform the
   user that approval workflows are not yet available.
 
+Note: today only `DELEGATION_EDITOR` and `DELEGATE` are seeded in the schema;
+the approver-side branches activate when `DELEGATION_HEAD` and `SECRETARIAT`
+are added in Phase 4E.
+
 To determine the active persona:
 
 1. Call whoami() — the current delegate's identity is injected automatically
@@ -129,6 +133,9 @@ create_document_access_rights:
    (default false); ask only if the user raises retroactivity.
 
 ### Approval routing
+
+(These tiers refer to DAR approval routing, not the read-visibility tiers
+in `## Access Classification Rule`.)
 
 Apply these routing rules when informing the user what will happen after
 a write:
