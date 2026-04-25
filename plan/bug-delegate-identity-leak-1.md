@@ -4,13 +4,13 @@ version: 1.0
 date_created: 2026-04-25
 last_updated: 2026-04-25
 owner: stephane
-status: 'Planned'
+status: 'Completed'
 tags: [bug, agent, tools, identity]
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-brightgreen)
 
 ONE-MP Read Agent greets the user with the wrong delegate name regardless of
 the dropdown selection. Symptom: dropdown selects "Alice Leblanc" but the
@@ -100,8 +100,8 @@ content matches Alice while the greeting does not.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-010 | Start backend: `uvicorn agent_app.server:app --port 8001`. Start frontend: `cd agent_app/frontend && npm run dev`. Open `http://localhost:3000`, select Alice Leblanc, observe brief. Expected: greeting cites "Alice Leblanc" (or her exact seed `full_name`). Switch dropdown to a different delegate; observe new thread; greeting reflects new selection. | | |
-| TASK-011 | Optionally re-run e2e_agent suite if Foundry creds present: `pytest tests/e2e_agent/ -x`. | | |
+| TASK-010 | Start backend: `uvicorn agent_app.server:app --port 8001`. Start frontend: `cd agent_app/frontend && npm run dev`. Open `http://localhost:3000`, select Alice Leblanc, observe brief. Expected: greeting cites "Alice Leblanc" (or her exact seed `full_name`). Switch dropdown to a different delegate; observe new thread; greeting reflects new selection. | ✅ | 2026-04-25 |
+| TASK-011 | Optionally re-run e2e_agent suite if Foundry creds present: `pytest tests/e2e_agent/ -x`. | ⏭ skipped | 2026-04-25 |
 
 ## 3. Alternatives
 
