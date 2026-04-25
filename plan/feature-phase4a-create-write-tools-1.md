@@ -3,13 +3,13 @@ goal: Phase 4A — create-side write tools (create_delegate, create_document_acc
 version: 1.0
 date_created: 2026-04-24
 owner: Stephane
-status: 'Done'
+status: 'Completed'
 tags: [feature, phase4, agent, write-tools, hitl]
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-brightgreen)
 
 Phase 4A delivers the two create-side HITL write tools in `agent_app/tools.py`
 with `approval_mode="always_require"`, editor identity injected via
