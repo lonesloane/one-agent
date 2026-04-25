@@ -455,7 +455,7 @@ def create_document_access_rights(
         SQLAlchemyError: Re-raised after rollback if any DB operation fails.
     """
     with _Session(_engine) as session:
-        _assert_editor(ctx, session)
+        editor = _assert_editor(ctx, session)
 
         delegate = session.get(Delegate, delegate_id)
         if delegate is None:
@@ -467,6 +467,13 @@ def create_document_access_rights(
             )
 
         delegation = session.get(Delegation, delegate.delegation_id)
+        if delegation is None:
+            return json.dumps(
+                {
+                    "error": f"Delegation '{delegate.delegation_id}' not found",
+                    "delegate_id": delegate_id,
+                }
+            )
         framework_agreements = list(delegation.framework_agreements)
 
         level = compute_default_access_level(
@@ -477,7 +484,6 @@ def create_document_access_rights(
         # Reason: strip tzinfo to match SQLite naive-datetime convention used
         # throughout the codebase.
         now = datetime.now(UTC).replace(tzinfo=None)
-        editor_id = ctx.kwargs.get("delegate_id", "")
 
         dar = DocumentAccessRight(
             delegate_id=delegate_id,
@@ -486,10 +492,12 @@ def create_document_access_rights(
             retroactive=retroactive,
             approval_status=status,
             created_at=now,
-            created_by=editor_id,
+            created_by=editor.id,
         )
         try:
             session.add(dar)
+            # Reason: flush() populates dar.id from the autoincrement sequence so the
+            # JSON response can include it before the session closes.
             session.flush()
             session.commit()
         except SQLAlchemyError:
