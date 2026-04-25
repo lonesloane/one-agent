@@ -1,6 +1,7 @@
 """Unit tests for agent_app/tools.py — DB-backed tool wrappers."""
+
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,6 +12,7 @@ from agent_app.tools import (
     get_delegation_info,
     get_upcoming_meetings,
     lookup_delegate,
+    whoami,
 )
 from shared.database import (
     ApprovalStatus,
@@ -28,7 +30,7 @@ from shared.database import (
 
 # -- Helpers ------------------------------------------------------------------
 
-_NOW = datetime.now(timezone.utc).replace(tzinfo=None)
+_NOW = datetime.now(UTC).replace(tzinfo=None)
 
 
 def _make_delegate(
@@ -87,12 +89,14 @@ class TestGetDelegationInfo:
                 )
             )
             sess.add(
-                _make_delegate("DEL-T1", "Alice Test", "a@test.com",
-                               "Head", "FRA")
+                _make_delegate(
+                    "DEL-T1", "Alice Test", "a@test.com", "Head", "FRA"
+                )
             )
             sess.add(
-                _make_delegate("DEL-T2", "Bob Test", "b@test.com",
-                               "Delegate", "FRA")
+                _make_delegate(
+                    "DEL-T2", "Bob Test", "b@test.com", "Delegate", "FRA"
+                )
             )
             sess.commit()
 
@@ -123,9 +127,7 @@ class TestGetDelegationInfo:
 class TestLookupDelegate:
     """Tests for the lookup_delegate tool."""
 
-    def test_found_with_committees_and_dars(
-        self, engine: object
-    ) -> None:
+    def test_found_with_committees_and_dars(self, engine: object) -> None:
         """Known delegate returns full profile with committees and DARs."""
         with Session(engine) as sess:
             sess.add(
@@ -148,7 +150,9 @@ class TestLookupDelegate:
             ]
             sess.add(
                 _make_dar(
-                    1, "DEL-T1", "EDU",
+                    1,
+                    "DEL-T1",
+                    "EDU",
                     ClassificationLevel.RESTRICTED,
                 )
             )
@@ -163,10 +167,7 @@ class TestLookupDelegate:
         committee_ids = [c["id"] for c in data["committees"]]
         assert "EDU" in committee_ids
         assert len(data["access_rights"]) == 1
-        assert (
-            data["access_rights"][0]["classification_level"]
-            == "RESTRICTED"
-        )
+        assert data["access_rights"][0]["classification_level"] == "RESTRICTED"
 
     def test_unknown_delegate_id_returns_null_filled(
         self, engine: object
@@ -180,8 +181,101 @@ class TestLookupDelegate:
         assert data["committees"] == []
         assert data["access_rights"] == []
 
+    def test_does_not_consult_ctx(self, engine: object) -> None:
+        """lookup_delegate accepts no ctx parameter and ignores session state."""
+        with Session(engine) as sess:
+            sess.add(
+                Delegation(
+                    id="FRA",
+                    name="France",
+                    membership_type=MembershipType.MEMBER,
+                )
+            )
+            sess.add(
+                _make_delegate(
+                    "DEL-T1", "Alice Test", "a@test.com", "Head", "FRA"
+                )
+            )
+            sess.commit()
 
-# -- Class 3: TestGetUpcomingMeetings -----------------------------------------
+        with patch("agent_app.tools._engine", engine):
+            result = lookup_delegate("DEL-T1")
+
+        data = json.loads(result)
+        assert data["id"] == "DEL-T1"
+        assert data["full_name"] == "Alice Test"
+
+
+# -- Class 3: TestWhoami ------------------------------------------------------
+
+
+class TestWhoami:
+    """Tests for the whoami tool (ctx-injected delegate identity)."""
+
+    def test_returns_current_delegate_profile_via_ctx(
+        self, engine: object
+    ) -> None:
+        """Ctx-injected delegate_id returns full profile with committees and DARs."""
+        with Session(engine) as sess:
+            sess.add(
+                Delegation(
+                    id="FRA",
+                    name="France",
+                    membership_type=MembershipType.MEMBER,
+                )
+            )
+            sess.add(Committee(id="EDU", name="Education Committee"))
+            sess.add(Committee(id="TRADE", name="Trade Committee"))
+            delegate = _make_delegate(
+                "DEL-T1", "Alice Test", "a@test.com", "Head", "FRA"
+            )
+            sess.add(delegate)
+            sess.flush()
+            delegate.committees = [
+                sess.get(Committee, "EDU"),
+                sess.get(Committee, "TRADE"),
+            ]
+            sess.add(
+                _make_dar(
+                    1,
+                    "DEL-T1",
+                    "EDU",
+                    ClassificationLevel.RESTRICTED,
+                )
+            )
+            sess.commit()
+
+        ctx = MagicMock()
+        ctx.kwargs = {"delegate_id": "DEL-T1"}
+        with patch("agent_app.tools._engine", engine):
+            result = whoami(ctx)
+
+        data = json.loads(result)
+        assert data["full_name"] == "Alice Test"
+        assert data["delegation_id"] == "FRA"
+        committee_ids = [c["id"] for c in data["committees"]]
+        assert "EDU" in committee_ids
+        assert len(data["access_rights"]) == 1
+        assert data["access_rights"][0]["classification_level"] == "RESTRICTED"
+
+    def test_missing_delegate_id_in_ctx_returns_null_filled(
+        self, engine: object
+    ) -> None:
+        """Empty delegate_id in ctx returns null-filled structure."""
+        ctx = MagicMock()
+        ctx.kwargs = {"delegate_id": ""}
+        with patch("agent_app.tools._engine", engine):
+            result = whoami(ctx)
+
+        data = json.loads(result)
+        assert data["id"] is None
+        assert data["full_name"] is None
+        assert data["delegation_id"] is None
+        assert data["committees"] == []
+        assert data["access_rights"] == []
+
+
+# -- Class 4: TestGetUpcomingMeetings -----------------------------------------
 
 
 class TestGetUpcomingMeetings:
@@ -317,9 +411,7 @@ class TestGetUpcomingMeetings:
 
         assert json.loads(result) == []
 
-    def test_empty_delegate_id_returns_empty(
-        self, engine: object
-    ) -> None:
+    def test_empty_delegate_id_returns_empty(self, engine: object) -> None:
         """Empty delegate_id in context returns empty list."""
         with Session(engine) as sess:
             self._setup_meetings(sess)
@@ -332,7 +424,7 @@ class TestGetUpcomingMeetings:
         assert json.loads(result) == []
 
 
-# -- Class 4: TestGetAgendaDocuments ------------------------------------------
+# -- Class 5: TestGetAgendaDocuments ------------------------------------------
 
 
 class TestGetAgendaDocuments:
@@ -349,9 +441,7 @@ class TestGetAgendaDocuments:
         )
         session.add(Committee(id="EDU", name="Education Committee"))
         session.add(
-            _make_delegate(
-                "DEL-T1", "Alice Test", "a@test.com", "Head", "FRA"
-            )
+            _make_delegate("DEL-T1", "Alice Test", "a@test.com", "Head", "FRA")
         )
         session.add(
             _make_delegate(
@@ -411,7 +501,9 @@ class TestGetAgendaDocuments:
             self._setup_base(sess)
             sess.add(
                 _make_dar(
-                    1, "DEL-T1", "EDU",
+                    1,
+                    "DEL-T1",
+                    "EDU",
                     ClassificationLevel.GENERAL,
                 )
             )
@@ -435,7 +527,9 @@ class TestGetAgendaDocuments:
             self._setup_base(sess)
             sess.add(
                 _make_dar(
-                    2, "DEL-T2", "EDU",
+                    2,
+                    "DEL-T2",
+                    "EDU",
                     ClassificationLevel.RESTRICTED,
                 )
             )
@@ -466,15 +560,15 @@ class TestGetAgendaDocuments:
 
         assert json.loads(result) == []
 
-    def test_empty_meeting_returns_empty(
-        self, engine: object
-    ) -> None:
+    def test_empty_meeting_returns_empty(self, engine: object) -> None:
         """Non-existent meeting ID returns empty list."""
         with Session(engine) as sess:
             self._setup_base(sess)
             sess.add(
                 _make_dar(
-                    1, "DEL-T1", "EDU",
+                    1,
+                    "DEL-T1",
+                    "EDU",
                     ClassificationLevel.GENERAL,
                 )
             )
@@ -487,9 +581,7 @@ class TestGetAgendaDocuments:
 
         assert json.loads(result) == []
 
-    def test_empty_delegate_id_returns_empty(
-        self, engine: object
-    ) -> None:
+    def test_empty_delegate_id_returns_empty(self, engine: object) -> None:
         """Empty delegate_id in context returns empty list."""
         with Session(engine) as sess:
             self._setup_base(sess)
