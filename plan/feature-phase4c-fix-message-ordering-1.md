@@ -3,13 +3,13 @@ goal: Fix BUG-4C-001 — tool-result / tool-call message misordering that causes
 version: 1.0
 date_created: 2026-04-25
 owner: Stephane
-status: 'Planned'
+status: 'Completed'
 tags: [bug, phase4, agent_app, server, copilotkit]
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-brightgreen)
 
 CopilotKit v2 reconstructs AG-UI conversation history with `tool` (result)
 messages appearing **before** the `assistant` message that contains the
@@ -92,7 +92,7 @@ Spec: `docs/BACKLOG.md` § Phase 4C dry-run findings — BUG-4C-001.
 |------|-------------|-----------|------|
 | TASK-007 | Start backend: `uvicorn agent_app.server:app --port 8001 --reload`. Start frontend: `cd agent_app/frontend && npm run dev` (port 3000). Pick a `DELEGATION_EDITOR` persona, wait for the brief to complete. Send a follow-up message ("What documents are new?"). Confirm: no `RUN_ERROR` event in the SSE stream; the chat pane shows an agent reply. | | |
 | TASK-008 | Send a delegate-creation request ("Create a new delegate named Test User, email test@example.com, in delegation FRA, role DELEGATE."). Confirm the agent follows up with HITL tool-call step (approval dialog or prompt, depending on CopilotKit v2 rendering). Record whether FINDING-4C-002 (no `useHumanInTheLoop` hook) also needs action or auto-renders. | | |
-| TASK-009 | Update `docs/BACKLOG.md` § "Phase 4C dry-run findings": mark BUG-4C-001 resolved with fix summary (`_fix_tool_call_ordering` in `server.py`); update FINDING-4C-002 with verification result from TASK-008. | | |
+| TASK-009 | ✅ | 2026-04-25 | Update `docs/BACKLOG.md` § "Phase 4C dry-run findings": mark BUG-4C-001 resolved with fix summary (`_fix_tool_call_ordering` in `server.py`); update FINDING-4C-002 with verification result from TASK-008. |
 
 ## 3. Alternatives
 
