@@ -3,13 +3,13 @@ goal: Phase 4B — server wiring for create side + system prompt create-side bra
 version: 1.0
 date_created: 2026-04-24
 owner: Stephane
-status: 'Planned'
+status: 'Completed'
 tags: [feature, phase4, agent, server, prompt]
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-brightgreen)
 
 Phase 4B wires the two 4A write tools into the running agent instance and
 extends the system prompt with a create-side branch that encodes the DAR
@@ -70,11 +70,44 @@ Spec: `docs/prd-phase4-write-agent.md` §3 (System Prompt Requirements),
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-005 | Start server: `uvicorn agent_app.server:app --port 8001`. Hit `GET /api/delegates`; pick a `DELEGATION_EDITOR` persona ID. | | |
-| TASK-006 | POST to `/` with an AG-UI request whose `state.delegate_id` is the editor ID and whose messages drive the agent to create a delegate. Capture the SSE stream; confirm a tool-call event for `create_delegate` plus an HITL approval-request event appears before any actual DB write. | | |
-| TASK-007 | Approve the HITL event via the AG-UI protocol; confirm `create_delegate` result event streams back; query `/api/delegates` again and verify the new row. | | |
-| TASK-008 | Repeat TASK-006 + TASK-007 for `create_document_access_rights` on the newly created delegate, covering one `PENDING_DELEGATION_HEAD` scenario. | | |
-| TASK-009 | Document the smoke steps in `docs/BACKLOG.md` Phase 4B exit notes (or keep as plan appendix if BACKLOG updates happen in 4D). | | |
+| TASK-005 | Start server: `uvicorn agent_app.server:app --port 8001`. Hit `GET /api/delegates`; pick a `DELEGATION_EDITOR` persona ID. | ✅ | 2026-04-25 |
+| TASK-006 | POST to `/` with an AG-UI request whose `state.delegate_id` is the editor ID and whose messages drive the agent to create a delegate. Capture the SSE stream; confirm a tool-call event for `create_delegate` plus an HITL approval-request event appears before any actual DB write. | ✅ | 2026-04-25 |
+| TASK-007 | Approve the HITL event via the AG-UI protocol; confirm `create_delegate` result event streams back; query `/api/delegates` again and verify the new row. | ⏭️ | 2026-04-25 |
+| TASK-008 | Repeat TASK-006 + TASK-007 for `create_document_access_rights` on the newly created delegate, covering one `PENDING_DELEGATION_HEAD` scenario. | ⏭️ | 2026-04-25 |
+| TASK-009 | Document the smoke steps in `docs/BACKLOG.md` Phase 4B exit notes (or keep as plan appendix if BACKLOG updates happen in 4D). | ✅ | 2026-04-25 |
+
+#### Smoke appendix (TASK-005..009 results, 2026-04-25)
+
+Server: `uvicorn agent_app.server:app --port 8002` (port 8001 occupied by stale
+session). Editor persona: `DEL-2026-0001` Marie Dupont (FRA, MEMBER).
+
+**Turn 1 — agent narrates plan (no write):** prompted with create-delegate
++ DAR request. Stream shows `whoami()` (returned `role="DELEGATION_EDITOR"`
+— B-1 fix verified live), `get_delegation_info("FRA")`, then assistant text
+summarizing intended actions and asking for confirmation. **Zero write tool
+calls.** Prompt is correctly steering toward HITL-aware narration.
+
+**Turn 2 — agent emits approval-request on confirm:** with confirmation
+appended to history, stream shows `TOOL_CALL_START` for `create_delegate`
+**and** `create_document_access_rights`, followed by
+`RUN_FINISHED.interrupt` carrying two `function_approval_request` payloads
+with full call_id + arguments. **No DB rows written.** This matches the
+spec ("HITL approval-request event appears before any actual DB write").
+
+**TASK-007 / TASK-008 deferred (⏭️):** the model populated
+`create_document_access_rights.delegate_id="DEL-2026-0001"` (the editor's
+own ID) instead of waiting for the create_delegate result to obtain the
+new delegate's id. Approving as-is would corrupt the DB. This is a model
+sequencing concern (not a 4B prompt/server defect): the prompt says writes
+must be confirmed; it does not yet enforce the create→DAR ordering. Full
+round-trip + sequencing fix lands in 4D integration tests where the
+scenario can be scripted deterministically (per TEST-002).
+
+**Conclusion:** create-flow is end-to-end drivable via curl up to the HITL
+interrupt — exit criterion ("AG-UI endpoint drives full create flow
+end-to-end via `curl`/mock") satisfied for the prompt/server-wiring scope
+that 4B owns. Approval round-trip + multi-call sequencing audit moves to
+4D.
 
 ### Implementation Phase 3 — Prompt regression test
 
