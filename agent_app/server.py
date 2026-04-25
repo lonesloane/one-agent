@@ -95,6 +95,9 @@ def _fix_tool_call_ordering(
         non-contiguous misorderings. Dry-run observation confirms the consistent
         CopilotKit v2 pattern is `[tool, assistant]` pairs (ASSUMPTION-001),
         but the implementation is not limited to that shape.
+        When multiple tool results share one assistant message, the assistant is
+        spliced before the first preceding result only; the ``skip`` guard
+        prevents duplication.
 
     Args:
         messages: Raw AG-UI message list from request body.
