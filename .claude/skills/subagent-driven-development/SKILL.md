@@ -70,6 +70,7 @@ digraph process {
         "Dispatch code quality reviewer subagent (./code-quality-reviewer-prompt.md)" [shape=box];
         "Code quality reviewer subagent approves?" [shape=diamond];
         "Implementer subagent fixes quality issues" [shape=box];
+        "Edit plan row (✅ + date), commit chore(plan)" [shape=box];
         "Mark task complete in TaskUpdate" [shape=box];
     }
 
@@ -91,10 +92,12 @@ digraph process {
     "Dispatch code quality reviewer subagent (./code-quality-reviewer-prompt.md)" -> "Code quality reviewer subagent approves?";
     "Code quality reviewer subagent approves?" -> "Implementer subagent fixes quality issues" [label="no"];
     "Implementer subagent fixes quality issues" -> "Dispatch code quality reviewer subagent (./code-quality-reviewer-prompt.md)" [label="re-review"];
-    "Code quality reviewer subagent approves?" -> "Mark task complete in TaskUpdate" [label="yes"];
+    "Code quality reviewer subagent approves?" -> "Edit plan row (✅ + date), commit chore(plan)" [label="yes"];
+    "Edit plan row (✅ + date), commit chore(plan)" -> "Mark task complete in TaskUpdate";
     "Mark task complete in TaskUpdate" -> "More tasks remain?";
     "More tasks remain?" -> "Dispatch implementer subagent (./implementer-prompt.md)" [label="yes"];
-    "More tasks remain?" -> "Dispatch final code reviewer subagent for entire implementation" [label="no"];
+    "More tasks remain?" -> "Flip plan frontmatter status to Completed + update intro badge" [label="no"];
+    "Flip plan frontmatter status to Completed + update intro badge" -> "Dispatch final code reviewer subagent for entire implementation";
     "Dispatch final code reviewer subagent for entire implementation" -> "Use superpowers:finishing-a-development-branch";
 }
 ```
@@ -131,6 +134,45 @@ Implementer subagents report one of four statuses. Handle each appropriately:
 4. If the plan itself is wrong, escalate to the human
 
 **Never** ignore an escalation or force the same model to retry without changes. If the implementer said it's stuck, something needs to change.
+
+## Plan Document Progress Tracking (MANDATORY)
+
+The plan markdown file (`plan/<feature>.md`) is the **durable record** of
+progress. The harness `TaskUpdate` list is session-local and disappears
+when the conversation ends; the plan file persists across sessions and
+is what the next operator (or you, after compaction) will use to resume.
+
+**Per task — after code-quality reviewer approves, BEFORE TaskUpdate
+complete:**
+
+1. Open the plan file in the worktree (e.g. `.worktrees/foo/plan/feature-x-1.md`).
+2. Find the `TASK-NNN` row in the Implementation Phase table.
+3. Edit the row:
+   - `Completed` column: `✅`
+   - `Date` column: today's date in `YYYY-MM-DD` format.
+4. Stage and commit in the worktree:
+   `git add plan/<file>.md && git commit -m "chore(plan): mark TASK-NNN complete"`
+5. Then call `TaskUpdate` to flip the harness task to `completed`.
+
+**At plan completion — after all tasks are ✅, BEFORE the final-reviewer
+subagent dispatch:**
+
+1. Edit the plan frontmatter: `status: 'Planned'` → `status: 'Completed'`.
+2. Edit the intro badge:
+   `![Status: Planned](https://img.shields.io/badge/status-Planned-blue)` →
+   `![Status: Completed](https://img.shields.io/badge/status-Completed-brightgreen)`.
+3. Commit: `chore(plan): mark <plan-name> complete`.
+
+**Why per-task commits (not batched at end):** if the run is interrupted
+mid-plan (compaction, crash, user cancels), the plan file on disk
+reflects ground truth. Resumable. Batched updates lose this property.
+
+**Why controller (not implementer subagent):** the plan file is outside
+the implementer's task scope. SKILL.md forbids implementers from reading
+the plan (full task text is pasted into their prompt instead). Letting
+implementers edit the plan re-introduces the anti-pattern. The
+controller already holds `TASK-NNN` and the worktree path — one `Edit`
+tool call.
 
 ## Prompt Templates
 
@@ -172,7 +214,9 @@ Spec reviewer: ✅ Spec compliant - all requirements met, nothing extra
 [Get git SHAs, dispatch code quality reviewer]
 Code reviewer: Strengths: Good test coverage, clean. Issues: None. Approved.
 
-[Mark Task 1 complete]
+[Edit plan/feature-plan.md row TASK-001: Completed=✅, Date=2026-04-25]
+[Commit in worktree: chore(plan): mark TASK-001 complete]
+[Mark Task 1 complete in TaskUpdate]
 
 Task 2: Recovery modes
 
@@ -211,6 +255,8 @@ Code reviewer: ✅ Approved
 ...
 
 [After all tasks]
+[Edit plan frontmatter: status: 'Planned' → 'Completed'; flip intro badge to brightgreen]
+[Commit: chore(plan): mark feature-plan complete]
 [Dispatch final code-reviewer]
 Final reviewer: All requirements met, ready to merge
 
@@ -264,6 +310,8 @@ Done!
 - Let implementer self-review replace actual review (both are needed)
 - **Start code quality review before spec compliance is ✅** (wrong order)
 - Move to next task while either review has open issues
+- **Mark TaskUpdate complete without first editing the plan markdown row** (✅ + date) and committing `chore(plan): mark TASK-NNN complete`. The harness task list is session-local; the plan file is the durable record across sessions.
+- **Finish the plan without flipping frontmatter `status` to `Completed` and updating the intro badge.**
 
 **If subagent asks questions:**
 - Answer clearly and completely

@@ -1,5 +1,6 @@
 {
   "enabledPlugins": {
-    "mempalace@mempalace": true
+    "mempalace@mempalace": false,
+    "caveman@caveman": true
   }
 }
