@@ -71,7 +71,7 @@ Spec: `docs/prd-phase4-write-agent.md` §2 (US-1 AC: HITL dialogs), §4
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-002 | Based on TASK-001 findings, implement the minimal frontend change required. Scope limited to `agent_app/frontend/src/app/page.tsx` and CSS modules unless Context7 mandates otherwise. Run full TypeScript check after. | | |
+| TASK-002 | Based on TASK-001 findings, implement the minimal frontend change required. Scope limited to `agent_app/frontend/src/app/page.tsx` and CSS modules unless Context7 mandates otherwise. Run full TypeScript check after. | ✅ | 2026-04-25 |
 | TASK-003 | Start server + frontend; pick a `DELEGATION_EDITOR` persona; say "Create a new delegate named Test User, email test@example.com, in delegation FRA, role DELEGATE." Confirm the HITL approval dialog appears BEFORE any DB write. | | |
 | TASK-004 | Approve the dialog; verify the new delegate appears in `/api/delegates`. | | |
 | TASK-005 | Repeat the flow but deny the dialog. Confirm no new delegate row; agent surfaces acknowledgement. | | |
