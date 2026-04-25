@@ -82,8 +82,8 @@ Spec: `docs/prd-phase4-write-agent.md` §3 (System Prompt Requirements),
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-010 | Add `tests/agent_app/test_system_prompt.py` asserting required substrings in `SYSTEM_PROMPT`: `"Persona Mode Selection"`, `"Create Side"`, `"HITL Write Guard"`, `"PENDING_DELEGATION_HEAD"`, `"PENDING_SECRETARIAT"`. | | |
-| TASK-011 | Run full suite: `pytest`. | | |
+| TASK-010 | Add `tests/agent_app/test_system_prompt.py` asserting required substrings in `SYSTEM_PROMPT`: `"Persona Mode Selection"`, `"Create Side"`, `"HITL Write Guard"`, `"PENDING_DELEGATION_HEAD"`, `"PENDING_SECRETARIAT"`. | ✅ | 2026-04-25 |
+| TASK-011 | Run full suite: `pytest`. | ✅ | 2026-04-25 |
 
 ## 3. Alternatives
 
