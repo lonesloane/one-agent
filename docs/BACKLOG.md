@@ -212,6 +212,29 @@
 - ASSUMPTION-001 in `plan/feature-phase4c-create-frontend-hitl-1.md` is **invalidated**: `V2Provider` does not pick up `always_require` schemas automatically without explicit hook wiring.
 - **Required before Phase 4D**: frontend HITL wiring — query Context7 `/copilotkit/copilotkit` for the correct v2 hook/component that renders `function_approval_request` events. Plan `feature-phase4c-create-frontend-hitl-1.md` must be revised from "validation only" to "implementation + validation" (CON-001 may need relaxing if a new component is required). Execute this plan before `feature-phase4d-create-integration-tests-1.md`.
 
+**BUG-4C-004** ✅ RESOLVED — Approving a write-tool HITL dialog never executed the underlying tool; the LLM saw "no result" and hallucinated a failure.
+- Root cause (three composing gaps in `agent_framework_ag_ui`'s approval-execution path):
+  1. `_BoundAgent` did not expose `default_options` / `mcp_tools`, so `collect_server_tools(bound)` returned `[]`, leaving the approval-execution `tool_map` empty and `_auto_invoke_function` short-circuiting on "hosted tool" assumption.
+  2. `_resolve_approval_responses` builds its function-middleware pipeline from `client.function_middleware` only — `AuditMiddleware` lives on `agent.middleware` and never ran for HITL-approved invocations, so the `function_invocation_kwargs.delegate_id` path was bypassed and the editor check raised PermissionError.
+  3. Frontend `respond()` payload still carried `steps: []`, which `_is_confirm_changes_response` interpreted as the legacy state-confirmation flow (text ack only), again skipping tool execution.
+- Fix landed in commit `103bbc0` (`fix(hitl): execute approved write tools end-to-end`):
+  * `_BoundAgent` now passes through `default_options` and `mcp_tools`.
+  * Module-level monkey-patch on `agent_framework._tools._auto_invoke_function` injects `delegate_id` from `_thread_delegate_map` (keyed by `session.metadata.ag_ui_thread_id`) before the framework dispatches the approved tool.
+  * `respond()` now sends `{accepted, function_call_id}` (no `steps`); `_resolve_approval_call_id` then maps the approval onto the underlying tool call.
+- Verified: Marie Dupont approve → DEL-2026-0010 (Henry Tan) created; subsequent approve → DAR id=25 with classification RESTRICTED, approval_status PENDING_DELEGATION_HEAD.
+
+**FINDING-4C-005** ⚠️ TO BE INVESTIGATED — Denied HITL response leaves the chat history with a `tool_calls` entry that has no matching tool result. The next user turn reaches Foundry with the gap and is rejected with `Error code: 400 - "No tool output found for function call <id>"`.
+- Empirical signal (2026-04-26): Marie Dupont denied `create_delegate(Iris Black)` → DB unchanged ✅, but the very next message ("Grant Henry Tan RESTRICTED…") never produced a model response; backend log carries the 400.
+- Suspected cause: `agent_framework_ag_ui._replace_approval_contents_with_results` does not write a "denied" function_result for rejected approvals, so the orphan tool_call survives into the next request.
+- Workaround until investigated: start a new thread (delegate-picker reset) after any deny.
+- Open question: is this a package bug, or do we need a frontend-side scrub of orphan tool_calls before re-sending the snapshot?
+
+**FINDING-4C-006** ⚠️ TO BE INVESTIGATED (cosmetic) — HITL completion card shows `<tool> — completed` after a Deny click instead of `denied` (approve path renders correctly).
+- Empirical signal (2026-04-26): the approve-then-deny sequence in the same session produced "completed" on deny; `lastDecision` state appears null at the moment the "complete" branch renders.
+- Suspected cause: HMR reset of `lastDecision` between the click that fired `respond()` and the re-render of the HITL card; the act of `respond()` cycles status `executing → complete` quickly enough that React batched the state update with a stale closure.
+- Tool execution and DB outcome are unaffected — purely a label shown in the approval card.
+- Open question: drive the label off `props.result` (with structural detection of denied response) instead of local state, or off a `useRef` so HMR cannot wipe it?
+
 ### Approver side (delegation head / secretariat persona) — OQ-9 resolution
 - [ ] Seed a delegation-head persona (role=DELEGATION_HEAD) and a secretariat persona
 - [ ] Extend `/api/delegates` to include approver personas in picker

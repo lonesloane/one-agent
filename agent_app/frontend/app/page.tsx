@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   CopilotChat,
   useAgent,
   useCopilotKit,
   useDefaultRenderTool,
+  useHumanInTheLoop,
 } from "@copilotkit/react-core/v2";
 import { CopilotKitCoreRuntimeConnectionStatus } from "@copilotkit/core";
 import "@copilotkit/react-core/v2/styles.css";
@@ -32,6 +33,25 @@ function ChatPane({
   });
   const { copilotkit } = useCopilotKit();
 
+  // Reason: guard against double-submission; reset when thread resets.
+  const [submitted, setSubmitted] = useState(false);
+  // Reason: ``props.result`` on a completed HITL turn carries the tool's
+  // function_result (e.g. the create_delegate JSON), not the
+  // ``{accepted}`` payload we passed to ``respond()``.  Tracking the
+  // user's choice locally lets the completion card show the correct
+  // approved/denied label regardless of tool output shape.
+  const [lastDecision, setLastDecision] = useState<"approved" | "denied" | null>(null);
+  // Reason: runtimeConnectionStatus cycles Connected→running→Connected on every
+  // RUN_FINISHED.  Without a guard, the brief-start effect re-fires after each
+  // completed run (including the HITL approval run), sending a spurious "start"
+  // message that aborts the HITL before the user can click Approve.
+  const hasStartedRef = useRef(false);
+  useEffect(() => {
+    setSubmitted(false);
+    setLastDecision(null);
+    hasStartedRef.current = false;
+  }, [threadId]);
+
   useDefaultRenderTool({
     render: ({ name, status, parameters, result }) => (
       <ToolCallBlock
@@ -41,6 +61,93 @@ function ChatPane({
         result={result}
       />
     ),
+  });
+
+  // Reason: agent_framework_ag_ui translates approval_mode="always_require"
+  // tool calls into a synthetic "confirm_changes" TOOL_CALL_* event sequence.
+  // The frontend must intercept this synthetic tool — not the original Python
+  // tool names — to avoid duplicate tool name errors on the backend.
+  // Args shape: { function_name, function_call_id, function_arguments, steps }
+  // Response shape: { accepted: bool, steps: [] } — required by
+  // _is_confirm_changes_response in agent_framework_ag_ui._agent_run.
+  useHumanInTheLoop({
+    name: "confirm_changes",
+    description: "Approval dialog for write operations requiring HITL confirmation",
+    render: (props) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyArgs = props.args as any;
+      const toolName: string = anyArgs?.function_name ?? "unknown tool";
+      const toolArgs: Record<string, unknown> = anyArgs?.function_arguments ?? {};
+
+      if (props.status === "inProgress") {
+        return (
+          <div className={styles.approvalCard}>
+            <div className={styles.approvalHeading}>Approval required — {toolName}</div>
+            <p className={styles.approvalStatus}>Preparing…</p>
+            <div className={styles.approvalActions}>
+              <button type="button" aria-label={`Approve ${toolName}`} className={styles.approveBtn} disabled>Approve</button>
+              <button type="button" aria-label={`Deny ${toolName}`} className={styles.denyBtn} disabled>Deny</button>
+            </div>
+          </div>
+        );
+      }
+
+      if (props.status === "executing") {
+        return (
+          <div className={styles.approvalCard}>
+            <div className={styles.approvalHeading}>Approval required — {toolName}</div>
+            <dl className={styles.approvalArgs}>
+              {Object.entries(toolArgs).map(([k, v]) => (
+                <div key={k} className={styles.approvalArgRow}>
+                  <dt className={styles.approvalArgKey}>{k}</dt>
+                  <dd className={styles.approvalArgVal}>
+                    {typeof v === "object" ? JSON.stringify(v) : String(v)}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <div className={styles.approvalActions}>
+              <button
+                type="button"
+                aria-label={`Approve ${toolName}`}
+                className={styles.approveBtn}
+                disabled={submitted}
+                onClick={() => {
+                  setSubmitted(true);
+                  setLastDecision("approved");
+                  props.respond({ accepted: true, function_call_id: anyArgs?.function_call_id });
+                }}
+              >
+                Approve
+              </button>
+              <button
+                type="button"
+                aria-label={`Deny ${toolName}`}
+                className={styles.denyBtn}
+                disabled={submitted}
+                onClick={() => {
+                  setSubmitted(true);
+                  setLastDecision("denied");
+                  props.respond({ accepted: false, function_call_id: anyArgs?.function_call_id });
+                }}
+              >
+                Deny
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // status === "complete"
+      const label = lastDecision ?? "completed";
+      return (
+        <div className={styles.approvalCard}>
+          <div className={styles.approvalHeading}>
+            {toolName} — {label}
+          </div>
+        </div>
+      );
+    },
   });
 
   useEffect(() => {
@@ -58,7 +165,16 @@ function ChatPane({
         CopilotKitCoreRuntimeConnectionStatus.Connected) {
       return;
     }
+    // Reason: runtimeConnectionStatus transitions back to Connected after
+    // every completed run.  Without this guard every RUN_FINISHED would
+    // re-fire the effect and append a new "start" message to the thread,
+    // which aborts any active HITL approval before the user can respond.
+    if (hasStartedRef.current) {
+      return;
+    }
     const timer = setTimeout(async () => {
+      if (hasStartedRef.current) return;
+      hasStartedRef.current = true;
       agent.setState({ delegate_id: delegateId });
       agent.addMessage({
         id: crypto.randomUUID(),

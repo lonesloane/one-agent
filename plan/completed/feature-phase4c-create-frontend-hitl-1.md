@@ -1,16 +1,16 @@
 ---
 goal: Phase 4C — create-side frontend HITL dialog implementation and verification
-version: 1.1
+version: 1.2
 date_created: 2026-04-24
-date_revised: 2026-04-25
+date_revised: 2026-04-26
 owner: Stephane
-status: 'Planned'
+status: 'Completed'
 tags: [feature, phase4, frontend, copilotkit, hitl]
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-brightgreen)
 
 > **⚠️ Scope revised 2026-04-25** — Dry-run confirmed ASSUMPTION-001 is
 > **false**: CopilotKit v2 `V2Provider` does NOT auto-render
@@ -63,7 +63,7 @@ Spec: `docs/prd-phase4-write-agent.md` §2 (US-1 AC: HITL dialogs), §4
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Query Context7 `/copilotkit/copilotkit` for: (a) how `function_approval_request` interrupt events are rendered in v2; (b) whether `useCopilotAction` with `renderAndWaitForResponse` or a dedicated HITL hook is the correct API; (c) what props/options are required. FINDING-4C-002 confirmed `V2Provider` alone is insufficient — this task determines the exact implementation path before any code is written. | | |
+| TASK-001 | Query Context7 `/copilotkit/copilotkit` for: (a) how `function_approval_request` interrupt events are rendered in v2; (b) whether `useCopilotAction` with `renderAndWaitForResponse` or a dedicated HITL hook is the correct API; (c) what props/options are required. FINDING-4C-002 confirmed `V2Provider` alone is insufficient — this task determines the exact implementation path before any code is written. | ✅ | 2026-04-25 |
 
 ### Implementation Phase 2 — Implement HITL frontend wiring
 
@@ -71,11 +71,11 @@ Spec: `docs/prd-phase4-write-agent.md` §2 (US-1 AC: HITL dialogs), §4
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-002 | Based on TASK-001 findings, implement the minimal frontend change required. Scope limited to `agent_app/frontend/src/app/page.tsx` and CSS modules unless Context7 mandates otherwise. Run full TypeScript check after. | | |
-| TASK-003 | Start server + frontend; pick a `DELEGATION_EDITOR` persona; say "Create a new delegate named Test User, email test@example.com, in delegation FRA, role DELEGATE." Confirm the HITL approval dialog appears BEFORE any DB write. | | |
-| TASK-004 | Approve the dialog; verify the new delegate appears in `/api/delegates`. | | |
-| TASK-005 | Repeat the flow but deny the dialog. Confirm no new delegate row; agent surfaces acknowledgement. | | |
-| TASK-006 | Drive the follow-up `create_document_access_rights` call; confirm a second independent HITL dialog appears for the DAR. | | |
+| TASK-002 | Based on TASK-001 findings, implement the minimal frontend change required. Scope limited to `agent_app/frontend/src/app/page.tsx` and CSS modules unless Context7 mandates otherwise. Run full TypeScript check after. | ✅ | 2026-04-25 |
+| TASK-003 | Start server + frontend; pick a `DELEGATION_EDITOR` persona; say "Create a new delegate named Test User, email test@example.com, in delegation FRA, role DELEGATE." Confirm the HITL approval dialog appears BEFORE any DB write. | ✅ | 2026-04-26 |
+| TASK-004 | Approve the dialog; verify the new delegate appears in `/api/delegates`. | ✅ | 2026-04-26 |
+| TASK-005 | Repeat the flow but deny the dialog. Confirm no new delegate row; agent surfaces acknowledgement. | ✅ | 2026-04-26 |
+| TASK-006 | Drive the follow-up `create_document_access_rights` call; confirm a second independent HITL dialog appears for the DAR. | ✅ | 2026-04-26 |
 
 ### Implementation Phase 3 — Polish capture
 
@@ -83,8 +83,10 @@ Spec: `docs/prd-phase4-write-agent.md` §2 (US-1 AC: HITL dialogs), §4
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-007 | Record any HITL dialog UX problems to `docs/BACKLOG.md`. Do NOT fix in 4C — route to the existing polish track if needed. | | |
-| TASK-008 | If polish is critical-blocker (dialog unreadable, buttons unclickable), halt and spin a separate `feature-ui-polish-phase4c-hitl-*.md` plan before proceeding to 4D. Otherwise proceed. | | |
+| TASK-007 | Record any HITL dialog UX problems to `docs/BACKLOG.md`. Do NOT fix in 4C — route to the existing polish track if needed. | ✅ | 2026-04-26 |
+| TASK-008 | If polish is critical-blocker (dialog unreadable, buttons unclickable), halt and spin a separate `feature-ui-polish-phase4c-hitl-*.md` plan before proceeding to 4D. Otherwise proceed. | ✅ | 2026-04-26 |
+
+> **Closure note (2026-04-26):** Approve flow now executes write tools end-to-end (BUG-4C-004 in BACKLOG.md, fix `103bbc0`). FINDING-4C-005 (denied-call orphan tool_call → next-turn 400) and FINDING-4C-006 (cosmetic "completed" label after Deny) are non-blocking for Phase 4D and tracked as "to be investigated".
 
 ## 3. Alternatives
 
