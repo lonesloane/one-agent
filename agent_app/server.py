@@ -58,8 +58,53 @@ class _ApprovalRegistry(OrderedDict):
 
 _DB_PATH: str = os.environ.get("DATABASE_PATH", "one_agent.db")
 _db_engine = get_engine(_DB_PATH)
+
 _agent: Agent | None = None
 _protocol_runner: AgentFrameworkAgent | None = None
+# Reason: CopilotKit HITL continuation POSTs drop the state dict, so
+# delegate_id is unavailable on approval round-trips.  We persist the
+# mapping from the initial request (which always carries state) and use
+# it as a fallback for stateless follow-up requests.
+_thread_delegate_map: dict[str, str] = {}
+
+
+def _install_approval_delegate_id_injector() -> None:
+    """Patch ``_auto_invoke_function`` to thread delegate_id into HITL execution.
+
+    ``agent_framework_ag_ui._resolve_approval_responses`` builds its function-
+    middleware pipeline from ``client.function_middleware`` only.  ONE-MP's
+    ``AuditMiddleware`` is registered on ``agent.middleware`` (the LLM-tool
+    path) and therefore never runs for HITL-approved tool execution, leaving
+    ``delegate_id`` absent from ctx.kwargs and write tools failing with
+    "Only delegation editors can create delegates/DARs".  We resolve the
+    acting delegate from the session's ``ag_ui_thread_id`` metadata via
+    ``_thread_delegate_map`` and inject it into ``custom_args`` before the
+    framework dispatches the approved tool.
+    """
+    import agent_framework._tools as _af_tools
+
+    _orig = _af_tools._auto_invoke_function
+
+    async def _patched(function_call_content, custom_args=None, **kw):
+        fcc_type = getattr(function_call_content, "type", "?")
+        if fcc_type == "function_approval_response":
+            args = dict(custom_args or {})
+            if not args.get("delegate_id"):
+                session = args.get("session")
+                metadata = getattr(session, "metadata", None) or {}
+                if isinstance(metadata, dict):
+                    thread_id = metadata.get("ag_ui_thread_id", "")
+                    if thread_id:
+                        resolved = _thread_delegate_map.get(thread_id, "")
+                        if resolved:
+                            args["delegate_id"] = resolved
+            custom_args = args
+        return await _orig(function_call_content, custom_args, **kw)
+
+    _af_tools._auto_invoke_function = _patched
+
+
+_install_approval_delegate_id_injector()
 
 _CORS_ORIGINS: list[str] = os.environ.get(
     "CORS_ORIGINS", "http://localhost:3000"
@@ -97,6 +142,14 @@ class _BoundAgent:
         self._delegate_id = delegate_id
         self.name: str = agent.name
         self.client: Any = agent.client
+        # Reason: AgentFrameworkAgent.collect_server_tools introspects
+        # ``default_options['tools']`` (and ``mcp_tools``) to build the
+        # tool_map used by the HITL approval-execution path.  Without
+        # these passthroughs the tool_map is empty, ``_auto_invoke_function``
+        # silently returns the approval response unchanged, and the
+        # approved write tool is never executed.
+        self.default_options: Any = getattr(agent, "default_options", None)
+        self.mcp_tools: Any = getattr(agent, "mcp_tools", None)
 
     def run(self, messages: Any, **kwargs: Any) -> Any:
         """Forward to underlying agent with delegate_id injected.
@@ -247,6 +300,11 @@ async def agent_endpoint(request_body: AGUIRequest) -> StreamingResponse:
         StreamingResponse in text/event-stream format.
     """
     delegate_id: str = (request_body.state or {}).get("delegate_id", "")
+    thread_id: str = request_body.thread_id or ""
+    if delegate_id and thread_id:
+        _thread_delegate_map[thread_id] = delegate_id
+    elif not delegate_id and thread_id:
+        delegate_id = _thread_delegate_map.get(thread_id, "")
     if not delegate_id:
         # Reason: without delegate_id, ctx-injected tools return empty
         # results and the brief silently degrades to "nothing new".

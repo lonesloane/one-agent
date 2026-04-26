@@ -35,6 +35,12 @@ function ChatPane({
 
   // Reason: guard against double-submission; reset when thread resets.
   const [submitted, setSubmitted] = useState(false);
+  // Reason: ``props.result`` on a completed HITL turn carries the tool's
+  // function_result (e.g. the create_delegate JSON), not the
+  // ``{accepted}`` payload we passed to ``respond()``.  Tracking the
+  // user's choice locally lets the completion card show the correct
+  // approved/denied label regardless of tool output shape.
+  const [lastDecision, setLastDecision] = useState<"approved" | "denied" | null>(null);
   // Reason: runtimeConnectionStatus cycles Connected→running→Connected on every
   // RUN_FINISHED.  Without a guard, the brief-start effect re-fires after each
   // completed run (including the HITL approval run), sending a spurious "start"
@@ -42,6 +48,7 @@ function ChatPane({
   const hasStartedRef = useRef(false);
   useEffect(() => {
     setSubmitted(false);
+    setLastDecision(null);
     hasStartedRef.current = false;
   }, [threadId]);
 
@@ -107,7 +114,8 @@ function ChatPane({
                 disabled={submitted}
                 onClick={() => {
                   setSubmitted(true);
-                  props.respond({ accepted: true, steps: [] });
+                  setLastDecision("approved");
+                  props.respond({ accepted: true, function_call_id: anyArgs?.function_call_id });
                 }}
               >
                 Approve
@@ -119,7 +127,8 @@ function ChatPane({
                 disabled={submitted}
                 onClick={() => {
                   setSubmitted(true);
-                  props.respond({ accepted: false, steps: [] });
+                  setLastDecision("denied");
+                  props.respond({ accepted: false, function_call_id: anyArgs?.function_call_id });
                 }}
               >
                 Deny
@@ -130,12 +139,11 @@ function ChatPane({
       }
 
       // status === "complete"
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const wasAccepted = (props.result as any)?.accepted === true;
+      const label = lastDecision ?? "completed";
       return (
         <div className={styles.approvalCard}>
           <div className={styles.approvalHeading}>
-            {toolName} — {wasAccepted ? "approved" : "denied"}
+            {toolName} — {label}
           </div>
         </div>
       );
