@@ -7,3 +7,4 @@ __pycache__/
 eval/results/*
 !eval/results/.gitkeep
 *.db
+.playwright-cli/
