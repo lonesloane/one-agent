@@ -97,14 +97,12 @@ one-agent-poc/                 # Project root
 │   ├── app.py                 # Routes
 │   ├── forms.py               # WTForms
 │   └── templates/             # Jinja2 templates (14 screens)
-├── agent_app/                 # Agent Framework app (Phase 3-4)
-│   ├── agent.py               # Agent setup + execution loop
-│   ├── tools.py               # @tool wrappers over shared/
-│   ├── middleware.py          # Audit, security
-│   └── kb_server/             # MCP Knowledge Base (Phase 5)
-│       ├── server.py          # MCP server
-│       ├── rules/             # Business rule markdown entries
-│       └── vector_store/      # ChromaDB embeddings
+├── agent_app/                 # Agent Framework app (Phase 3+, rebuild pending)
+│   └── (TBD — layout depends on frontend stack decision; see OQ-7)
+├── kb_server/                 # MCP Knowledge Base (Phase 5)
+│   ├── server.py              # MCP server
+│   ├── rules/                 # Business rule markdown entries
+│   └── vector_store/          # ChromaDB embeddings
 ├── pyproject.toml             # Project metadata + dependencies
 ├── .env.example               # Template for FOUNDRY_PROJECT_ENDPOINT
 └── one_agent.db               # SQLite (shared, Phase 1+)
