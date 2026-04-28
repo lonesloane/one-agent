@@ -29,33 +29,31 @@ Questions deferred from design, tracked here until resolved.
 **Context**: Adding an MCP KB round-trip increases pressure on model quality — the model must correctly decide *when* to query the KB, interpret confidence signals, and then select the right backend tool. Mini-tier models (`gpt-4o-mini`, `gpt-4.1-mini`) must be validated specifically on KB-guided tool selection, not just plain tool use.
 **Update (2026-04-06)**: Phase 0a harness infrastructure is complete. Plain tool selection (without KB) is being evaluated first. KB-guided evaluation will be added once a base model is selected.
 
-### OQ-7: Agent frontend technology choice ✓ Resolved (2026-04-19)
+### OQ-7: Agent frontend technology choice — Re-opened (2026-04-28)
 **Relevant phase**: Phase 3
 **Context**: The brainstorming docs suggest Next.js + Vercel AI SDK for the agent frontend (streaming, tool call display). Is this confirmed, or should a simpler alternative (e.g., a terminal/CLI interface) suffice for the PoC demo?
-**Decision**: AG-UI (FastAPI backend) + CopilotKit (React frontend). AG-UI is a
-standardized protocol with native Microsoft Agent Framework support; `approval_mode`
-maps directly to AG-UI Human-in-the-Loop, and `@tool` / `agent.run(stream=True)` map
-to backend tools and SSE with no custom wiring. CopilotKit provides polished streaming
-chat, tool call visualization, and approval dialogs out of the box. Frontend lives in
-`agent_app/frontend/` inside the monorepo. See `docs/DECISIONS.md` and
-`docs/prd-phase3-read-agent.md`.
+**Status**: Re-opened 2026-04-28 after first agent_app attempt was abandoned. Earlier
+resolution (AG-UI + CopilotKit, 2026-04-19) is archived under
+`docs/_archived/failed-attempt-2026-04/` because the AG-UI HITL contract proved
+fragile in practice (multi-turn tool-call ordering, denied-approval orphans,
+V2Provider not rendering `function_approval_request`). Pending fresh research
+phase — see `docs/research-agent-stack.md` (TBD). Decision criteria should be
+established without reference to the prior attempt's specific findings.
 
 ### OQ-8: Test data generation strategy ✓ Resolved (2026-04-12)
 **Relevant phase**: Phase 1
 **Context**: Test data must cover all demo scenarios (member + partner delegations, Framework Agreements, various meeting/document states, delegate login history). Manual crafting vs. scripted generation? What level of realism is needed for stakeholder demos?
 **Decision**: Hardcoded Python in `shared/seed_data.py` (no Faker, no JSON fixtures) with domain-realistic content (OECD-flavored delegation names, real-ish committee names, document titles that sound like OECD output). One-liner placeholder summaries are acceptable — full briefing-language summaries are out of scope. See `docs/DECISIONS.md`.
 
-### OQ-9: Delegation head approval workflow implementation ✓ Resolved (2026-04-24)
+### OQ-9: Delegation head approval workflow implementation — Phase 4 portion re-opened (2026-04-28)
 **Relevant phase**: Phase 4
 **Context**: Restricted DAR creation routes to "pending delegation head approval." How is this modeled in the PoC? A status flag only (no actual notification), or a minimal approval UI?
-**Phase 2 decision (2026-04-19)**: Status flag only — `DocumentAccessRight.approval_status` is
-set (`PENDING_DELEGATION_HEAD`, `PENDING_SECRETARIAT`, `AUTO_APPROVED`). No notification, no
-approval inbox, no approver UI. Deferred to Phase 4.
-**Phase 4 decision (2026-04-24)**: Agent-centric approver flow. Switch delegate picker to a
-delegation-head persona; agent surfaces pending DARs in conversation and offers approve/reject
-via a write tool `approve_dar` (or `reject_dar`) with `approval_mode="always_require"` HITL
-confirmation. New read tool `list_pending_dars` scoped to current approver identity. No
-classical app inbox screen (out of scope). No email notifications (out of scope). Status
-propagates: `PENDING_*` → `APPROVED`/`REJECTED`, and approved DARs become visible to the
-delegate per existing `is_document_visible` logic. Full audit via existing `AuditMiddleware`.
+**Phase 2 decision (2026-04-19) — STILL VALID**: Status flag only —
+`DocumentAccessRight.approval_status` is set (`PENDING_DELEGATION_HEAD`,
+`PENDING_SECRETARIAT`, `AUTO_APPROVED`). No notification, no approval inbox, no
+approver UI in the classical app. Phase 2 shipped this way and remains correct.
+**Phase 4 status (2026-04-28)**: Re-opened. Earlier agent-centric resolution
+(2026-04-24) is archived under `docs/_archived/failed-attempt-2026-04/` —
+that decision rested on `approval_mode="always_require"` working through the
+abandoned AG-UI HITL stack. Approver UX TBD pending agent stack decision (OQ-7).
 OQ-1 (full RBAC model) remains open.

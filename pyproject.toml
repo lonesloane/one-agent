@@ -5,18 +5,15 @@ description = "ONE-MP Agent evaluation harness for model exploration"
 requires-python = ">=3.11"
 dependencies = [
     "agent-framework>=1.0.0",
-    "agent-framework-ag-ui>=0.1.0",
     "agent-framework-foundry>=1.0.0",
     "azure-identity>=1.19.0",
     "email-validator>=2.0",
-    "fastapi>=0.110",
     "flask>=3.0",
     "flask-wtf>=1.2",
     "loguru>=0.7.0",
     "pydantic>=2.0",
     "python-dotenv>=1.0.0",
     "sqlalchemy>=2.0",
-    "uvicorn>=0.29",
 ]
 
 [project.optional-dependencies]
@@ -28,7 +25,7 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["agent_app", "classical_app", "eval", "shared"]
+packages = ["classical_app", "eval", "shared"]
 
 [build-system]
 requires = ["setuptools>=68.0"]

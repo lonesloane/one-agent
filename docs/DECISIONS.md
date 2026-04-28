@@ -319,48 +319,23 @@ outcome; no notification, no approval inbox, no approver UI. Full approver UX is
 to Phase 4. This is intentional scope control — the contrast tool needs to show routing
 outcomes, not implement the approval workflow itself.
 
-### [2026-04-24] Phase 4 approver workflow — agent-centric (OQ-9 resolved)
+### [2026-04-28] Agent app reset — quarantine failed attempt, re-decide stack
 
-OQ-9 (delegation-head approval workflow) resolved for Phase 4 with option B:
-approver persona acts through the agent. No classical app inbox screen, no email
-notifications — both out of scope.
+First `agent_app/` implementation (Phase 3 / 3.5 / 4 + spikes) abandoned 2026-04-28
+after AG-UI + CopilotKit HITL/multi-turn fragility could not be resolved within the
+package boundaries (multi-turn 400 from out-of-order tool history; HITL dialog
+not auto-rendered by `V2Provider`; denied-approval orphan tool_call; HMR-induced
+state loss; brittle replay behavior). All artifacts (PRDs, plans, source tree,
+memory entries) moved to `_archived/` (gitignored). Rebuild starts from the
+standing classical app + shared layer + selected model (`gpt-4.1-mini`).
 
-**Scope:**
-- Persona switch in delegate picker — delegation editors AND delegation heads selectable
-- New read tool `list_pending_dars(approver_id)` — returns DARs awaiting the current
-  approver per their scope (delegation head sees only PENDING_DELEGATION_HEAD for their
-  delegation; secretariat sees PENDING_SECRETARIAT)
-- New write tools `approve_dar(dar_id, reason?)` and `reject_dar(dar_id, reason)` with
-  `approval_mode="always_require"` — AG-UI HITL dialog confirms the action
-- Status propagation: `PENDING_*` → `APPROVED` / `REJECTED`; approved DARs surface via
-  existing `is_document_visible` logic
-- Audit via existing `AuditMiddleware` — approvals captured in the trace
+**Retained:** Microsoft Agent Framework as agent runtime; `gpt-4.1-mini` as model;
+`shared/` data layer; `classical_app/`; Phase 0–2 docs and plans.
 
-**Rationale:** Demonstrates the AG-UI HITL protocol end-to-end — the write agent proposes
-an action, the approver sees a confirmation dialog, decides, and the system reacts. This
-is the most on-theme story for the PoC ("agent handles the whole workflow including
-approval"). Approver inbox in the classical app is deliberately skipped so the contrast
-stays sharp: classical = editor-side only, agent = full loop.
+**Re-opened:** OQ-7 (frontend stack) and OQ-9 Phase 4 portion (approver UX).
+Earlier resolutions ([2026-04-19] AG-UI + CopilotKit; [2026-04-24] agent-centric
+approver) are archived because both were premised on the AG-UI HITL contract
+behaving as documented, which the failed attempt disproved empirically.
 
-### [2026-04-19] Agent frontend: AG-UI + CopilotKit (OQ-7 resolved)
-
-The agent frontend (Phase 3+) uses **AG-UI** as the communication protocol between the
-Python agent and the browser, with **CopilotKit** as the React UI layer. This replaces
-the earlier candidate of Next.js + Vercel AI SDK.
-
-**Rationale:**
-- `approval_mode="always_require"` on write tools maps directly to AG-UI's built-in
-  Human-in-the-Loop protocol — no custom confirmation UI code needed (critical for Phase 4).
-- `agent.run(stream=True)` and `@tool` wrappers map natively to SSE and AG-UI backend
-  tool events; zero custom streaming code.
-- CopilotKit provides polished streaming chat, collapsible tool call visualization, and
-  approval dialogs out of the box — the demo "wow factor" without reinventing the wheel.
-- The Microsoft Agent Framework ships a native Python AG-UI adapter
-  (`agent-framework-ag-ui`), making the integration a first-class pattern rather than
-  a custom bridge.
-
-**Architecture:** FastAPI AG-UI endpoint (`agent_app/server.py`) + CopilotKit Next.js
-frontend (`agent_app/frontend/`), both inside the monorepo.
-
-**Caveat:** `agent-framework-ag-ui` is a preview package (`--pre`). Pin to the first
-working version and monitor for breaking changes.
+**Next:** Fresh research phase (`docs/research-agent-stack.md`,
+`docs/research-hitl-approach.md`) before any new PRD or implementation plan.

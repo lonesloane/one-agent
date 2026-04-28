@@ -122,130 +122,15 @@
 - [x] `docs/DEMO_PHASE2.md` — golden-path demo dry-run script (6 scenarios, all 3 approval routes)
 - [x] Documentation closure: BACKLOG, DESIGN, OPEN_QUESTIONS, DECISIONS updated
 
-## Phase 3 — Agent App (Read Agent — UC1) ✓ (2026-04-22)
-> "The Proactive Read Agent" — meeting brief on session start
+## Phase 3+ — Agent App (rebuild pending)
+> First attempt (Phase 3 / 3.5 / 4 / spikes) abandoned 2026-04-28; artifacts under `docs/_archived/` and `plan/_archived/`. Microsoft Agent Framework retained as runtime; frontend stack and HITL approach are open again (OQ-7, OQ-9).
 
-### Phase 3A — Tools and Agent Setup ✓ (2026-04-20)
-- [x] Implement agent tools: `get_delegation_info`, `lookup_delegate`, `get_upcoming_meetings`, `get_agenda_documents` (thin wrappers over shared layer using `@tool` + `FunctionInvocationContext` for identity threading)
-- [x] Write system prompt encoding domain model, access-classification rule, proactive brief sequence, write-guard, grounding rule
-- [x] Set up `Agent` with `FoundryChatClient` + read tools + `AuditMiddleware`
-- [x] 15 new tests in `tests/agent_app/test_tools.py` (202 tests total)
-
-### Phase 3B — FastAPI AG-UI Server ✓ (2026-04-20)
-- [x] FastAPI AG-UI endpoint (`agent_app/server.py`) with `_BoundAgent` identity threading pattern
-- [x] Custom AG-UI POST endpoint bypassing `HttpAgent` threadId reset limitation
-- [x] Lazy agent singleton + `get_engine` DB initialization
-- [x] `/api/delegates` endpoint for persona switcher (JOINed load)
-
-### Phase 3C — CopilotKit Frontend ✓ (2026-04-20)
-- [x] Next.js + CopilotKit frontend (`agent_app/frontend/`)
-- [x] Streaming brief visually confirmed end-to-end
-- [x] Document visibility rules function correctly via `get_agenda_documents` + DAR enforcement
-
-### Phase 3D — Integration Tests and Doc Closure ✓ (2026-04-22)
-- [x] `tests/agent_app/test_brief_logic.py` — brief trigger (new docs within lookback), suppress (stale docs, no meetings), grounding (tool-returned titles only), DAR visibility enforcement, multiple meetings, delegate-not-found edge case
-- [x] ≥ 20 new tests across Phase 3 (15 Phase 3A + 16 Phase 3D = 31 new tests)
-- [x] Full suite green: **203 tests passing**
-- [x] Documentation closure: BACKLOG, DESIGN, DECISIONS updated
-
-### Phase 3E — CopilotKit E2E Playwright Tests ✓ (2026-04-20)
-- [x] 4 Playwright e2e tests in `tests/e2e_agent/` covering brief trigger, suppress, persona switch, tool call blocks
-- [x] Tests require live Azure AI Foundry (excluded from unit test suite)
-
-## Phase 3.5 — Agent UI Polish (OECD-corporate) ✓ (2026-04-23) — [plan](../plan/feature-ui-polish-phase4-oecd-1.md)
-> Post-Phase 3 visual pass: tokens, shell, chat theming, tool-call accordion
-
-### P1 — App shell + OECD design tokens ✓ (2026-04-22, merged cf1fa2c)
-- [x] Design tokens in `app/globals.css` (`--color-primary` #0060A9, `--color-bg`, `--color-surface`, radii, shadows, spacing scale)
-- [x] App shell in `app/page.tsx` + `page.module.css` — OECD blue header, "Acting as" persona bar, centered 900px card
-- [x] DelegatePicker CSS module + focus ring
-- [x] Side-effect fix: `useAgent<T>` generic + `initialState` removed (dead in v2)
-
-### P2 — CopilotKit chat theming ✓ (2026-04-23, merged 1f170ca)
-- [x] Override `--copilot-kit-*` CSS vars scoped to `.copilotKitChat` (primary, contrast, background, separator, muted, input bg)
-- [x] Assistant bubble: border + surface bg; user bubble: OECD blue + white
-- [x] Input focus-within ring
-- [x] Reviewer caught 2 dead v2 selectors (`.copilotKitInputControlButton`, `.poweredBy`) — removed
-
-### P3 — Tool-call accordion restyle ✓ (2026-04-23, merged 03cfcb1)
-- [x] `ToolCallBlock` extracted to own file + CSS module (matches DelegatePicker pattern)
-- [x] Chevron rotates on open, monospace name, status pill, border-left primary accent
-- [x] `<pre>` blocks in `--color-tool-bg` with horizontal scroll
-
-## Phase 4 — Agent App (Write Agent — UC2)
-> "The Write Agent with Reasoning" — delegate creation with DAR + approver flow (option B, see DECISIONS 2026-04-24)
-
-### Phase 4A — Write Tools ✓ (2026-04-25, merged 8280471) — [plan](../plan/completed/feature-phase4a-create-write-tools-1.md)
-- [x] Implement write tools `create_delegate` + `create_document_access_rights` with `approval_mode="always_require"`
-- [x] FunctionInvocationContext editor identity threading; same-delegation constraint enforced at tool boundary
-- [x] Explicit rollback in `create_delegate` (REQ-005 symmetry); unknown-delegation no-side-effect tests
-- [x] 195 tests passing
-
-### Phase 4B — Server Wiring + System Prompt ✓ (2026-04-25, merged 6fb4fed) — [plan](../plan/feature-phase4b-create-server-prompt-1.md)
-- [x] SYSTEM_PROMPT extended: `## Persona Mode Selection`, `## Create Side (Delegation Editor)`, `## HITL Write Guard`
-- [x] Selection algorithm names every seeded role (DELEGATE, DELEGATION_EDITOR) explicitly + disclaimer for deferred approver roles
-- [x] `_serialize_delegate_profile` exposes `role` via `DelegateRole.value`; `whoami` short-circuit also returns `role: None`
-- [x] Prompt regression test (`tests/agent_app/test_system_prompt.py`, 7 tests guarding required sections + role branches)
-- [x] Live SSE smoke against `uvicorn agent_app.server:app`: HITL approval-request event fires before any DB write
-- [x] 243 tests passing
-
-### Create side — remaining
-- [ ] **Phase 4C** — Frontend HITL dialog rendering (CopilotKit `always_require` out-of-box, verify in browser)
-- [ ] **Phase 4D** — Integration tests (5 DAR scenarios) + create-side doc closure
-- [ ] Test: member delegate creation (General + Restricted access)
-- [ ] Test: partner delegate creation (General only)
-- [ ] Test: partner + Framework Agreement (elevated access)
-- [ ] Test: Confidential access request (secretariat approval)
-- [ ] Test: retroactive access request (secretariat approval)
-- [ ] Tighten prompt for create→DAR sequencing (smoke surfaced model issuing both calls in parallel with stale `delegate_id`)
-
-### Phase 4C dry-run findings
-
-**BUG-4C-001** ✅ RESOLVED — Tool-result / tool-call message misordering causes Foundry 400 on follow-up turns.
-- Root cause: CopilotKit v2 reconstructs conversation history with `role:"tool"` messages before the `role:"assistant"` message that requested them. `_sanitize_tool_history` in `agent_framework_ag_ui` drops the out-of-order results, leaving dangling tool_call IDs that Foundry rejects with `400 — No tool output found for function call <id>`.
-- Fix: `_fix_tool_call_ordering` added to `agent_app/server.py`; called in `agent_endpoint` after `model_dump` before `_BoundAgent` construction. O(n) two-pass algorithm: first pass builds `call_id → assistant_index` map; second pass splices each assistant message before its first preceding tool result, guarded with `asst_idx not in skip` to avoid duplication when multiple tool results share one assistant.
-- Tests: 8-case unit suite in `tests/agent_app/test_server.py` (Cases A–H); 251 total tests green.
-
-**FINDING-4C-002** ❌ CONFIRMED — CopilotKit v2 `V2Provider` does NOT auto-render `function_approval_request` HITL dialogs.
-- Dry-run result (2026-04-25): DELEGATION_EDITOR persona, brief loaded, follow-up message ("What documents are new?") succeeded ✅. Delegate-creation request triggered `create_delegate_access_request` with `approval_mode="always_require"` — backend fired `RUN_FINISHED` with `interrupt` payload correctly, but frontend showed nothing. No approval dialog rendered.
-- Downstream symptom: subsequent turns send history with unanswered `tool_calls` entry → Foundry 400 `No tool output found for function call <id>`. This is a distinct failure mode from BUG-4C-001 (missing result vs. misordered result — `_fix_tool_call_ordering` cannot help here).
-- ASSUMPTION-001 in `plan/feature-phase4c-create-frontend-hitl-1.md` is **invalidated**: `V2Provider` does not pick up `always_require` schemas automatically without explicit hook wiring.
-- **Required before Phase 4D**: frontend HITL wiring — query Context7 `/copilotkit/copilotkit` for the correct v2 hook/component that renders `function_approval_request` events. Plan `feature-phase4c-create-frontend-hitl-1.md` must be revised from "validation only" to "implementation + validation" (CON-001 may need relaxing if a new component is required). Execute this plan before `feature-phase4d-create-integration-tests-1.md`.
-
-**BUG-4C-004** ✅ RESOLVED — Approving a write-tool HITL dialog never executed the underlying tool; the LLM saw "no result" and hallucinated a failure.
-- Root cause (three composing gaps in `agent_framework_ag_ui`'s approval-execution path):
-  1. `_BoundAgent` did not expose `default_options` / `mcp_tools`, so `collect_server_tools(bound)` returned `[]`, leaving the approval-execution `tool_map` empty and `_auto_invoke_function` short-circuiting on "hosted tool" assumption.
-  2. `_resolve_approval_responses` builds its function-middleware pipeline from `client.function_middleware` only — `AuditMiddleware` lives on `agent.middleware` and never ran for HITL-approved invocations, so the `function_invocation_kwargs.delegate_id` path was bypassed and the editor check raised PermissionError.
-  3. Frontend `respond()` payload still carried `steps: []`, which `_is_confirm_changes_response` interpreted as the legacy state-confirmation flow (text ack only), again skipping tool execution.
-- Fix landed in commit `103bbc0` (`fix(hitl): execute approved write tools end-to-end`):
-  * `_BoundAgent` now passes through `default_options` and `mcp_tools`.
-  * Module-level monkey-patch on `agent_framework._tools._auto_invoke_function` injects `delegate_id` from `_thread_delegate_map` (keyed by `session.metadata.ag_ui_thread_id`) before the framework dispatches the approved tool.
-  * `respond()` now sends `{accepted, function_call_id}` (no `steps`); `_resolve_approval_call_id` then maps the approval onto the underlying tool call.
-- Verified: Marie Dupont approve → DEL-2026-0010 (Henry Tan) created; subsequent approve → DAR id=25 with classification RESTRICTED, approval_status PENDING_DELEGATION_HEAD.
-
-**FINDING-4C-005** ⚠️ TO BE INVESTIGATED — Denied HITL response leaves the chat history with a `tool_calls` entry that has no matching tool result. The next user turn reaches Foundry with the gap and is rejected with `Error code: 400 - "No tool output found for function call <id>"`.
-- Empirical signal (2026-04-26): Marie Dupont denied `create_delegate(Iris Black)` → DB unchanged ✅, but the very next message ("Grant Henry Tan RESTRICTED…") never produced a model response; backend log carries the 400.
-- Suspected cause: `agent_framework_ag_ui._replace_approval_contents_with_results` does not write a "denied" function_result for rejected approvals, so the orphan tool_call survives into the next request.
-- Workaround until investigated: start a new thread (delegate-picker reset) after any deny.
-- Open question: is this a package bug, or do we need a frontend-side scrub of orphan tool_calls before re-sending the snapshot?
-
-**FINDING-4C-006** ⚠️ TO BE INVESTIGATED (cosmetic) — HITL completion card shows `<tool> — completed` after a Deny click instead of `denied` (approve path renders correctly).
-- Empirical signal (2026-04-26): the approve-then-deny sequence in the same session produced "completed" on deny; `lastDecision` state appears null at the moment the "complete" branch renders.
-- Suspected cause: HMR reset of `lastDecision` between the click that fired `respond()` and the re-render of the HITL card; the act of `respond()` cycles status `executing → complete` quickly enough that React batched the state update with a stale closure.
-- Tool execution and DB outcome are unaffected — purely a label shown in the approval card.
-- Open question: drive the label off `props.result` (with structural detection of denied response) instead of local state, or off a `useRef` so HMR cannot wipe it?
-
-### Approver side (delegation head / secretariat persona) — OQ-9 resolution
-- [ ] Seed a delegation-head persona (role=DELEGATION_HEAD) and a secretariat persona
-- [ ] Extend `/api/delegates` to include approver personas in picker
-- [ ] Read tool `list_pending_dars(approver_id)` — scoped by approver role + delegation
-- [ ] Write tool `approve_dar(dar_id, reason?)` with `approval_mode="always_require"`
-- [ ] Write tool `reject_dar(dar_id, reason)` with `approval_mode="always_require"`
-- [ ] Status propagation → `APPROVED` / `REJECTED`; document visibility via existing `is_document_visible`
-- [ ] Test: delegation head approves PENDING_DELEGATION_HEAD → delegate sees doc
-- [ ] Test: secretariat approves PENDING_SECRETARIAT (Confidential + retroactive routes)
-- [ ] Test: reject flow (status → REJECTED, doc stays invisible)
-- [ ] Test: approver cannot act on DARs outside their scope
+Pre-implementation prerequisites:
+- [ ] Research phase — agent frontend stack (`docs/research-agent-stack.md`)
+- [ ] Research phase — HITL approach (`docs/research-hitl-approach.md`)
+- [ ] New PRD — read agent (UC1, proactive meeting brief)
+- [ ] New PRD — write agent (UC2, delegate creation + DAR + approver flow)
+- [ ] Implementation plans per phase
 
 ## Phase 5 — MCP Knowledge Base
 > Business rules as a queryable MCP server

@@ -11,3 +11,6 @@ eval/results/*
 mempalace.yaml
 entities.json
 docs/entities.json
+_archived/
+docs/_archived/
+plan/_archived/

@@ -45,7 +45,7 @@ Side-by-side, they make the case without a slide deck.
 | Model (dev) | Local Ollama (`phi-4-mini`, `mistral-small`) via `OllamaChatClient` |
 | Model (fallback) | `gpt-4o` or `gpt-4.1` if mini-tier fails tool selection |
 | Classical frontend | Flask + Jinja2 + Bootstrap 5 |
-| Agent frontend | Next.js + CopilotKit (AG-UI protocol) |
+| Agent frontend | TBD — research phase pending (re-opened 2026-04-28, see OQ-7) |
 | Database | SQLite (shared) |
 | Business KB | MCP server (mcp SDK) + ChromaDB + git-backed markdown |
 | Session/audit | `AgentSession` serialized to SQLite |
@@ -110,15 +110,11 @@ one-agent-poc/                 # Project root
 └── one_agent.db               # SQLite (shared, Phase 1+)
 ```
 
-> **Current state (2026-04-23)**: Phase 3 complete + Phase 3.5 UI polish merged.
-> The ONE-MP Read Agent delivers proactive session briefs via AG-UI + CopilotKit.
-> The `agent_app/` package contains: `agent.py` (system prompt + `create_agent()`),
-> `tools.py` (four `@tool` wrappers: `lookup_delegate`, `get_delegation_info`,
-> `get_upcoming_meetings`, `get_agenda_documents`), `middleware.py` (AuditMiddleware),
-> and `server.py` (FastAPI AG-UI endpoint). The CopilotKit Next.js frontend
-> (`agent_app/frontend/`) connects via AG-UI protocol and wears an OECD-corporate
-> visual theme (P1 shell + tokens, P2 chat theming, P3 tool-call accordion —
-> merged cf1fa2c / 1f170ca / 03cfcb1). Identity threading uses
-> `FunctionInvocationContext` to inject `delegate_id` invisibly into every tool call.
-> **203 tests passing** (187 baseline + 16 new Phase 3D unit tests; 4 e2e agent
-> tests excluded — require live Azure AI Foundry). Phase 4 (write agent, UC2) is next.
+> **Current state (2026-04-28)**: Phase 0 (model selection — `gpt-4.1-mini`),
+> Phase 1 (shared data layer), and Phase 2 (classical app, read + write flows)
+> shipped. **`agent_app/` rebuild pending fresh research and PRDs** — first
+> attempt (Phase 3 / 3.5 / 4 / spikes) abandoned 2026-04-28 and quarantined
+> under `docs/_archived/` and `plan/_archived/`. Microsoft Agent Framework
+> retained as agent runtime; frontend stack and HITL approach are open
+> questions again (OQ-7, OQ-9). 188 tests passing (`tests/shared` +
+> `tests/classical_app`).
