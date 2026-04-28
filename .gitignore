@@ -8,3 +8,6 @@ eval/results/*
 !eval/results/.gitkeep
 *.db
 .playwright-cli/
+mempalace.yaml
+entities.json
+docs/entities.json
