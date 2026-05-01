@@ -1,8 +1,15 @@
-# Project: ONE-MP Agent (Python 3.11, Microsoft Agent Framework)
+# Project: ONE-MP Agent (Python 3.11 + .NET 8/9, Microsoft Agent Framework)
+
+> Cross-language repo. `classical_app/` + `shared/` (Python) and
+> `agent_app/` + `shared/csharp/` (C# / .NET) live side by side, sharing
+> the SQLite database and seed data. See
+> `docs/agent-stack-decision-2026-04-29.md` for the pivot rationale.
 
 ## 🧱 Code Structure & Modularity
 
 ### Style & Formatting (automated)
+
+#### Python (`classical_app/`, `shared/`, `eval/`, `tests/`)
 
 **Python style is enforced by `ruff` — see `[tool.ruff]` in `pyproject.toml`
 for the single source of truth** (line length, import order, blank lines,
@@ -22,6 +29,33 @@ enumerated list of violations.
 
 Use PEP 484 type hints (`dict[str, int]`, not `typing.Dict[str, int]`).
 
+#### C# / .NET (`agent_app/`, `shared/csharp/`)
+
+**C# style is enforced by `dotnet format` against the repo `.editorconfig`
+— single source of truth** (indentation, brace placement, using order,
+naming conventions via `dotnet_naming_*`).
+
+Before committing, always run:
+
+```bash
+dotnet format
+```
+
+Same shift-left rule as Python: reviewers must not re-litigate anything
+`dotnet format` owns. The only acceptable response to style drift is
+"run dotnet format".
+
+Conventions:
+
+- Target framework: .NET 8 (LTS) or .NET 9 — pinned in `*.csproj`
+  `<TargetFramework>`.
+- `<Nullable>enable</Nullable>` and `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`
+  in every project. Nullable reference types are non-negotiable.
+- File-scoped namespaces (`namespace Foo.Bar;`).
+- `var` only when type is obvious from RHS; explicit type otherwise.
+- `async` methods end in `Async`; pass `CancellationToken` through async
+  call chains.
+
 ### File and Function Limits
 
 - **Never create a file longer than 500 lines of code**. If approaching this
@@ -39,10 +73,21 @@ Use PEP 484 type hints (`dict[str, int]`, not `typing.Dict[str, int]`).
 
 ## 🛠️ Development Setup
 
+### Python
+
 Use venv for dependencies.
 
 - Virtual env: `source .venv/bin/activate` before any Python commands
 - Dependencies: `pip install -e ".[dev]"` for dev install with extras
+
+### C# / .NET
+
+- SDK: install .NET 8 (LTS) or .NET 9 SDK (`dotnet --list-sdks` to check).
+- Restore + build: `dotnet restore && dotnet build` from `agent_app/`.
+- Run: `dotnet run --project agent_app/AgentApp.csproj` (project name TBD
+  during scaffold).
+- Tests: `dotnet test` (xUnit). Parity tests for `shared/csharp/` live
+  alongside the C# port and mirror `tests/shared/test_business_rules.py`.
 
 ## 📋 Style & Conventions
 
@@ -210,6 +255,12 @@ def generate_secure_token(length: int = 32) -> str:
 - PEP 484 (Type Hints): https://www.python.org/dev/peps/pep-0484/
 - The Hitchhiker's Guide to Python: https://docs.python-guide.org/
 
+### C# / .NET Best Practices
+
+- Framework design guidelines: https://learn.microsoft.com/dotnet/standard/design-guidelines/
+- C# coding conventions: https://learn.microsoft.com/dotnet/csharp/fundamentals/coding-style/coding-conventions
+- Nullable reference types: https://learn.microsoft.com/dotnet/csharp/nullable-references
+
 ## ⚠️ Important Notes
 
 - **NEVER ASSUME OR GUESS** - When in doubt, ask for clarification
@@ -248,18 +299,43 @@ Always use jCodemunch-MCP tools — never fall back to Read, Grep, Glob, or Bash
 - Call resolve_repo with the current directory first; if not indexed, call index_folder.
 
 ## Agent Framework & CopilotKit Policy
-Before writing any code in `agent_app/` that uses Microsoft Agent Framework or
-CopilotKit APIs, **query Context7 first** for the relevant topic. Never assume
-API signatures or configuration from training data — these are preview/bleeding-
-edge packages that change frequently.
+
+Before writing any code in `agent_app/` (C# / .NET) or `shared/csharp/`
+that uses Microsoft Agent Framework or CopilotKit APIs, **query Context7
+first** for the relevant topic. Never assume API signatures or
+configuration from training data — these are preview / bleeding-edge
+packages that change frequently.
 
 | Library | Context7 ID |
 |---|---|
 | Microsoft Agent Framework | `/websites/learn_microsoft_en-us_agent-framework` |
 | CopilotKit | `/copilotkit/copilotkit` |
 
-Examples of when to query: tool decorator options, `add_agent_framework_fastapi_endpoint`
-signature, `HttpAgent` / `threadId` reset, streaming event types, middleware API.
+**MS Learn zone pivots are mandatory.** Pages with `zone_pivot_groups:
+programming-languages` default to C# in WebFetch / Context7 output but
+contain *both* C# and Python versions interleaved. Always include
+`?pivots=programming-language-csharp` in the URL when fetching C#
+guidance for `agent_app/` — and `?pivots=programming-language-python`
+when researching anything residual on the Python side. Cross-language
+pattern leakage caused the multi-week derail that triggered the
+2026-04-29 pivot.
+
+Canonical C# entry points:
+
+- AG-UI hosting: `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore`
+  (`app.MapAGUI("/", agent)`).
+- Agent runtime: `Microsoft.Agents.AI` (`AsAIAgent` extension on
+  `Microsoft.Agents.AI.Foundry` `FoundryChatClient`).
+- HITL: `ApprovalRequiredAIFunction` + `request_approval` synthetic
+  client tool + bidirectional middleware (per
+  `integrations/ag-ui/human-in-the-loop?pivots=programming-language-csharp`).
+- Frontend: CopilotKit React via `HttpAgent` runtime registration (per
+  CopilotKit MAF page).
+
+Examples of when to query: `ApprovalRequiredAIFunction` constructor
+options, `MapAGUI` route shape, `HttpAgent` registration / `threadId`
+reset, streaming event types, middleware insertion order, `FoundryChatClient`
+construction.
 
 _This document is a living guide. Update it as the project evolves and new
 patterns emerge._

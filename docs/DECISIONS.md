@@ -339,3 +339,55 @@ behaving as documented, which the failed attempt disproved empirically.
 
 **Next:** Fresh research phase (`docs/research-agent-stack.md`,
 `docs/research-hitl-approach.md`) before any new PRD or implementation plan.
+
+### [2026-04-29] Agent app pivots to C# / .NET; classical_app + shared stay Python
+
+Three throwaway spikes were built on `research/agent-stack-spikes` against
+the same four-turn HITL scenario (T1 list → T2 approve create → T3 deny
+create → T4 list). **C4 (Chainlit + MAF Python)** passed all four turns
+in ~120 LOC. **C2 (Python AG-UI custom client)** was empirically blocked:
+the published Python sample at
+`integrations/ag-ui/human-in-the-loop?pivots=programming-language-python`
+ships with four structural bugs and a missing `send_approval_response`
+API surface; reverse-engineering `_message_adapters.py` could not drive
+the round-trip to completion within the spike budget. **C1 (CopilotKit +
+Python AG-UI)** was not built — it inherits C2's wire-layer issues and
+adds JS toolchain effort to confirm what C2 already showed.
+
+**Decision:** Rebuild `agent_app/` in **C# / .NET** using
+`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` for the AG-UI server,
+`ApprovalRequiredAIFunction` + `request_approval` synthetic client tool +
+bidirectional middleware for HITL (per the C# zone of MS Learn), and
+CopilotKit React on the frontend via `HttpAgent` runtime registration.
+The .NET HITL contract is documented end-to-end and the surface area is
+mature; the Python equivalent is not yet usable as published.
+
+**What stays Python:** `classical_app/`, `shared/database.py`,
+`shared/business_rules.py`, `shared/seed_data.py`, `eval/`, `tests/`. The
+SQLite database is the cross-language integration surface.
+
+**What gets ported:** `shared/business_rules.py` →
+`shared/csharp/BusinessRules.cs`. Small, stable surface (~200 LOC).
+Parity tests against the Python originals catch drift.
+
+**What stays the same:** Microsoft Agent Framework as agent runtime;
+`gpt-4.1-mini` via `FoundryChatClient` (now the
+`agent-framework-foundry` / `Microsoft.Agents.AI.Foundry` C# package);
+Phase 0 / 1 / 2 docs and decisions.
+
+**Resolves:** OQ-7 (frontend stack — CopilotKit React via AG-UI on a C#
+server), OQ-9 Phase 4 portion (approver UX hosted as a separate
+CopilotKit route inside `agent_app/`, served by ordinary agent tools
+against `DocumentAccessRight.approval_status`).
+
+**Tracking:** Set a 2026-Q3 reminder to re-evaluate the Python AG-UI
+client. If Microsoft fixes the published Python sample and adds the
+missing `send_approval_response` API, the Python path may become viable
+again.
+
+**Spike branch:** `research/agent-stack-spikes` stays unmerged but
+preserved as a falsification record. Do not delete.
+
+Full record: `docs/agent-stack-decision-2026-04-29.md`. Companion docs:
+`docs/research-agent-stack.md` (criteria), `docs/research-agent-stack-candidates.md`
+(survey + hard-gate + spike results), `plan/research-agent-stack-spike.md`.

@@ -40,17 +40,18 @@ Side-by-side, they make the case without a slide deck.
 
 | Layer | Technology |
 |---|---|
-| Agent runtime | Python + Microsoft Agent Framework |
-| Model (PoC) | `gpt-4o-mini` or `gpt-4.1-mini` via `FoundryChatClient` (Azure OpenAI) |
-| Model (dev) | Local Ollama (`phi-4-mini`, `mistral-small`) via `OllamaChatClient` |
-| Model (fallback) | `gpt-4o` or `gpt-4.1` if mini-tier fails tool selection |
-| Classical frontend | Flask + Jinja2 + Bootstrap 5 |
-| Agent frontend | TBD — research phase pending (re-opened 2026-04-28, see OQ-7) |
-| Database | SQLite (shared) |
-| Business KB | MCP server (mcp SDK) + ChromaDB + git-backed markdown |
-| Session/audit | `AgentSession` serialized to SQLite |
-| Tools | `@tool` decorator + Pydantic `Field` schemas |
-| Cross-cutting | Agent Framework middleware (audit, security) |
+| Agent runtime | C# / .NET 8–9 + Microsoft Agent Framework (`Microsoft.Agents.AI`) |
+| Model (PoC) | `gpt-4.1-mini` via `FoundryChatClient` (Azure AI Foundry) |
+| Model (fallback) | `gpt-5.4-nano` (validated alternative, 86% on eval suite) |
+| Classical frontend | Flask + Jinja2 + Bootstrap 5 (Python, unchanged) |
+| Agent frontend | CopilotKit React via AG-UI (`HttpAgent` runtime registration) |
+| Agent transport | `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` (`MapAGUI`) |
+| Database | SQLite (cross-language integration surface) |
+| Shared business rules | Python `shared/business_rules.py` ↔ C# `shared/csharp/BusinessRules.cs` (parity-tested) |
+| Business KB | MCP server (mcp SDK) + ChromaDB + git-backed markdown (Phase 5) |
+| Session/audit | `AgentThread` / `AgentSession` (.NET) — workflow-scoped per use case |
+| Tools | `[Description]`-annotated methods + `ApprovalRequiredAIFunction` for HITL writes |
+| Cross-cutting | Agent Framework middleware (audit, identity, bidirectional HITL) |
 
 ## Use Cases (PoC Scope)
 
@@ -70,49 +71,64 @@ Side-by-side, they make the case without a slide deck.
 
 ## Key Architectural Patterns
 
-- **Human-in-the-loop**: `approval_mode="always_require"` on write tools; `"never_require"` on reads
-- **Audit trail**: `FunctionMiddleware` intercepts every tool call (who, what, when, result)
-- **Identity threading**: user identity passed via `function_invocation_kwargs`, invisible to model
-- **MCP KB**: business rules queryable at runtime via MCP protocol (semantic search + structured lookups)
-- **Streaming**: `agent.run(stream=True)` for real-time transparency in the UI
+- **Human-in-the-loop**: `ApprovalRequiredAIFunction` wraps write tools; reads run unwrapped. Round-trip via the AG-UI `request_approval` synthetic client tool + bidirectional middleware (C# zone of MS Learn HITL doc).
+- **Audit trail**: function-invocation middleware intercepts every tool call (who, what, when, result).
+- **Identity threading**: user identity propagated through `IServiceProvider`-scoped context (HTTP scope) and injected into tool-method parameters; invisible to the model.
+- **MCP KB**: business rules queryable at runtime via MCP protocol (semantic search + structured lookups). Phase 5 — language-agnostic, consumed by the C# agent.
+- **Streaming**: AG-UI SSE stream surfaced through CopilotKit React for real-time transparency.
+- **Workflow-scoped sessions**: each use case (UC1 brief, UC2 wizard, UC3 approver) opens a fresh `AgentThread`; identity persists via auth, not session history.
 
 ## Project Structure
 
 ```
 one-agent-poc/                 # Project root
-├── eval/                      # Phase 0 evaluation harness ← built in Phase 0a
+├── eval/                      # Phase 0 evaluation harness (Python)
 │   ├── __init__.py
 │   ├── tools.py               # 6 stub tools with @tool decorator
 │   ├── middleware.py          # RecorderMiddleware — captures tool traces
-│   ├── evaluators.py          # ScenarioScore, C1 evaluator, C2-C4 stubs
+│   ├── evaluators.py          # ScenarioScore, C1–C4 evaluators
 │   ├── harness.py             # evaluate_scenario, run_all, __main__
 │   ├── scenarios/
-│   │   └── scenarios.json     # A1, B1, C1 scenarios (Phase 0a); grows in 0b
+│   │   └── scenarios.json     # 15 scenarios across A/B/C/D categories
 │   └── results/               # Gitignored output directory
 ├── shared/                    # Shared data layer (Phase 1)
-│   ├── database.py            # SQLAlchemy models
-│   ├── business_rules.py      # DAR computation, approval routing
-│   └── seed_data.py           # Test data population
-├── classical_app/             # Flask form-based app (Phase 1-2)
+│   ├── database.py            # SQLAlchemy models (Python — schema owner)
+│   ├── business_rules.py      # DAR computation, approval routing (Python)
+│   ├── seed_data.py           # Test data population (Python)
+│   └── csharp/                # C# port of business rules (Phase 3+)
+│       ├── BusinessRules.cs   # Mirrors business_rules.py, parity-tested
+│       └── BusinessRules.csproj
+├── classical_app/             # Flask form-based app (Phase 1–2, Python)
 │   ├── app.py                 # Routes
 │   ├── forms.py               # WTForms
 │   └── templates/             # Jinja2 templates (14 screens)
-├── agent_app/                 # Agent Framework app (Phase 3+, rebuild pending)
-│   └── (TBD — layout depends on frontend stack decision; see OQ-7)
-├── kb_server/                 # MCP Knowledge Base (Phase 5)
+├── agent_app/                 # Microsoft Agent Framework app (Phase 3+, C# / .NET)
+│   ├── AgentApp.csproj        # ASP.NET Core host
+│   ├── Program.cs             # MapAGUI("/", agent) + DI wiring
+│   ├── Tools/                 # Agent tools (`ApprovalRequiredAIFunction` writes, plain reads)
+│   ├── Middleware/            # Audit, identity threading, bidirectional HITL
+│   └── frontend/              # CopilotKit React app (Next.js or Vite)
+│       └── (HttpAgent runtime registration → AG-UI server)
+├── kb_server/                 # MCP Knowledge Base (Phase 5, language-agnostic over MCP)
 │   ├── server.py              # MCP server
 │   ├── rules/                 # Business rule markdown entries
 │   └── vector_store/          # ChromaDB embeddings
-├── pyproject.toml             # Project metadata + dependencies
-├── .env.example               # Template for FOUNDRY_PROJECT_ENDPOINT
-└── one_agent.db               # SQLite (shared, Phase 1+)
+├── tests/                     # pytest suite (Python: shared/, classical_app/)
+├── pyproject.toml             # Python metadata + deps
+├── global.json                # .NET SDK pin (TBD during scaffold)
+├── .editorconfig              # dotnet format + ruff source of truth
+├── .env.example               # FOUNDRY_PROJECT_ENDPOINT, FOUNDRY_MODEL
+└── one_agent.db               # SQLite (cross-language integration surface)
 ```
 
-> **Current state (2026-04-28)**: Phase 0 (model selection — `gpt-4.1-mini`),
-> Phase 1 (shared data layer), and Phase 2 (classical app, read + write flows)
-> shipped. **`agent_app/` rebuild pending fresh research and PRDs** — first
-> attempt (Phase 3 / 3.5 / 4 / spikes) abandoned 2026-04-28 and quarantined
-> under `docs/_archived/` and `plan/_archived/`. Microsoft Agent Framework
-> retained as agent runtime; frontend stack and HITL approach are open
-> questions again (OQ-7, OQ-9). 188 tests passing (`tests/shared` +
-> `tests/classical_app`).
+> **Current state (2026-04-29)**: Phase 0 (model selection — `gpt-4.1-mini`),
+> Phase 1 (shared data layer), and Phase 2 (classical app, read + write
+> flows including the 8-screen add-delegate wizard) shipped to `main`.
+> **Agent stack pivoted to C# / .NET** — the Python `agent_app/` attempt
+> was abandoned 2026-04-28 and quarantined under `docs/_archived/` and
+> `plan/_archived/`; the Python AG-UI client surface proved too under-baked
+> for HITL round-trip (see `docs/agent-stack-decision-2026-04-29.md`).
+> Microsoft Agent Framework retained as agent runtime via the .NET package
+> set; CopilotKit React selected as frontend. `agent_app/` C# scaffold +
+> spike pending (Step B of the path forward). 188 tests passing
+> (`tests/shared` + `tests/classical_app`).

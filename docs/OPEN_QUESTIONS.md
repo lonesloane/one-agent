@@ -29,31 +29,48 @@ Questions deferred from design, tracked here until resolved.
 **Context**: Adding an MCP KB round-trip increases pressure on model quality — the model must correctly decide *when* to query the KB, interpret confidence signals, and then select the right backend tool. Mini-tier models (`gpt-4o-mini`, `gpt-4.1-mini`) must be validated specifically on KB-guided tool selection, not just plain tool use.
 **Update (2026-04-06)**: Phase 0a harness infrastructure is complete. Plain tool selection (without KB) is being evaluated first. KB-guided evaluation will be added once a base model is selected.
 
-### OQ-7: Agent frontend technology choice — Re-opened (2026-04-28)
+### OQ-7: Agent frontend technology choice ✓ Resolved (2026-04-29)
 **Relevant phase**: Phase 3
 **Context**: The brainstorming docs suggest Next.js + Vercel AI SDK for the agent frontend (streaming, tool call display). Is this confirmed, or should a simpler alternative (e.g., a terminal/CLI interface) suffice for the PoC demo?
-**Status**: Re-opened 2026-04-28 after first agent_app attempt was abandoned. Earlier
-resolution (AG-UI + CopilotKit, 2026-04-19) is archived under
-`docs/_archived/failed-attempt-2026-04/` because the AG-UI HITL contract proved
-fragile in practice (multi-turn tool-call ordering, denied-approval orphans,
-V2Provider not rendering `function_approval_request`). Pending fresh research
-phase — see `docs/research-agent-stack.md` (TBD). Decision criteria should be
-established without reference to the prior attempt's specific findings.
+**History**: Initial resolution (AG-UI + CopilotKit on Python, 2026-04-19) was
+archived 2026-04-28 under `docs/_archived/failed-attempt-2026-04/` after the
+Python AG-UI HITL contract proved fragile (multi-turn tool-call ordering,
+denied-approval orphans, V2Provider not rendering `function_approval_request`).
+Re-opened 2026-04-28 pending fresh research.
+**Decision (2026-04-29)**: **CopilotKit React via AG-UI on a C# / .NET server**
+(`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` + `MapAGUI` + `HttpAgent` runtime
+registration on the client). The .NET HITL contract is documented end-to-end
+(`ApprovalRequiredAIFunction` + `request_approval` synthetic client tool +
+bidirectional middleware) where the Python equivalent is not yet usable as
+published. Three throwaway spikes on `research/agent-stack-spikes` produced the
+evidence: C4 Chainlit passed cleanly, C2 Python AG-UI custom client was
+empirically blocked, C1 CopilotKit + Python skipped (inherits C2's wire-layer
+issues). C4 retained as fallback. Full record:
+`docs/agent-stack-decision-2026-04-29.md`; DECISIONS entry
+`[2026-04-29] Agent app pivots to C# / .NET`.
 
 ### OQ-8: Test data generation strategy ✓ Resolved (2026-04-12)
 **Relevant phase**: Phase 1
 **Context**: Test data must cover all demo scenarios (member + partner delegations, Framework Agreements, various meeting/document states, delegate login history). Manual crafting vs. scripted generation? What level of realism is needed for stakeholder demos?
 **Decision**: Hardcoded Python in `shared/seed_data.py` (no Faker, no JSON fixtures) with domain-realistic content (OECD-flavored delegation names, real-ish committee names, document titles that sound like OECD output). One-liner placeholder summaries are acceptable — full briefing-language summaries are out of scope. See `docs/DECISIONS.md`.
 
-### OQ-9: Delegation head approval workflow implementation — Phase 4 portion re-opened (2026-04-28)
-**Relevant phase**: Phase 4
+### OQ-9: Delegation head approval workflow implementation ✓ Resolved (2026-04-29)
+**Relevant phase**: Phase 2 (status flag) + Phase 4 (approver UX)
 **Context**: Restricted DAR creation routes to "pending delegation head approval." How is this modeled in the PoC? A status flag only (no actual notification), or a minimal approval UI?
 **Phase 2 decision (2026-04-19) — STILL VALID**: Status flag only —
 `DocumentAccessRight.approval_status` is set (`PENDING_DELEGATION_HEAD`,
 `PENDING_SECRETARIAT`, `AUTO_APPROVED`). No notification, no approval inbox, no
 approver UI in the classical app. Phase 2 shipped this way and remains correct.
-**Phase 4 status (2026-04-28)**: Re-opened. Earlier agent-centric resolution
-(2026-04-24) is archived under `docs/_archived/failed-attempt-2026-04/` —
-that decision rested on `approval_mode="always_require"` working through the
-abandoned AG-UI HITL stack. Approver UX TBD pending agent stack decision (OQ-7).
+**Phase 4 history**: Initial agent-centric resolution (2026-04-24) was archived
+under `docs/_archived/failed-attempt-2026-04/` 2026-04-28 — that decision rested
+on `approval_mode="always_require"` working through the abandoned Python AG-UI
+HITL stack.
+**Phase 4 decision (2026-04-29)**: **Approver UX hosted as a separate route
+inside the C# `agent_app/`** (UC3). CopilotKit React route distinct from UC2,
+served by ordinary agent tools that read/write `DocumentAccessRight.approval_status`
+against the shared SQLite database. **Not** the in-session
+`ApprovalRequiredAIFunction` mechanism — UC3 is an asynchronous queue, not an
+in-flight HITL handshake. Full record:
+`docs/agent-stack-decision-2026-04-29.md` §5.2 + §6 ("Approver UX (UC3)");
+DECISIONS entry `[2026-04-29] Agent app pivots to C# / .NET`.
 OQ-1 (full RBAC model) remains open.

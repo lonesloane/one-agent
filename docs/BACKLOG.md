@@ -122,14 +122,21 @@
 - [x] `docs/DEMO_PHASE2.md` — golden-path demo dry-run script (6 scenarios, all 3 approval routes)
 - [x] Documentation closure: BACKLOG, DESIGN, OPEN_QUESTIONS, DECISIONS updated
 
-## Phase 3+ — Agent App (rebuild pending)
-> First attempt (Phase 3 / 3.5 / 4 / spikes) abandoned 2026-04-28; artifacts under `docs/_archived/` and `plan/_archived/`. Microsoft Agent Framework retained as runtime; frontend stack and HITL approach are open again (OQ-7, OQ-9).
+## Phase 3+ — Agent App (C# / .NET rebuild)
+> First attempt (Phase 3 / 3.5 / 4 / spikes) abandoned 2026-04-28; artifacts under `docs/_archived/` and `plan/_archived/`. Stack pivot to C# / .NET decided 2026-04-29 (see `docs/agent-stack-decision-2026-04-29.md`). Microsoft Agent Framework retained as runtime; CopilotKit React via AG-UI on `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` selected as frontend; HITL via `ApprovalRequiredAIFunction` + `request_approval` synthetic client tool + bidirectional middleware.
+
+Research & decision (done):
+- [x] Agent stack research — `docs/research-agent-stack.md`, `docs/research-agent-stack-candidates.md`
+- [x] HITL approach — folded into stack decision (`docs/agent-stack-decision-2026-04-29.md` §5–6); standalone `research-hitl-approach.md` not needed
+- [x] OQ-7 resolved (frontend) — see `docs/OPEN_QUESTIONS.md`
+- [x] OQ-9 Phase 4 resolved (approver UX = separate CopilotKit route, UC3) — see `docs/OPEN_QUESTIONS.md`
 
 Pre-implementation prerequisites:
-- [ ] Research phase — agent frontend stack (`docs/research-agent-stack.md`)
-- [ ] Research phase — HITL approach (`docs/research-hitl-approach.md`)
-- [ ] New PRD — read agent (UC1, proactive meeting brief)
-- [ ] New PRD — write agent (UC2, delegate creation + DAR + approver flow)
+- [ ] `shared/csharp/BusinessRules.cs` port + parity tests against `shared/business_rules.py`
+- [ ] `agent_app/` .NET scaffold: `AgentApp.csproj`, `Program.cs` w/ `MapAGUI("/", agent)`, `FoundryChatClient` wiring, `.editorconfig` + `global.json`
+- [ ] PRD — read agent (UC1, proactive meeting brief)
+- [ ] PRD — write agent (UC2, delegate creation + DAR routing via HITL)
+- [ ] PRD — approver UX (UC3, separate CopilotKit route over `DocumentAccessRight.approval_status`)
 - [ ] Implementation plans per phase
 
 ## Phase 5 — MCP Knowledge Base
