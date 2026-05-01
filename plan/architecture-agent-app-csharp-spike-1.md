@@ -4,13 +4,30 @@ version: 1.0
 date_created: 2026-05-01
 last_updated: 2026-05-01
 owner: stephane.varin@gmail.com
-status: 'In progress'
+status: 'Closed — Falsified (fall back to C4)'
 tags: [architecture, spike, agent_app, dotnet, agent-framework, ag-ui]
 ---
 
 # Introduction
 
-![Status: In progress](https://img.shields.io/badge/status-In_progress-yellow)
+![Status: Closed — Falsified](https://img.shields.io/badge/status-Closed%20--%20Falsified-red)
+
+**Outcome (2026-05-01):** Phases 1–3 executed; Phases 4–5 not executed.
+PAT-001 falsified by live SSE trace against the running spike server:
+approval-gated tool calls produce no client-visible signal because
+`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore 1.3.0-preview.260423.1`
+ships no approval-translation middleware (no `UseAGUIApprovalAdapter`,
+no `request_approval` synthetic tool, no approval AGUI event type).
+`MapAGUI` swallows `ToolApprovalRequestContent`. Non-approval flow
+streams cleanly. Per-turn evidence + decision: `docs/research-agent-stack-candidates.md`
+§5.5. Memory: `reference_dotnet_agui_hitl_broken.md`.
+
+**Decision:** fall back to C4 (Chainlit + `agent-framework` Python)
+for the PoC per the plan-opening escalation rule. Spike code retained
+on `spike/csharp-b` for reference + re-evaluation when the AGUI
+hosting package gap closes.
+
+---
 
 Step B of the agent-stack pivot decision (`docs/agent-stack-decision-2026-04-29.md` §7). Build a minimal C# / .NET spike under `spikes/csharp_b/` that runs the same four-turn HITL scenario the Python C4 (Chainlit) spike passed cleanly. Empirically falsifies — or confirms — that the documented .NET pattern (`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` + `ApprovalRequiredAIFunction` + bidirectional middleware + `request_approval` synthetic client tool) round-trips approvals end-to-end. Spike is isolated from `agent_app/` deliberately (see ALT-001) — given prior HITL pain, a sibling-of-`c4_chainlit` layout keeps the falsification record clean. If the spike passes, production `agent_app/` is scaffolded fresh on a new branch off `main` and Step C (port `shared/business_rules.py`) follows. If it fails on something analogous to the Python C2 protocol issues, escalate before further investment — fall back to C4 (Chainlit) for the PoC.
 
