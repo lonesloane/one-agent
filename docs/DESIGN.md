@@ -7,7 +7,7 @@
 The PoC ships two applications sharing the same database, business rules, and test data:
 
 - **Classical app** (Flask + forms): demonstrates the click-heavy status quo (contrast tool)
-- **Agent app** (Microsoft Agent Framework): demonstrates conversational, proactive alternative
+- **Agent app** (Chainlit + Microsoft Agent Framework Python): demonstrates conversational, proactive alternative
 
 Side-by-side, they make the case without a slide deck.
 
@@ -40,18 +40,18 @@ Side-by-side, they make the case without a slide deck.
 
 | Layer | Technology |
 |---|---|
-| Agent runtime | C# / .NET 8–9 + Microsoft Agent Framework (`Microsoft.Agents.AI`) |
+| Agent runtime | Python 3.11 + Microsoft Agent Framework (`agent-framework`) |
 | Model (PoC) | `gpt-4.1-mini` via `FoundryChatClient` (Azure AI Foundry) |
 | Model (fallback) | `gpt-5.4-nano` (validated alternative, 86% on eval suite) |
-| Classical frontend | Flask + Jinja2 + Bootstrap 5 (Python, unchanged) |
-| Agent frontend | CopilotKit React via AG-UI (`HttpAgent` runtime registration) |
-| Agent transport | `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` (`MapAGUI`) |
-| Database | SQLite (cross-language integration surface) |
-| Shared business rules | Python `shared/business_rules.py` ↔ C# `shared/csharp/BusinessRules.cs` (parity-tested) |
+| Classical frontend | Flask + Jinja2 + Bootstrap 5 (Python) |
+| Agent frontend | Chainlit (Python) — chat UI, streaming, native HITL prompt action |
+| Agent transport | Chainlit's WebSocket — no AG-UI |
+| Database | SQLite (single-language now; agent + classical both Python) |
+| Shared business rules | `shared/business_rules.py` — single source of truth, called directly by both apps |
 | Business KB | MCP server (mcp SDK) + ChromaDB + git-backed markdown (Phase 5) |
-| Session/audit | `AgentThread` / `AgentSession` (.NET) — workflow-scoped per use case |
-| Tools | `[Description]`-annotated methods + `ApprovalRequiredAIFunction` for HITL writes |
-| Cross-cutting | Agent Framework middleware (audit, identity, bidirectional HITL) |
+| Session/audit | `AgentThread` (Python) — workflow-scoped per use case |
+| Tools | `@tool`-decorated functions + `@tool(approval_mode="always_require")` for HITL writes |
+| Cross-cutting | Agent Framework middleware (audit, identity, HITL via approval mode) |
 
 ## Use Cases (PoC Scope)
 
@@ -71,12 +71,12 @@ Side-by-side, they make the case without a slide deck.
 
 ## Key Architectural Patterns
 
-- **Human-in-the-loop**: `ApprovalRequiredAIFunction` wraps write tools; reads run unwrapped. Round-trip via the AG-UI `request_approval` synthetic client tool + bidirectional middleware (C# zone of MS Learn HITL doc).
+- **Human-in-the-loop**: `@tool(approval_mode="always_require")` decorates write tools; reads run unwrapped. Approval prompt rendered by Chainlit's native HITL action UI (no custom wire-protocol glue). Validated by spike `spikes/c4_chainlit/` (passed 2026-04-29).
 - **Audit trail**: function-invocation middleware intercepts every tool call (who, what, when, result).
-- **Identity threading**: user identity propagated through `IServiceProvider`-scoped context (HTTP scope) and injected into tool-method parameters; invisible to the model.
-- **MCP KB**: business rules queryable at runtime via MCP protocol (semantic search + structured lookups). Phase 5 — language-agnostic, consumed by the C# agent.
-- **Streaming**: AG-UI SSE stream surfaced through CopilotKit React for real-time transparency.
-- **Workflow-scoped sessions**: each use case (UC1 brief, UC2 wizard, UC3 approver) opens a fresh `AgentThread`; identity persists via auth, not session history.
+- **Identity threading**: delegate identity propagated through Chainlit's per-session `cl.user_session` and injected into tool-function parameters; invisible to the model.
+- **MCP KB**: business rules queryable at runtime via MCP protocol (semantic search + structured lookups). Phase 5 — single-language Python.
+- **Streaming**: Chainlit's WebSocket streams partial messages and tool-call traces directly into the chat UI.
+- **Workflow-scoped sessions**: each use case (UC1 brief, UC2 wizard, UC3 approver) opens a fresh `AgentThread`; identity persists via Chainlit auth, not session history.
 
 ## Project Structure
 
@@ -92,43 +92,37 @@ one-agent-poc/                 # Project root
 │   │   └── scenarios.json     # 15 scenarios across A/B/C/D categories
 │   └── results/               # Gitignored output directory
 ├── shared/                    # Shared data layer (Phase 1)
-│   ├── database.py            # SQLAlchemy models (Python — schema owner)
-│   ├── business_rules.py      # DAR computation, approval routing (Python)
-│   ├── seed_data.py           # Test data population (Python)
-│   └── csharp/                # C# port of business rules (Phase 3+)
-│       ├── BusinessRules.cs   # Mirrors business_rules.py, parity-tested
-│       └── BusinessRules.csproj
-├── classical_app/             # Flask form-based app (Phase 1–2, Python)
+│   ├── database.py            # SQLAlchemy models (schema owner)
+│   ├── business_rules.py      # DAR computation, approval routing — single source of truth
+│   └── seed_data.py           # Test data population
+├── classical_app/             # Flask form-based app (Phase 1–2)
 │   ├── app.py                 # Routes
 │   ├── forms.py               # WTForms
 │   └── templates/             # Jinja2 templates (14 screens)
-├── agent_app/                 # Microsoft Agent Framework app (Phase 3+, C# / .NET)
-│   ├── AgentApp.csproj        # ASP.NET Core host
-│   ├── Program.cs             # MapAGUI("/", agent) + DI wiring
-│   ├── Tools/                 # Agent tools (`ApprovalRequiredAIFunction` writes, plain reads)
-│   ├── Middleware/            # Audit, identity threading, bidirectional HITL
-│   └── frontend/              # CopilotKit React app (Next.js or Vite)
-│       └── (HttpAgent runtime registration → AG-UI server)
-├── kb_server/                 # MCP Knowledge Base (Phase 5, language-agnostic over MCP)
+├── agent_app/                 # Chainlit + Microsoft Agent Framework Python (Phase 3+)
+│   ├── app.py                 # Chainlit entrypoint + agent construction
+│   ├── tools/                 # @tool functions; @tool(approval_mode="always_require") for writes
+│   └── middleware/            # Audit, identity threading
+├── kb_server/                 # MCP Knowledge Base (Phase 5)
 │   ├── server.py              # MCP server
 │   ├── rules/                 # Business rule markdown entries
 │   └── vector_store/          # ChromaDB embeddings
-├── tests/                     # pytest suite (Python: shared/, classical_app/)
+├── tests/                     # pytest suite (shared/, classical_app/, agent_app/)
 ├── pyproject.toml             # Python metadata + deps
-├── global.json                # .NET SDK pin (TBD during scaffold)
-├── .editorconfig              # dotnet format + ruff source of truth
 ├── .env.example               # FOUNDRY_PROJECT_ENDPOINT, FOUNDRY_MODEL
-└── one_agent.db               # SQLite (cross-language integration surface)
+└── one_agent.db               # SQLite (shared by classical_app + agent_app)
 ```
 
-> **Current state (2026-04-29)**: Phase 0 (model selection — `gpt-4.1-mini`),
+> **Current state (2026-05-01)**: Phase 0 (model selection — `gpt-4.1-mini`),
 > Phase 1 (shared data layer), and Phase 2 (classical app, read + write
 > flows including the 8-screen add-delegate wizard) shipped to `main`.
-> **Agent stack pivoted to C# / .NET** — the Python `agent_app/` attempt
-> was abandoned 2026-04-28 and quarantined under `docs/_archived/` and
-> `plan/_archived/`; the Python AG-UI client surface proved too under-baked
-> for HITL round-trip (see `docs/agent-stack-decision-2026-04-29.md`).
-> Microsoft Agent Framework retained as agent runtime via the .NET package
-> set; CopilotKit React selected as frontend. `agent_app/` C# scaffold +
-> spike pending (Step B of the path forward). 188 tests passing
-> (`tests/shared` + `tests/classical_app`).
+> **Agent stack: C4 (Chainlit + `agent-framework` Python).** The
+> 2026-04-29 pivot to C# / .NET was reversed on 2026-05-01 after Step B
+> empirically falsified the documented .NET AG-UI HITL contract (see
+> `docs/agent-stack-decision-2026-04-29.md` §9). C# spike code retained
+> on branch `spike/csharp-b` for re-evaluation when the
+> `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` preview ships an
+> approval-translation middleware. Phase 3+ implementation proceeds
+> against the C4 stack — a `agent-framework` Python agent fronted by
+> Chainlit, calling `shared/business_rules.py` directly. 188 tests
+> passing (`tests/shared` + `tests/classical_app`).
