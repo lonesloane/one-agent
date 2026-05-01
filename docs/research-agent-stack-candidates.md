@@ -525,6 +525,85 @@ risk, no JS toolchain). C1 and C2 spikes carry forward as
 **falsification-only** to honour the "extra sure" framing — they no
 longer affect finalist selection.
 
+### §5.5 Spike Step B (C# .NET) — FAIL (2026-05-01)
+
+Spike under `spikes/csharp_b/` (branch `spike/csharp-b`). Reached
+end of Phase 3 of `plan/architecture-agent-app-csharp-spike-1.md`;
+Phases 4–5 not executed because the wire contract underlying them
+is empirically absent.
+
+**Per-turn outcomes (live curl against running server, port 5141):**
+
+| Turn | Prompt | Expected | Observed | Verdict |
+|------|--------|----------|----------|---------|
+| T1 | "List the records" | streams `alpha, beta` | `RUN_STARTED` → `TOOL_CALL_START`(`list_records`) → `TOOL_CALL_ARGS` → `TOOL_CALL_END` → `TOOL_CALL_RESULT`(`"alpha, beta"`) → `TEXT_MESSAGE_*` (`"The current records are: alpha, beta."`) → `RUN_FINISHED` | ✅ |
+| T1b | "hello" (control, no tool) | streams greeting | `RUN_STARTED` → `TEXT_MESSAGE_*` → `RUN_FINISHED` | ✅ |
+| T2 | "Create a record named gamma" | approval prompt rendered | `RUN_STARTED` → `RUN_FINISHED` (`result:null`). Run elapsed 8.5 s (LLM call did happen). **Zero events between RUN_STARTED and RUN_FINISHED.** No `TOOL_CALL_*`, no `TEXT_*`, no approval signal. | ❌ |
+| T3, T4 | not run | — | — | n/a (gate broken at T2) |
+
+**Root cause** (verified by reflection over installed assemblies and
+by the live SSE trace above):
+
+`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore 1.3.0-preview.260423.1`
+ships exactly two public extension methods — `IServiceCollection
+AddAGUI(this IServiceCollection)` and `IEndpointConventionBuilder
+MapAGUI(this IEndpointRouteBuilder, string, AIAgent)`. There is no
+documented bidirectional approval middleware (`UseAGUIApprovalAdapter`
+or analogous), no `request_approval` synthetic-tool string constant
+in the package, and no approval event type in the AGUI event-types
+constant class (which lists only `RUN_*`, `TEXT_MESSAGE_*`,
+`TOOL_CALL_*`, `STATE_*`).
+
+When `ApprovalRequiredAIFunction` (from `Microsoft.Extensions.AI.Abstractions`)
+gates a tool call, the underlying `ChatClientAgent` run pauses and
+emits a `ToolApprovalRequestContent` on the run. The `MapAGUI` route
+handler does not translate that content into any AG-UI event, and
+no extension hook exists to intercept and translate it. The run
+finishes silently with `result:null` and the gate is effectively
+unreachable from a remote AG-UI client.
+
+This is the same shape of failure as the Python C2 spike (`spikes/c2_custom_agui/`)
+documented in §5.2 — documentation describes a wire contract for
+HITL that the published preview package does not implement. .NET
+preview is somewhat further along than Python preview was on the
+non-approval flow (T1 / T1b stream cleanly, tools register with the
+overridden snake_case names) but is identical in the gap that
+matters: no approval round-trip on the wire.
+
+**PAT-001 falsified.** Plan REQ-004, REQ-005, and REQ-006 cannot
+be satisfied with the documented .NET stack as published in this
+preview.
+
+**Decision (Step B closure):** **fall back to C4 (Chainlit) for
+the production PoC** per the plan-opening escalation rule
+("If it fails on something analogous to the Python C2 protocol
+issues, escalate before further investment — fall back to C4
+(Chainlit) for the PoC."). Three reasons not to hand-roll the
+adapter despite the runtime supporting `ToolApprovalRequestContent`:
+
+1. ALT-002 was rejected at plan time for the same reason it should
+   be rejected now: rolling a custom gate proves only that we can
+   roll a custom gate, not that the documented contract works.
+2. REQ-007 budget (≤ 1 working day) is already past stretched.
+3. C4 has a green spike. Investing further in C# wire-protocol
+   archeology delays the PoC for an architectural validation that
+   has already been performed against a different stack.
+
+The agent runtime layer (`Microsoft.Agents.AI` 1.3.0,
+`Microsoft.Agents.AI.Foundry` 1.3.0, `AzureCliCredential`,
+`AIFunctionFactory`, `ApprovalRequiredAIFunction`) is sound. The
+`Hosting.AGUI.AspNetCore` preview is not. Re-evaluate when that
+package reaches stable (or when the missing middleware ships).
+Spike code is retained on `spike/csharp-b` for reference.
+
+**Re-evaluation trigger:** monitor the
+`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` package for a release
+(stable or preview) whose public surface includes either an
+approval-translation middleware or an extensibility point on the
+`MapAGUI` handler that lets a host project intercept
+`ToolApprovalRequestContent`. At that point Step B can be re-run
+on the same scaffold.
+
 ## §6. Finalists (Step 2.6)
 
 TBD.

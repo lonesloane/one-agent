@@ -4,13 +4,30 @@ version: 1.0
 date_created: 2026-05-01
 last_updated: 2026-05-01
 owner: stephane.varin@gmail.com
-status: 'In progress'
+status: 'Closed — Falsified (fall back to C4)'
 tags: [architecture, spike, agent_app, dotnet, agent-framework, ag-ui]
 ---
 
 # Introduction
 
-![Status: In progress](https://img.shields.io/badge/status-In_progress-yellow)
+![Status: Closed — Falsified](https://img.shields.io/badge/status-Closed%20--%20Falsified-red)
+
+**Outcome (2026-05-01):** Phases 1–3 executed; Phases 4–5 not executed.
+PAT-001 falsified by live SSE trace against the running spike server:
+approval-gated tool calls produce no client-visible signal because
+`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore 1.3.0-preview.260423.1`
+ships no approval-translation middleware (no `UseAGUIApprovalAdapter`,
+no `request_approval` synthetic tool, no approval AGUI event type).
+`MapAGUI` swallows `ToolApprovalRequestContent`. Non-approval flow
+streams cleanly. Per-turn evidence + decision: `docs/research-agent-stack-candidates.md`
+§5.5. Memory: `reference_dotnet_agui_hitl_broken.md`.
+
+**Decision:** fall back to C4 (Chainlit + `agent-framework` Python)
+for the PoC per the plan-opening escalation rule. Spike code retained
+on `spike/csharp-b` for reference + re-evaluation when the AGUI
+hosting package gap closes.
+
+---
 
 Step B of the agent-stack pivot decision (`docs/agent-stack-decision-2026-04-29.md` §7). Build a minimal C# / .NET spike under `spikes/csharp_b/` that runs the same four-turn HITL scenario the Python C4 (Chainlit) spike passed cleanly. Empirically falsifies — or confirms — that the documented .NET pattern (`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` + `ApprovalRequiredAIFunction` + bidirectional middleware + `request_approval` synthetic client tool) round-trips approvals end-to-end. Spike is isolated from `agent_app/` deliberately (see ALT-001) — given prior HITL pain, a sibling-of-`c4_chainlit` layout keeps the falsification record clean. If the spike passes, production `agent_app/` is scaffolded fresh on a new branch off `main` and Step C (port `shared/business_rules.py`) follows. If it fails on something analogous to the Python C2 protocol issues, escalate before further investment — fall back to C4 (Chainlit) for the PoC.
 
@@ -42,13 +59,13 @@ Step B of the agent-stack pivot decision (`docs/agent-stack-decision-2026-04-29.
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
 | TASK-001 | Verify .NET SDK installed: `dotnet --list-sdks` shows 8.0.x or 9.0.x. If absent, install .NET 8 LTS SDK via official channel. | ✅ | 2026-05-01 |
-| TASK-002 | Create directory `spikes/csharp_b/`. From `spikes/csharp_b/` run `dotnet new web -n SpikeServer -o server --framework net8.0`. Result: `spikes/csharp_b/server/SpikeServer.csproj`, `spikes/csharp_b/server/Program.cs`, `spikes/csharp_b/server/appsettings.json`, `spikes/csharp_b/server/Properties/launchSettings.json`. | | |
-| TASK-003 | Edit `spikes/csharp_b/server/SpikeServer.csproj` — set `<Nullable>enable</Nullable>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<LangVersion>latest</LangVersion>`. | | |
-| TASK-004 | Add `spikes/csharp_b/global.json` pinning the SDK roll-forward policy: `{ "sdk": { "version": "8.0.0", "rollForward": "latestFeature" } }`. | | |
-| TASK-005 | Add `.editorconfig` at repo root (or extend existing) with `dotnet_naming_*` rules: PascalCase types/methods, _camelCase private fields, file-scoped namespaces. Verify `dotnet format --verify-no-changes` passes on the empty scaffold. | | |
-| TASK-006 | Add NuGet packages to `SpikeServer.csproj` via `dotnet add spikes/csharp_b/server package <name>`: `Microsoft.Agents.AI` (latest preview), `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` (latest preview), `Microsoft.Agents.AI.Foundry` (latest preview), `Azure.Identity` (stable). Pin versions explicitly — no floating refs. | | |
-| TASK-007 | Add `spikes/csharp_b/.gitignore` entries: `bin/`, `obj/`, `*.user`, `appsettings.Development.json`. Verify build output is not staged. | | |
-| TASK-008 | Verify clean build: `dotnet build spikes/csharp_b/server/SpikeServer.csproj` returns exit 0, zero warnings. | | |
+| TASK-002 | Create directory `spikes/csharp_b/`. From `spikes/csharp_b/` run `dotnet new web -n SpikeServer -o server --framework net8.0`. Result: `spikes/csharp_b/server/SpikeServer.csproj`, `spikes/csharp_b/server/Program.cs`, `spikes/csharp_b/server/appsettings.json`, `spikes/csharp_b/server/Properties/launchSettings.json`. | ✅ | 2026-05-01 |
+| TASK-003 | Edit `spikes/csharp_b/server/SpikeServer.csproj` — set `<Nullable>enable</Nullable>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<LangVersion>latest</LangVersion>`. | ✅ | 2026-05-01 |
+| TASK-004 | Add `spikes/csharp_b/global.json` pinning the SDK roll-forward policy: `{ "sdk": { "version": "8.0.0", "rollForward": "latestFeature" } }`. | ✅ | 2026-05-01 |
+| TASK-005 | Add `.editorconfig` at repo root (or extend existing) with `dotnet_naming_*` rules: PascalCase types/methods, _camelCase private fields, file-scoped namespaces. Verify `dotnet format --verify-no-changes` passes on the empty scaffold. | ✅ | 2026-05-01 |
+| TASK-006 | Add NuGet packages to `SpikeServer.csproj` via `dotnet add spikes/csharp_b/server package <name>`: `Microsoft.Agents.AI` (latest preview), `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` (latest preview), `Microsoft.Agents.AI.Foundry` (latest preview), `Azure.Identity` (stable). Pin versions explicitly — no floating refs. | ✅ | 2026-05-01 |
+| TASK-007 | Add `spikes/csharp_b/.gitignore` entries: `bin/`, `obj/`, `*.user`, `appsettings.Development.json`. Verify build output is not staged. | ✅ | 2026-05-01 |
+| TASK-008 | Verify clean build: `dotnet build spikes/csharp_b/server/SpikeServer.csproj` returns exit 0, zero warnings. | ✅ | 2026-05-01 |
 
 ### Implementation Phase 2 — Agent + tools (server-side)
 
@@ -56,11 +73,11 @@ Step B of the agent-stack pivot decision (`docs/agent-stack-decision-2026-04-29.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-009 | Context7 query: `/websites/learn_microsoft_en-us_agent-framework` with topic "AIAgent Foundry AsAIAgent" — capture exact `AIAgent` factory signature for Foundry + `AzureCliCredential` wiring. Record findings as comments in `spikes/csharp_b/server/Program.cs` for reviewer audit. | | |
-| TASK-010 | Create `spikes/csharp_b/server/Tools/RecordStore.cs` — static class holding `private static readonly List<string> _records = new() { "alpha", "beta" };`. Methods: `IReadOnlyList<string> List()` and `int Add(string name)` returning new total count. Thread-safety not required for spike (single-threaded request flow). | | |
-| TASK-011 | Create `spikes/csharp_b/server/Tools/RecordTools.cs` — two methods decorated for Agent Framework tool registration: `[Description("Return a comma-separated list of records.")] public static string ListRecords()` and `[Description("Create a new record with the given name.")] public static string CreateRecord([Description("Name of the record to create")] string name)`. Verify the exact decorator (`[AIFunction]`, `[Description]`, `[McpServerTool]`, etc.) via Context7 before writing. | | |
-| TASK-012 | In `spikes/csharp_b/server/Program.cs` build the agent: load `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_CHAT_COMPLETION_MODEL` (= `gpt-4.1-mini`), `AZURE_OPENAI_API_VERSION` from environment / appsettings. Construct `FoundryChatClient` with `AzureCliCredential`. Construct `AIAgent` with name `SpikeAgent`, instructions verbatim from GUD-002, tools = [`ListRecords` AIFunction, `CreateRecord` wrapped via `ApprovalRequiredAIFunction.Wrap(createRecordFn)` or equivalent helper]. | | |
-| TASK-013 | Verify agent boots in isolation via a temporary `Main` smoke call: invoke `agent.RunAsync("List the records")` and write the streamed response to console. Pass: streams "alpha, beta". Remove the smoke call once verified. | | |
+| TASK-009 | Context7 query: `/websites/learn_microsoft_en-us_agent-framework` with topic "AIAgent Foundry AsAIAgent" — capture exact `AIAgent` factory signature for Foundry + `AzureCliCredential` wiring. Record findings as comments in `spikes/csharp_b/server/Program.cs` for reviewer audit. | ✅ | 2026-05-01 |
+| TASK-010 | Create `spikes/csharp_b/server/Tools/RecordStore.cs` — static class holding `private static readonly List<string> _records = new() { "alpha", "beta" };`. Methods: `IReadOnlyList<string> List()` and `int Add(string name)` returning new total count. Thread-safety not required for spike (single-threaded request flow). | ✅ | 2026-05-01 |
+| TASK-011 | Create `spikes/csharp_b/server/Tools/RecordTools.cs` — two methods decorated for Agent Framework tool registration: `[Description("Return a comma-separated list of records.")] public static string ListRecords()` and `[Description("Create a new record with the given name.")] public static string CreateRecord([Description("Name of the record to create")] string name)`. Verify the exact decorator (`[AIFunction]`, `[Description]`, `[McpServerTool]`, etc.) via Context7 before writing. | ✅ | 2026-05-01 |
+| TASK-012 | In `spikes/csharp_b/server/Program.cs` build the agent: load `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_CHAT_COMPLETION_MODEL` (= `gpt-4.1-mini`), `AZURE_OPENAI_API_VERSION` from environment / appsettings. Construct `FoundryChatClient` with `AzureCliCredential`. Construct `AIAgent` with name `SpikeAgent`, instructions verbatim from GUD-002, tools = [`ListRecords` AIFunction, `CreateRecord` wrapped via `ApprovalRequiredAIFunction.Wrap(createRecordFn)` or equivalent helper]. | ✅ | 2026-05-01 |
+| TASK-013 | Verify agent boots in isolation via a temporary `Main` smoke call: invoke `agent.RunAsync("List the records")` and write the streamed response to console. Pass: streams "alpha, beta". Remove the smoke call once verified. | ✅ | 2026-05-01 |
 
 ### Implementation Phase 3 — AG-UI server endpoint + bidirectional middleware
 
@@ -68,11 +85,11 @@ Step B of the agent-stack pivot decision (`docs/agent-stack-decision-2026-04-29.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-014 | Context7 query: same library, topic "MapAGUI ApprovalRequiredAIFunction request_approval middleware HITL" with `?pivots=programming-language-csharp` — capture exact middleware registration API and the synthetic tool-name constant. Confirm `request_approval` is the correct synthetic name (vs Python's `confirm_changes` per decision doc §3.2). | | |
-| TASK-015 | In `spikes/csharp_b/server/Program.cs` after agent construction: `app.MapAGUI("/", agent)`. Verify the AG-UI handler is registered by hitting `GET /` with `Accept: text/event-stream` via curl — expect 200 + SSE upgrade or method-not-allowed (POST-only) response, not 404. | | |
-| TASK-016 | Add bidirectional middleware: install the documented `.NET` HITL adapter so server-emitted `FunctionApprovalRequestContent` becomes a client-visible `request_approval` tool call, and a client-side `request_approval` tool result becomes server-side `FunctionApprovalResponseContent`. Use the exact registration call from MS Learn (likely `app.UseAGUIApprovalAdapter()` or builder-method equivalent — verify via Context7 in TASK-014). | | |
-| TASK-017 | Add structured request/response logging via `ILogger` at the AG-UI handler boundary — log each AG-UI event type, tool call, and approval response. Sufficient detail to diagnose F1 (approval not rendered) or F2 (multi-turn 400) symptoms during T1–T4 walk-through. | | |
-| TASK-018 | Run `dotnet run --project spikes/csharp_b/server/SpikeServer.csproj` and confirm server listens on `http://localhost:5000` (or whichever port `launchSettings.json` assigns). Capture chosen port in plan notes for client-side spike. | | |
+| TASK-014 | Context7 query: same library, topic "MapAGUI ApprovalRequiredAIFunction request_approval middleware HITL" with `?pivots=programming-language-csharp` — capture exact middleware registration API and the synthetic tool-name constant. Confirm `request_approval` is the correct synthetic name (vs Python's `confirm_changes` per decision doc §3.2). | ✅ | 2026-05-01 |
+| TASK-015 | In `spikes/csharp_b/server/Program.cs` after agent construction: `app.MapAGUI("/", agent)`. Verify the AG-UI handler is registered by hitting `GET /` with `Accept: text/event-stream` via curl — expect 200 + SSE upgrade or method-not-allowed (POST-only) response, not 404. | ✅ | 2026-05-01 |
+| TASK-016 | Add bidirectional middleware: install the documented `.NET` HITL adapter so server-emitted `FunctionApprovalRequestContent` becomes a client-visible `request_approval` tool call, and a client-side `request_approval` tool result becomes server-side `FunctionApprovalResponseContent`. Use the exact registration call from MS Learn (likely `app.UseAGUIApprovalAdapter()` or builder-method equivalent — verify via Context7 in TASK-014). | ✅ | 2026-05-01 |
+| TASK-017 | Add structured request/response logging via `ILogger` at the AG-UI handler boundary — log each AG-UI event type, tool call, and approval response. Sufficient detail to diagnose F1 (approval not rendered) or F2 (multi-turn 400) symptoms during T1–T4 walk-through. | ✅ | 2026-05-01 |
+| TASK-018 | Run `dotnet run --project spikes/csharp_b/server/SpikeServer.csproj` and confirm server listens on `http://localhost:5000` (or whichever port `launchSettings.json` assigns). Capture chosen port in plan notes for client-side spike. | ✅ | 2026-05-01 |
 
 ### Implementation Phase 4 — Spike client (console)
 

@@ -1,0 +1,124 @@
+root = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# All files: universal baseline
+# ─────────────────────────────────────────────────────────────────────────────
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+
+# ─────────────────────────────────────────────────────────────────────────────
+# C# files
+# ─────────────────────────────────────────────────────────────────────────────
+[*.cs]
+indent_style = space
+indent_size = 4
+
+# Require file-scoped namespaces (C# 10+)
+csharp_style_namespace_declarations = file_scoped:warning
+
+# ── Naming conventions ──────────────────────────────────────────────────────
+# Symbols
+
+dotnet_naming_symbols.types_and_namespaces.applicable_kinds = namespace, class, struct, interface, enum, delegate
+dotnet_naming_symbols.types_and_namespaces.applicable_accessibilities = *
+
+dotnet_naming_symbols.methods_and_properties.applicable_kinds = method, property, event
+dotnet_naming_symbols.methods_and_properties.applicable_accessibilities = *
+
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.applicable_accessibilities = *
+dotnet_naming_symbols.constants.required_modifiers = const
+
+dotnet_naming_symbols.public_fields.applicable_kinds = field
+dotnet_naming_symbols.public_fields.applicable_accessibilities = public, protected, protected_internal, internal
+
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private, private_protected
+
+dotnet_naming_symbols.parameters_and_locals.applicable_kinds = parameter, local
+dotnet_naming_symbols.parameters_and_locals.applicable_accessibilities = *
+
+dotnet_naming_symbols.type_parameters.applicable_kinds = type_parameter
+dotnet_naming_symbols.type_parameters.applicable_accessibilities = *
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_symbols.interfaces.applicable_accessibilities = *
+
+# Styles
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+
+dotnet_naming_style.i_pascal_case.capitalization = pascal_case
+dotnet_naming_style.i_pascal_case.required_prefix = I
+
+dotnet_naming_style.t_pascal_case.capitalization = pascal_case
+dotnet_naming_style.t_pascal_case.required_prefix = T
+
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+dotnet_naming_style.camel_case.capitalization = camel_case
+
+# Rules
+
+dotnet_naming_rule.interfaces_should_be_i_pascal.symbols = interfaces
+dotnet_naming_rule.interfaces_should_be_i_pascal.style = i_pascal_case
+dotnet_naming_rule.interfaces_should_be_i_pascal.severity = suggestion
+
+dotnet_naming_rule.type_parameters_should_be_t_pascal.symbols = type_parameters
+dotnet_naming_rule.type_parameters_should_be_t_pascal.style = t_pascal_case
+dotnet_naming_rule.type_parameters_should_be_t_pascal.severity = suggestion
+
+dotnet_naming_rule.types_and_namespaces_should_be_pascal.symbols = types_and_namespaces
+dotnet_naming_rule.types_and_namespaces_should_be_pascal.style = pascal_case
+dotnet_naming_rule.types_and_namespaces_should_be_pascal.severity = suggestion
+
+dotnet_naming_rule.methods_and_properties_should_be_pascal.symbols = methods_and_properties
+dotnet_naming_rule.methods_and_properties_should_be_pascal.style = pascal_case
+dotnet_naming_rule.methods_and_properties_should_be_pascal.severity = suggestion
+
+dotnet_naming_rule.constants_should_be_pascal.symbols = constants
+dotnet_naming_rule.constants_should_be_pascal.style = pascal_case
+dotnet_naming_rule.constants_should_be_pascal.severity = suggestion
+
+dotnet_naming_rule.public_fields_should_be_pascal.symbols = public_fields
+dotnet_naming_rule.public_fields_should_be_pascal.style = pascal_case
+dotnet_naming_rule.public_fields_should_be_pascal.severity = suggestion
+
+dotnet_naming_rule.private_fields_should_be_underscore_camel.symbols = private_fields
+dotnet_naming_rule.private_fields_should_be_underscore_camel.style = underscore_camel_case
+dotnet_naming_rule.private_fields_should_be_underscore_camel.severity = suggestion
+
+dotnet_naming_rule.parameters_and_locals_should_be_camel.symbols = parameters_and_locals
+dotnet_naming_rule.parameters_and_locals_should_be_camel.style = camel_case
+dotnet_naming_rule.parameters_and_locals_should_be_camel.severity = suggestion
+
+# ── Using directives ─────────────────────────────────────────────────────────
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# ── Braces ────────────────────────────────────────────────────────────────────
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# JSON / YAML / XML / Markdown / Shell
+# ─────────────────────────────────────────────────────────────────────────────
+[*.{json,yaml,yml}]
+indent_style = space
+indent_size = 2
+
+[*.{xml,csproj,props,targets}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.sh]
+end_of_line = lf

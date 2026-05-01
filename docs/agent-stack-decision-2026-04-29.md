@@ -1,13 +1,21 @@
 # Agent Stack Decision — 2026-04-29
 
+> ⚠️ **Superseded 2026-05-01 — see §9.** Step B (C# / .NET HITL spike)
+> was empirically falsified during execution. The 2026-04-29 pivot to
+> C# / .NET for `agent_app/` is **reversed**: production PoC reverts
+> to Python via C4 (Chainlit + `agent-framework`). `classical_app/`
+> and `shared/` remain Python (unchanged). Sections §5, §7 (Steps B–E)
+> below describe the now-superseded plan; retained as the falsification
+> record. Read §9 first for current state.
+
 > Hand-off document. Captures the rationale, evidence, and next steps for
 > the agent_app stack pivot decided on 2026-04-29 so a fresh conversation
 > can pick up without rebuilding context.
 >
 > Companion documents (read in this order if you want the full story):
 > 1. `docs/research-agent-stack.md` — criteria
-> 2. `docs/research-agent-stack-candidates.md` — survey, hard-gate, spike results
-> 3. **This document** — decision + path forward
+> 2. `docs/research-agent-stack-candidates.md` — survey, hard-gate, spike results (§5.5 Step B FAIL)
+> 3. **This document** — decision + path forward (see §9 for the 2026-05-01 reversal)
 
 ## 1. Context
 
@@ -352,6 +360,137 @@ per use case.
 
 ---
 
+## 9. Step B Closure & Pivot Reversal (2026-05-01)
+
+**Outcome: FALSIFIED. C# / .NET path reverted. PoC continues on C4 (Chainlit + `agent-framework` Python).**
+
+Step B (`plan/architecture-agent-app-csharp-spike-1.md`) executed
+Phases 1–3 on branch `spike/csharp-b` under `spikes/csharp_b/`.
+Phase 4–5 not executed because the wire contract Phase 4–5 depended
+on does not exist in the published preview package.
+
+### 9.1 Per-turn evidence (live curl against running server, port 5141)
+
+| Turn | Prompt | Expected | Observed | Verdict |
+|------|--------|----------|----------|---------|
+| T1 | "List the records" | streams `alpha, beta` | `RUN_STARTED` → `TOOL_CALL_START`(`list_records`) → `TOOL_CALL_ARGS` → `TOOL_CALL_END` → `TOOL_CALL_RESULT`(`"alpha, beta"`) → `TEXT_MESSAGE_*` ("The current records are: alpha, beta.") → `RUN_FINISHED` | ✅ |
+| T1b | "hello" (control, no tool) | streams greeting | `RUN_STARTED` → `TEXT_MESSAGE_*` → `RUN_FINISHED` | ✅ |
+| T2 | "Create a record named gamma" | approval prompt rendered | `RUN_STARTED` → `RUN_FINISHED` (`result:null`); 8.5 s elapsed (LLM call did happen). **Zero events between.** No `TOOL_CALL_*`, no `TEXT_*`, no approval signal. | ❌ |
+| T3, T4 | not run | — | — | n/a (gate broken at T2) |
+
+### 9.2 Root cause
+
+`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore 1.3.0-preview.260423.1`
+ships exactly two public extension methods: `AddAGUI(IServiceCollection)`
+and `MapAGUI(IEndpointRouteBuilder, string, AIAgent)`. There is **no**
+documented bidirectional approval middleware (no `UseAGUIApprovalAdapter`
+or analogous), **no** `request_approval` synthetic-tool string constant
+in the package, and **no** approval event type in `AGUIEventTypes`
+(only `RUN_*`, `TEXT_MESSAGE_*`, `TOOL_CALL_*`, `STATE_*`).
+
+When `ApprovalRequiredAIFunction` (from `Microsoft.Extensions.AI.Abstractions 10.5.0`)
+gates a tool call, `ChatClientAgent.RunStreamingAsync` pauses and emits
+a `ToolApprovalRequestContent` on the run. `MapAGUI`'s route handler
+does not translate that content into any AG-UI event, and no
+extension hook lets a host project intercept it. The run finishes
+silently with `result:null` and the gate is unreachable from a
+remote AG-UI client.
+
+§5.1 / §5.5 of `docs/research-agent-stack-candidates.md` carries
+the same finding alongside the C2 / C4 records. Type-name correction:
+the published .NET HITL doc references `FunctionApprovalRequest/ResponseContent`;
+the actual installed types are `ToolApproval{Request,Response}Content`
+under `Microsoft.Extensions.AI.Abstractions` (not `Microsoft.Agents.AI`).
+
+### 9.3 Surprising finds during the spike (kept for future re-evaluation)
+
+- `Microsoft.Agents.AI` and `Microsoft.Agents.AI.Foundry` already
+  shipped **stable** at 1.3.0 (NuGet ignored `--prerelease` and
+  resolved stable). Only `Hosting.AGUI.AspNetCore` is still preview.
+  The runtime stack itself is stable; only the AG-UI hosting glue
+  is not.
+- **`FoundryChatClient` does not exist in `Microsoft.Agents.AI.Foundry 1.3.0`.**
+  The package ships `FoundryAgent` (marked `OPENAI001` experimental)
+  and an `AzureAIProjectChatClientExtensions.AsAIAgent()` extension
+  on `Azure.AI.Projects.AIProjectClient`. The spike used Path B
+  (`AIProjectClient.AsAIAgent`) successfully; the Phase 2 audit
+  comment block in `spikes/csharp_b/server/Program.cs` documents
+  the deviation.
+- Non-approval flow on .NET AGUI is healthy: `TOOL_CALL_*` and
+  `TEXT_MESSAGE_*` stream cleanly. `AIFunctionFactoryOptions.Name`
+  override successfully threads snake_case tool names (`list_records`,
+  `create_record`) through the wire.
+- `Azure.AI.Projects 2.0.0` is currently pulled in **transitively**
+  via `Microsoft.Agents.AI.Foundry 1.3.0`. Future production work
+  should pin a direct `<PackageReference>`.
+
+### 9.4 Decision
+
+**Fall back to C4 (Chainlit + `agent-framework` Python)** for the
+production PoC, per the original plan's escalation rule
+("If it fails on something analogous to the Python C2 protocol
+issues, escalate before further investment — fall back to C4
+(Chainlit) for the PoC.").
+
+Three reasons:
+
+1. ALT-002 (custom approval gate) was rejected at plan time for
+   the same reason it should be rejected now: rolling a custom gate
+   proves only that we can roll a custom gate, not that the
+   documented contract works.
+2. REQ-007 budget (≤ 1 working day) is already past stretched.
+3. C4 has a green spike. Investing further in C# wire-protocol
+   archeology delays the PoC for an architectural validation
+   already performed against a different stack.
+
+### 9.5 What this changes vs §5 / §7
+
+- **§5.1 Cross-language project shape — REVERSED.** `agent_app/`
+  reverts to Python. There is no longer a `shared/csharp/` port
+  obligation; `shared/business_rules.py` stays single-source in
+  Python, called directly by the Python agent app.
+- **§7 Steps B–E — Step B closed FAIL; Steps C–E rewritten under
+  the C4 path.**
+  - Step C (`shared/business_rules.py` C# port) — **deferred indefinitely**.
+    No port required while the agent is in Python.
+  - Step D (rewrite Phase 3+ PRDs against C# stack) — **rewritten
+    against the C4 / Python stack** instead. PRDs target Chainlit
+    UI + `agent-framework` middleware + the existing
+    `ApprovalRequiredAIFunction` Python equivalent (`@tool(approval_mode="always_require")`).
+  - Step E (UC1 → UC2 → UC3 in C#) — **same use-case sequence,
+    Python implementation**.
+- **§5.2 What stays the same** — still holds: `gpt-4.1-mini`,
+  `classical_app/` Python, SQLite cross-language surface (now
+  reduced to single-language since `agent_app/` is Python again),
+  `shared/business_rules.py` as source of truth.
+- **§5.3 Custom AG-UI HITL adapter rejection** — still holds.
+  C4 sidesteps AG-UI entirely; the rejection of a custom adapter
+  in either language is unchanged.
+
+### 9.6 Re-evaluation trigger
+
+Monitor `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` for a release
+(stable or preview) whose public surface includes either an
+approval-translation middleware or an extensibility point on the
+`MapAGUI` handler that lets a host project intercept
+`ToolApprovalRequestContent`. At that point Step B can be re-run
+on the same scaffold (`spike/csharp-b`) without rebuilding.
+
+### 9.7 Artefacts
+
+- Spike code: branch `spike/csharp-b`, `spikes/csharp_b/server/`
+  (8 commits: scaffold, agent + tools, MapAGUI mount, AddAGUI,
+  AGUIRequestLogger, plan-row updates, falsification record).
+- Live SSE trace: §5.5 of `docs/research-agent-stack-candidates.md`.
+- Plan: `plan/architecture-agent-app-csharp-spike-1.md`, status
+  `Closed — Falsified`.
+- Memory pointers: `reference_dotnet_agui_hitl_broken.md`,
+  `project_agent_stack_pivot.md`, `feedback_csharp_coder_reflection.md`.
+
+---
+
 End of decision record. From a fresh conversation, the next concrete
-action is **Step A** (update CLAUDE.md, DESIGN.md, DECISIONS.md), then
-**Step B** (C# spike).
+action is the **C4 PoC implementation** — restart Phase 3+ planning
+with the Chainlit + `agent-framework` Python stack. Read §9 above
+for context; §1–§8 are the falsification record for the abandoned
+C# pivot.
