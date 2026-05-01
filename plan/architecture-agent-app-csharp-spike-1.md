@@ -42,13 +42,13 @@ Step B of the agent-stack pivot decision (`docs/agent-stack-decision-2026-04-29.
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
 | TASK-001 | Verify .NET SDK installed: `dotnet --list-sdks` shows 8.0.x or 9.0.x. If absent, install .NET 8 LTS SDK via official channel. | ✅ | 2026-05-01 |
-| TASK-002 | Create directory `spikes/csharp_b/`. From `spikes/csharp_b/` run `dotnet new web -n SpikeServer -o server --framework net8.0`. Result: `spikes/csharp_b/server/SpikeServer.csproj`, `spikes/csharp_b/server/Program.cs`, `spikes/csharp_b/server/appsettings.json`, `spikes/csharp_b/server/Properties/launchSettings.json`. | | |
-| TASK-003 | Edit `spikes/csharp_b/server/SpikeServer.csproj` — set `<Nullable>enable</Nullable>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<LangVersion>latest</LangVersion>`. | | |
-| TASK-004 | Add `spikes/csharp_b/global.json` pinning the SDK roll-forward policy: `{ "sdk": { "version": "8.0.0", "rollForward": "latestFeature" } }`. | | |
-| TASK-005 | Add `.editorconfig` at repo root (or extend existing) with `dotnet_naming_*` rules: PascalCase types/methods, _camelCase private fields, file-scoped namespaces. Verify `dotnet format --verify-no-changes` passes on the empty scaffold. | | |
-| TASK-006 | Add NuGet packages to `SpikeServer.csproj` via `dotnet add spikes/csharp_b/server package <name>`: `Microsoft.Agents.AI` (latest preview), `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` (latest preview), `Microsoft.Agents.AI.Foundry` (latest preview), `Azure.Identity` (stable). Pin versions explicitly — no floating refs. | | |
-| TASK-007 | Add `spikes/csharp_b/.gitignore` entries: `bin/`, `obj/`, `*.user`, `appsettings.Development.json`. Verify build output is not staged. | | |
-| TASK-008 | Verify clean build: `dotnet build spikes/csharp_b/server/SpikeServer.csproj` returns exit 0, zero warnings. | | |
+| TASK-002 | Create directory `spikes/csharp_b/`. From `spikes/csharp_b/` run `dotnet new web -n SpikeServer -o server --framework net8.0`. Result: `spikes/csharp_b/server/SpikeServer.csproj`, `spikes/csharp_b/server/Program.cs`, `spikes/csharp_b/server/appsettings.json`, `spikes/csharp_b/server/Properties/launchSettings.json`. | ✅ | 2026-05-01 |
+| TASK-003 | Edit `spikes/csharp_b/server/SpikeServer.csproj` — set `<Nullable>enable</Nullable>`, `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`, `<ImplicitUsings>enable</ImplicitUsings>`, `<LangVersion>latest</LangVersion>`. | ✅ | 2026-05-01 |
+| TASK-004 | Add `spikes/csharp_b/global.json` pinning the SDK roll-forward policy: `{ "sdk": { "version": "8.0.0", "rollForward": "latestFeature" } }`. | ✅ | 2026-05-01 |
+| TASK-005 | Add `.editorconfig` at repo root (or extend existing) with `dotnet_naming_*` rules: PascalCase types/methods, _camelCase private fields, file-scoped namespaces. Verify `dotnet format --verify-no-changes` passes on the empty scaffold. | ✅ | 2026-05-01 |
+| TASK-006 | Add NuGet packages to `SpikeServer.csproj` via `dotnet add spikes/csharp_b/server package <name>`: `Microsoft.Agents.AI` (latest preview), `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` (latest preview), `Microsoft.Agents.AI.Foundry` (latest preview), `Azure.Identity` (stable). Pin versions explicitly — no floating refs. | ✅ | 2026-05-01 |
+| TASK-007 | Add `spikes/csharp_b/.gitignore` entries: `bin/`, `obj/`, `*.user`, `appsettings.Development.json`. Verify build output is not staged. | ✅ | 2026-05-01 |
+| TASK-008 | Verify clean build: `dotnet build spikes/csharp_b/server/SpikeServer.csproj` returns exit 0, zero warnings. | ✅ | 2026-05-01 |
 
 ### Implementation Phase 2 — Agent + tools (server-side)
 
