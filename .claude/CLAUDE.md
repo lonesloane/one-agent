@@ -1,15 +1,21 @@
-# Project: ONE-MP Agent (Python 3.11 + .NET 8/9, Microsoft Agent Framework)
+# Project: ONE-MP Agent (Python 3.11, Microsoft Agent Framework + Chainlit)
 
-> Cross-language repo. `classical_app/` + `shared/` (Python) and
-> `agent_app/` + `shared/csharp/` (C# / .NET) live side by side, sharing
-> the SQLite database and seed data. See
-> `docs/agent-stack-decision-2026-04-29.md` for the pivot rationale.
+> Single-language Python repo. `classical_app/` (Flask), `agent_app/`
+> (Chainlit + `agent-framework`), and `shared/` (database, seed data,
+> business rules) live side by side, sharing the SQLite database and
+> a single `shared/business_rules.py` source of truth.
+>
+> The 2026-04-29 pivot to C# / .NET was reversed on 2026-05-01 after
+> Step B falsified the documented .NET AG-UI HITL contract — see
+> `docs/agent-stack-decision-2026-04-29.md` §9. C# spike code retained
+> on branch `spike/csharp-b` for re-evaluation when the
+> `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` preview ships an
+> approval-translation middleware. Until then, do not reintroduce
+> `shared/csharp/` or `*.csproj` projects in this repo.
 
 ## 🧱 Code Structure & Modularity
 
 ### Style & Formatting (automated)
-
-#### Python (`classical_app/`, `shared/`, `eval/`, `tests/`)
 
 **Python style is enforced by `ruff` — see `[tool.ruff]` in `pyproject.toml`
 for the single source of truth** (line length, import order, blank lines,
@@ -29,33 +35,6 @@ enumerated list of violations.
 
 Use PEP 484 type hints (`dict[str, int]`, not `typing.Dict[str, int]`).
 
-#### C# / .NET (`agent_app/`, `shared/csharp/`)
-
-**C# style is enforced by `dotnet format` against the repo `.editorconfig`
-— single source of truth** (indentation, brace placement, using order,
-naming conventions via `dotnet_naming_*`).
-
-Before committing, always run:
-
-```bash
-dotnet format
-```
-
-Same shift-left rule as Python: reviewers must not re-litigate anything
-`dotnet format` owns. The only acceptable response to style drift is
-"run dotnet format".
-
-Conventions:
-
-- Target framework: .NET 8 (LTS) or .NET 9 — pinned in `*.csproj`
-  `<TargetFramework>`.
-- `<Nullable>enable</Nullable>` and `<TreatWarningsAsErrors>true</TreatWarningsAsErrors>`
-  in every project. Nullable reference types are non-negotiable.
-- File-scoped namespaces (`namespace Foo.Bar;`).
-- `var` only when type is obvious from RHS; explicit type otherwise.
-- `async` methods end in `Async`; pass `CancellationToken` through async
-  call chains.
-
 ### File and Function Limits
 
 - **Never create a file longer than 500 lines of code**. If approaching this
@@ -73,21 +52,13 @@ Conventions:
 
 ## 🛠️ Development Setup
 
-### Python
-
 Use venv for dependencies.
 
 - Virtual env: `source .venv/bin/activate` before any Python commands
 - Dependencies: `pip install -e ".[dev]"` for dev install with extras
-
-### C# / .NET
-
-- SDK: install .NET 8 (LTS) or .NET 9 SDK (`dotnet --list-sdks` to check).
-- Restore + build: `dotnet restore && dotnet build` from `agent_app/`.
-- Run: `dotnet run --project agent_app/AgentApp.csproj` (project name TBD
-  during scaffold).
-- Tests: `dotnet test` (xUnit). Parity tests for `shared/csharp/` live
-  alongside the C# port and mirror `tests/shared/test_business_rules.py`.
+- Run agent app: `chainlit run agent_app/app.py` (Phase 3+; entrypoint TBD during scaffold)
+- Run classical app: `flask --app classical_app run`
+- Tests: `pytest` (full suite covers `shared/`, `classical_app/`, and `agent_app/`)
 
 ## 📋 Style & Conventions
 
@@ -255,12 +226,6 @@ def generate_secure_token(length: int = 32) -> str:
 - PEP 484 (Type Hints): https://www.python.org/dev/peps/pep-0484/
 - The Hitchhiker's Guide to Python: https://docs.python-guide.org/
 
-### C# / .NET Best Practices
-
-- Framework design guidelines: https://learn.microsoft.com/dotnet/standard/design-guidelines/
-- C# coding conventions: https://learn.microsoft.com/dotnet/csharp/fundamentals/coding-style/coding-conventions
-- Nullable reference types: https://learn.microsoft.com/dotnet/csharp/nullable-references
-
 ## ⚠️ Important Notes
 
 - **NEVER ASSUME OR GUESS** - When in doubt, ask for clarification
@@ -298,44 +263,47 @@ Always use jCodemunch-MCP tools — never fall back to Read, Grep, Glob, or Bash
 - Before exploring structure: use get_file_tree or get_repo_outline
 - Call resolve_repo with the current directory first; if not indexed, call index_folder.
 
-## Agent Framework & CopilotKit Policy
+## Agent Framework & Chainlit Policy
 
-Before writing any code in `agent_app/` (C# / .NET) or `shared/csharp/`
-that uses Microsoft Agent Framework or CopilotKit APIs, **query Context7
-first** for the relevant topic. Never assume API signatures or
-configuration from training data — these are preview / bleeding-edge
-packages that change frequently.
+Before writing any code in `agent_app/` that uses Microsoft Agent
+Framework or Chainlit APIs, **query Context7 first** for the relevant
+topic. Never assume API signatures or configuration from training data
+— these are preview / bleeding-edge packages that change frequently.
 
 | Library | Context7 ID |
 |---|---|
 | Microsoft Agent Framework | `/websites/learn_microsoft_en-us_agent-framework` |
-| CopilotKit | `/copilotkit/copilotkit` |
+| Chainlit | `/chainlit/chainlit` |
 
 **MS Learn zone pivots are mandatory.** Pages with `zone_pivot_groups:
 programming-languages` default to C# in WebFetch / Context7 output but
-contain *both* C# and Python versions interleaved. Always include
-`?pivots=programming-language-csharp` in the URL when fetching C#
-guidance for `agent_app/` — and `?pivots=programming-language-python`
-when researching anything residual on the Python side. Cross-language
-pattern leakage caused the multi-week derail that triggered the
-2026-04-29 pivot.
+contain *both* C# and Python versions interleaved. **Always include
+`?pivots=programming-language-python`** in the URL when fetching
+guidance for `agent_app/`. Cross-language pattern leakage caused the
+multi-week derail that triggered the 2026-04-29 pivot, and Step B
+(2026-05-01) confirmed the .NET preview lacks the documented HITL
+contract — neither path leaks into Python's correct shape.
 
-Canonical C# entry points:
+Canonical Python entry points (validated by `spikes/c4_chainlit/`):
 
-- AG-UI hosting: `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore`
-  (`app.MapAGUI("/", agent)`).
-- Agent runtime: `Microsoft.Agents.AI` (`AsAIAgent` extension on
-  `Microsoft.Agents.AI.Foundry` `FoundryChatClient`).
-- HITL: `ApprovalRequiredAIFunction` + `request_approval` synthetic
-  client tool + bidirectional middleware (per
-  `integrations/ag-ui/human-in-the-loop?pivots=programming-language-csharp`).
-- Frontend: CopilotKit React via `HttpAgent` runtime registration (per
-  CopilotKit MAF page).
+- Agent runtime: `agent_framework.Agent` with `agent_framework.foundry.FoundryChatClient`.
+- Auth: `azure.identity.AzureCliCredential` (no API key handling).
+- Tools: `@agent_framework.tool` decorator on plain Python functions;
+  `@agent_framework.tool(approval_mode="always_require")` for HITL writes.
+- UI: Chainlit `@cl.on_chat_start` / `@cl.on_message` handlers; native
+  approval prompt via Chainlit's `cl.AskActionMessage` action UI.
+- Identity: `cl.user_session` for per-session delegate threading.
 
-Examples of when to query: `ApprovalRequiredAIFunction` constructor
-options, `MapAGUI` route shape, `HttpAgent` registration / `threadId`
-reset, streaming event types, middleware insertion order, `FoundryChatClient`
-construction.
+Examples of when to query: `Agent` constructor signature,
+`FoundryChatClient` `project_endpoint` shape, `@tool(approval_mode=...)`
+options, `AgentThread` lifecycle, Chainlit's action message API,
+streaming partial messages.
+
+**C# / .NET re-evaluation note:** Spike `spike/csharp-b` and reference
+memory `reference_dotnet_agui_hitl_broken.md` document why .NET is
+deferred. Do not write or recommend C# / `.NET` code in this repo
+until that re-evaluation lands a positive signal — production stays
+single-language Python.
 
 _This document is a living guide. Update it as the project evolves and new
 patterns emerge._
