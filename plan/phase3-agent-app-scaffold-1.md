@@ -132,7 +132,7 @@ by dependency, not preference.
   `get_new_documents`.
 - **Exit criterion:** delegate logs in, asks "what do I have coming
   up?", agent surfaces meetings + new agenda docs since last visit.
-- **PRD file (future):** `docs/prd-phase3-agent-uc1-brief.md`.
+- **PRD:** `docs/prd-uc1-meeting-brief.md` (drafted 2026-05-02).
 
 ### UC2 — Delegate Creation with Document Access Rights (second)
 
@@ -142,34 +142,50 @@ by dependency, not preference.
   Agreements, approval routing) — payoff of `shared/business_rules.py`
   staying single-source.
 - **Reads:** existing delegations + committees.
-- **Writes:** new `Delegate` + new `DocumentAccessRights` rows. Both
-  gated by `@tool(approval_mode="always_require")`.
-- **Tools added:** `create_delegate` (approval-gated),
-  `assign_delegate_to_committee` (approval-gated),
-  `compute_default_dar_preview` (read-only computation tool —
-  shows the rule output before the write fires).
+- **Writes:** new `Delegate` + new `DocumentAccessRights` rows in a
+  single transaction, gated by one `@tool(approval_mode="always_require")`
+  call.
+- **Tools added:** `create_delegate_with_access_rights` (approval-gated,
+  combined transaction — delegate + DARs commit atomically; one
+  approval prompt, one rollback boundary), `compute_default_dar_preview`
+  (read-only computation tool — shows the rule output before the
+  write fires). Note: committee assignment is implicit — DAR rows
+  carry `committee_id`, so DAR creation establishes committee
+  membership. Modifying an existing delegate's committee membership
+  is out of UC2 scope (deferred to a later UC).
+- **Why combined, not split:** two separate approval-gated tools
+  (delegate + DARs) cannot satisfy atomicity — user could approve
+  the delegate write, deny the DAR write, leaving an orphan
+  delegate. One tool = one transaction = one approval = one
+  rollback boundary. Mirrors the classical wizard's commit shape.
 - **Exit criterion:** delegation editor types "create delegate Marie
   Dubois on the FRA delegation, member of EPC and TC", agent walks
   through reasoning, shows DAR preview, asks for approval, fires the
   write only on Approve. Identical outcome to classical app's wizard
   but in 3 conversational turns.
-- **PRD file (future):** `docs/prd-phase3-agent-uc2-delegate-creation.md`.
+- **PRD:** `docs/prd-uc2-delegate-creation.md` (drafted 2026-05-02).
 
 ### UC3 — Approver Inbox (third)
 
-- **Why third:** different role / different Chainlit profile / no
-  net-new wire-protocol challenge once UC2's HITL is solid. UC3
-  reuses UC2's approval pattern from the *approver* perspective.
-- **Reads:** pending DAR change requests filtered by approver scope.
-- **Writes:** approval / denial of pending requests, gated by
-  `@tool(approval_mode="always_require")`.
-- **Tools added:** `list_pending_approvals`, `approve_dar_request`
-  (approval-gated meta-action), `deny_dar_request` (approval-gated).
-- **Exit criterion:** approver logs in, asks "what's in my queue?",
-  agent surfaces pending requests with rationale; approver says
-  "approve item 3", agent confirms via `cl.AskActionMessage`,
-  triggers the approval write.
-- **PRD file (future):** `docs/prd-phase4-agent-uc3-approver-inbox.md`.
+- **Why third:** different role / different Chainlit profile.
+  UC3 is **not** a re-use of UC2's HITL pattern — it is an
+  asynchronous queue over `DocumentAccessRight.approval_status`,
+  per OQ-9 Phase 4. The approver IS the human in the loop; the
+  agent simply mediates the queue.
+- **Reads:** pending DAR change requests filtered by approver scope
+  (delegation-head sees own delegation; secretariat sees all).
+- **Writes:** approval / denial of pending requests by direct
+  state transition (`PENDING_*` → `APPROVED` / `REJECTED`).
+- **Tools added:** `list_pending_approvals`, `approve_dar_request`,
+  `reject_dar_request`. **None approval-gated.** Rationale: the
+  approver typing "approve item 3" already carries intent; an extra
+  `cl.AskActionMessage` confirm-before-write adds friction without
+  safety. Cross-cutting audit middleware logs every approve/reject
+  (actor, target DAR, decision, reason, timestamp).
+- **Exit criterion:** approver logs in, agent proactively briefs
+  pending count + breakdown, approver says "approve item 3", agent
+  fires the write directly and confirms in chat.
+- **PRD:** `docs/prd-uc3-approver-inbox.md` (drafted 2026-05-02).
 
 ### Sequencing gates between UCs
 
