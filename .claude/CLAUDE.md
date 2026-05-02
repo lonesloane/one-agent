@@ -287,17 +287,27 @@ contract — neither path leaks into Python's correct shape.
 Canonical Python entry points (validated by `spikes/c4_chainlit/`):
 
 - Agent runtime: `agent_framework.Agent` with `agent_framework.foundry.FoundryChatClient`.
+- Per-conversation session: `Agent.create_session()` returning
+  `AgentSession`. `AgentThread` was removed in the 2026 Python migration —
+  do not reintroduce it.
 - Auth: `azure.identity.AzureCliCredential` (no API key handling).
 - Tools: `@agent_framework.tool` decorator on plain Python functions;
   `@agent_framework.tool(approval_mode="always_require")` for HITL writes.
+  Introspect via `tool.approval_mode` (string `Literal["never_require",
+  "always_require"]`); use **positive assertions** in tests because
+  missing `approval_mode` defaults silently to `"never_require"`.
 - UI: Chainlit `@cl.on_chat_start` / `@cl.on_message` handlers; native
-  approval prompt via Chainlit's `cl.AskActionMessage` action UI.
+  approval prompt via Chainlit's `cl.AskActionMessage` action UI
+  (default `timeout=90s`; HITL flows override to `timeout=300`).
 - Identity: `cl.user_session` for per-session delegate threading.
+  Chat profiles persist across hard refresh via URL query param;
+  switching profiles mid-`AskActionMessage` drops pending action state.
 
 Examples of when to query: `Agent` constructor signature,
 `FoundryChatClient` `project_endpoint` shape, `@tool(approval_mode=...)`
-options, `AgentThread` lifecycle, Chainlit's action message API,
-streaming partial messages.
+options, `AgentSession` lifecycle, Chainlit's action message API,
+streaming partial messages, `cl.set_chat_profiles` for multi-persona
+deployments.
 
 **C# / .NET re-evaluation note:** Spike `spike/csharp-b` and reference
 memory `reference_dotnet_agui_hitl_broken.md` document why .NET is

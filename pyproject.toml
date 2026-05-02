@@ -7,6 +7,7 @@ dependencies = [
     "agent-framework>=1.0.0",
     "agent-framework-foundry>=1.0.0",
     "azure-identity>=1.19.0",
+    "chainlit>=2.11,<3",
     "email-validator>=2.0",
     "flask>=3.0",
     "flask-wtf>=1.2",
@@ -22,6 +23,11 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-playwright>=0.5",
     "ruff>=0.6",
+]
+spikes = [
+    "agent-framework-ag-ui>=1.0.0b260428",
+    "fastapi>=0.115",
+    "uvicorn>=0.32",
 ]
 
 [tool.setuptools]
