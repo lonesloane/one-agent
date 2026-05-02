@@ -391,3 +391,46 @@ preserved as a falsification record. Do not delete.
 Full record: `docs/agent-stack-decision-2026-04-29.md`. Companion docs:
 `docs/research-agent-stack.md` (criteria), `docs/research-agent-stack-candidates.md`
 (survey + hard-gate + spike results), `plan/research-agent-stack-spike.md`.
+
+### [2026-05-01] Agent app stack reversal — C# pivot falsified; back to C4 (Chainlit + `agent-framework` Python)
+
+Step B (the C# / .NET HITL spike defined in
+`plan/architecture-agent-app-csharp-spike-1.md`) executed against
+`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` 1.3.0-preview.260423.1
+empirically falsified the documented .NET AG-UI HITL contract that the
+2026-04-29 pivot relied on. Live four-turn curl trace against the
+running spike server (port 5141) showed `MapAGUI` swallows
+`ToolApprovalRequestContent` events — the approval-translation
+middleware the docs describe does not exist in the published preview.
+Non-approval flows stream cleanly; the approval handshake never reaches
+the client. Per the plan's own escalation rule, fall back to **C4
+(Chainlit + `agent-framework` Python)**, which has a green spike
+(`spikes/c4_chainlit/`).
+
+**Reverses [2026-04-29]:**
+- `agent_app/` stays Python. No `shared/csharp/BusinessRules.cs` port,
+  no `*.csproj` projects, no CopilotKit React frontend.
+- `shared/business_rules.py` remains single source of truth, called
+  directly by the Python agent.
+- HITL via `@tool(approval_mode="always_require")` rendered in
+  Chainlit's native `cl.AskActionMessage` action UI — no AG-UI wire
+  protocol, no custom adapter.
+
+**Retained from [2026-04-29]:** Microsoft Agent Framework as runtime;
+`gpt-4.1-mini` via `FoundryChatClient`; UC1 → UC2 → UC3 sequencing.
+
+**Re-evaluation trigger:** monitor
+`Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` for a release whose
+public surface exposes an approval-translation middleware or a
+`MapAGUI` extensibility point that intercepts
+`ToolApprovalRequestContent`. At that point Step B can be re-run.
+
+**Spike code:** retained on branch `spike/csharp-b` as a falsification
+record. Do not delete, do not merge.
+
+**OQ updates:** OQ-7 (frontend) and OQ-9 Phase 4 portion (approver UX)
+are re-resolved against C4 — see `docs/OPEN_QUESTIONS.md`.
+
+Full record: `docs/agent-stack-decision-2026-04-29.md` §9 (Step B
+closure & pivot reversal). Phase 3 scaffold plan:
+`plan/phase3-agent-app-scaffold-1.md`.

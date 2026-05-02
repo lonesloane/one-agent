@@ -122,22 +122,22 @@
 - [x] `docs/DEMO_PHASE2.md` — golden-path demo dry-run script (6 scenarios, all 3 approval routes)
 - [x] Documentation closure: BACKLOG, DESIGN, OPEN_QUESTIONS, DECISIONS updated
 
-## Phase 3+ — Agent App (C# / .NET rebuild)
-> First attempt (Phase 3 / 3.5 / 4 / spikes) abandoned 2026-04-28; artifacts under `docs/_archived/` and `plan/_archived/`. Stack pivot to C# / .NET decided 2026-04-29 (see `docs/agent-stack-decision-2026-04-29.md`). Microsoft Agent Framework retained as runtime; CopilotKit React via AG-UI on `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` selected as frontend; HITL via `ApprovalRequiredAIFunction` + `request_approval` synthetic client tool + bidirectional middleware.
+## Phase 3+ — Agent App (Chainlit + `agent-framework` Python — C4 stack)
+> First attempt (Phase 3 / 3.5 / 4 / spikes) abandoned 2026-04-28; artifacts under `docs/_archived/` and `plan/_archived/`. 2026-04-29 pivot to C# / .NET reversed 2026-05-01 after Step B falsified the documented .NET AG-UI HITL contract — see `docs/agent-stack-decision-2026-04-29.md` §9 and `[2026-05-01]` entry in `docs/DECISIONS.md`. Stack: **Chainlit + `agent-framework` Python + `FoundryChatClient` + `AzureCliCredential`**, validated by `spikes/c4_chainlit/`. HITL via `@tool(approval_mode="always_require")` rendered in Chainlit's native `cl.AskActionMessage` action UI. C# spike code retained on branch `spike/csharp-b` for re-evaluation when `Microsoft.Agents.AI.Hosting.AGUI.AspNetCore` ships an approval-translation middleware.
 
 Research & decision (done):
 - [x] Agent stack research — `docs/research-agent-stack.md`, `docs/research-agent-stack-candidates.md`
-- [x] HITL approach — folded into stack decision (`docs/agent-stack-decision-2026-04-29.md` §5–6); standalone `research-hitl-approach.md` not needed
-- [x] OQ-7 resolved (frontend) — see `docs/OPEN_QUESTIONS.md`
-- [x] OQ-9 Phase 4 resolved (approver UX = separate CopilotKit route, UC3) — see `docs/OPEN_QUESTIONS.md`
+- [x] HITL approach — folded into stack decision (`docs/agent-stack-decision-2026-04-29.md` §5–6 + §9); standalone `research-hitl-approach.md` not needed
+- [x] Step B (C# / .NET HITL spike) — FAIL 2026-05-01; pivot reversed
+- [x] OQ-7 re-resolved (frontend = Chainlit) — see `docs/OPEN_QUESTIONS.md`
+- [x] OQ-9 Phase 4 re-resolved (approver UX = separate Chainlit session/page over `DocumentAccessRight.approval_status`) — see `docs/OPEN_QUESTIONS.md`
 
 Pre-implementation prerequisites:
-- [ ] `shared/csharp/BusinessRules.cs` port + parity tests against `shared/business_rules.py`
-- [ ] `agent_app/` .NET scaffold: `AgentApp.csproj`, `Program.cs` w/ `MapAGUI("/", agent)`, `FoundryChatClient` wiring, `.editorconfig` + `global.json`
-- [ ] PRD — read agent (UC1, proactive meeting brief)
-- [ ] PRD — write agent (UC2, delegate creation + DAR routing via HITL)
-- [ ] PRD — approver UX (UC3, separate CopilotKit route over `DocumentAccessRight.approval_status`)
-- [ ] Implementation plans per phase
+- [ ] `agent_app/` Python scaffold per `plan/phase3-agent-app-scaffold-1.md` (Chainlit entrypoint, `agent.py` factory, `tools/` package, identity threading via `cl.user_session`, one read-only smoke tool)
+- [ ] PRD — UC1 read agent (proactive meeting brief)
+- [ ] PRD — UC2 write agent (delegate creation + DAR routing via `@tool(approval_mode="always_require")`)
+- [ ] PRD — UC3 approver UX (separate Chainlit session/page over `DocumentAccessRight.approval_status`)
+- [ ] Implementation plans per UC
 
 ## Phase 5 — MCP Knowledge Base
 > Business rules as a queryable MCP server
