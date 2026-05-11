@@ -84,11 +84,11 @@ right load-bearing walls.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-001 | Verify worktree branch + `.env`. Check `pyproject.toml` lists `chainlit`, `agent-framework`, `agent-framework-foundry`, `loguru`, `azure-identity`. If `agent-framework-ag-ui` is still listed, remove it (no longer used). | | |
-| TASK-002 | Create `agent_app/__init__.py` (empty) and `agent_app/app.py` (Chainlit entrypoint stub with `@cl.on_chat_start` + `@cl.on_message` returning a placeholder message). Verify `chainlit run agent_app/app.py` boots without error. | | |
-| TASK-003 | Create `agent_app/agent.py` — `build_agent(credential, delegate_id) -> Agent` factory. Constructs `FoundryChatClient` from `FOUNDRY_PROJECT_ENDPOINT` + `gpt-4.1-mini` + `AzureCliCredential`. Tools list initially empty. Instructions string: TBD per UC1 PRD; for scaffold use a one-liner placeholder ("You assist a delegate. Tools added in subsequent phases."). | | |
-| TASK-004 | Create `agent_app/tools/__init__.py` and `agent_app/tools/delegate.py` — placeholder module with the read-only tool `get_current_delegate_summary` factory function (closure-bound `delegate_id`). Stub returns one-line summary using `shared.database` queries (delegate name + delegation name). No write tools yet. | | |
-| TASK-005 | Wire `app.py` end-to-end: `on_chat_start` reads `delegate_id` from `cl.user_session` (default `1` for spike-mode), constructs agent + session, stores them; `on_message` drives the loop verbatim from `spikes/c4_chainlit/app.py` minus the approval branch (no HITL tools yet, branch is dead but present for future UC2). | | |
+| TASK-001 | Verify worktree branch + `.env`. Check `pyproject.toml` lists `chainlit`, `agent-framework`, `agent-framework-foundry`, `loguru`, `azure-identity`. If `agent-framework-ag-ui` is still listed, remove it (no longer used). | ✅ | 2026-05-11 |
+| TASK-002 | Create `agent_app/__init__.py` (empty) and `agent_app/app.py` (Chainlit entrypoint stub with `@cl.on_chat_start` + `@cl.on_message` returning a placeholder message). Verify `chainlit run agent_app/app.py` boots without error. | ✅ | 2026-05-11 |
+| TASK-003 | Create `agent_app/agent.py` — `build_agent(credential, delegate_id) -> Agent` factory. Constructs `FoundryChatClient` from `FOUNDRY_PROJECT_ENDPOINT` + `gpt-4.1-mini` + `AzureCliCredential`. Tools list initially empty. Instructions string: TBD per UC1 PRD; for scaffold use a one-liner placeholder ("You assist a delegate. Tools added in subsequent phases."). | ✅ | 2026-05-11 |
+| TASK-004 | Create `agent_app/tools/__init__.py` and `agent_app/tools/delegate.py` — placeholder module with the read-only tool `get_current_delegate_summary` factory function (closure-bound `delegate_id`). Stub returns one-line summary using `shared.database` queries (delegate name + delegation name). No write tools yet. | ✅ | 2026-05-11 |
+| TASK-005 | Wire `app.py` end-to-end: `on_chat_start` reads `delegate_id` from `cl.user_session` (default `1` for spike-mode), constructs agent + session, stores them; `on_message` drives the loop verbatim from `spikes/c4_chainlit/app.py` minus the approval branch (no HITL tools yet, branch is dead but present for future UC2). | ✅ | 2026-05-11 |
 
 ### Implementation Phase 2 — Identity & DB session
 
