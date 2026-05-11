@@ -1,8 +1,8 @@
-"""Tests for agent_app.tools.delegate path resolution."""
+"""Tests for agent_app.session path resolution."""
 
 from pathlib import Path
 
-from agent_app.tools.delegate import _DEFAULT_DB
+from agent_app.session import _DEFAULT_DB
 
 
 def test_default_db_path_points_at_project_root() -> None:

@@ -7,30 +7,12 @@ with the zero-argument ``@tool``-decorated callable.
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
-
 from agent_framework import tool
 from loguru import logger
 from sqlalchemy import select
-from sqlalchemy.orm import sessionmaker
 
-from shared.database import Delegate, Delegation, get_engine
-
-# Default DB path: three parent() steps up from this file lands at project root.
-# Override via ONE_AGENT_DB_PATH env var when running from a worktree.
-_DEFAULT_DB = str(
-    Path(__file__).resolve().parent.parent.parent / "one_agent.db"
-)
-
-
-def _get_db_path() -> str:
-    """Return the resolved database file path.
-
-    Returns:
-        Absolute path to the SQLite database file.
-    """
-    return os.environ.get("ONE_AGENT_DB_PATH", _DEFAULT_DB)
+from agent_app.session import db_session
+from shared.database import Delegate, Delegation
 
 
 def make_get_current_delegate_summary(delegate_id: str):
@@ -54,9 +36,7 @@ def make_get_current_delegate_summary(delegate_id: str):
         Returns:
             A string in the format ``"<full_name> — <delegation_name>"``.
         """
-        engine = get_engine(_get_db_path())
-        session_factory = sessionmaker(bind=engine)
-        with session_factory() as session:
+        with db_session() as session:
             stmt = (
                 select(Delegate)
                 .join(Delegation, Delegate.delegation_id == Delegation.id)
