@@ -10,6 +10,8 @@ it as a tool argument.
 
 from __future__ import annotations
 
+import os
+
 import chainlit as cl
 from agent_framework import Message
 from azure.identity import AzureCliCredential
@@ -22,12 +24,34 @@ from agent_app.agent import build_agent
 _DEV_DEFAULT_DELEGATE_ID = "DEL-2026-0001"
 
 
+def _resolve_delegate_id() -> str:
+    """Resolve the delegate ID for the current session.
+
+    Resolution order (first truthy value wins):
+
+    1. ``cl.user_session["delegate_id"]`` — set by the future real auth
+       flow.
+       Reason: Production identity wiring (real auth setting
+       ``cl.user_session['delegate_id']``) is out of scope for Phase 3
+       scaffold; the ``cl.user_session`` slot is reserved for it.
+    2. ``ONE_AGENT_DEV_DELEGATE_ID`` env var — dev override for testing
+       as a different delegate without a code change.
+    3. ``_DEV_DEFAULT_DELEGATE_ID`` — hardcoded last-resort fallback.
+
+    Returns:
+        The resolved delegate ID string.
+    """
+    return (
+        cl.user_session.get("delegate_id")
+        or os.environ.get("ONE_AGENT_DEV_DELEGATE_ID")
+        or _DEV_DEFAULT_DELEGATE_ID
+    )
+
+
 @cl.on_chat_start
 async def on_chat_start() -> None:
     """Initialise the agent and stash it on the user session."""
-    delegate_id: str = cl.user_session.get(
-        "delegate_id", _DEV_DEFAULT_DELEGATE_ID
-    )
+    delegate_id: str = _resolve_delegate_id()
     credential = AzureCliCredential()
     agent = build_agent(credential=credential, delegate_id=delegate_id)
     session = agent.create_session()
