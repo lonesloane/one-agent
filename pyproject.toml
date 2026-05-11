@@ -31,7 +31,7 @@ spikes = [
 ]
 
 [tool.setuptools]
-packages = ["classical_app", "eval", "shared"]
+packages = ["agent_app", "agent_app.tools", "classical_app", "eval", "shared"]
 
 [build-system]
 requires = ["setuptools>=68.0"]
