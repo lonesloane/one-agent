@@ -109,10 +109,10 @@ right load-bearing walls.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-009 | Create `tests/agent_app/test_tools_delegate.py` — pytest covering `get_current_delegate_summary` against the seeded DB. Asserts the closure reads the right delegate. No Chainlit / agent-framework mocking — directly call the tool function. | | |
-| TASK-010 | Create `tests/agent_app/test_agent_factory.py` — instantiate `build_agent` with a fake credential and `delegate_id`, assert the resulting `Agent` has the expected name, instructions, and tool count. No live HTTP calls. | | |
+| TASK-009 | Create `tests/agent_app/test_tools_delegate.py` — pytest covering `get_current_delegate_summary` against the seeded DB. Asserts the closure reads the right delegate. No Chainlit / agent-framework mocking — directly call the tool function. | ✅ | 2026-05-11 |
+| TASK-010 | Create `tests/agent_app/test_agent_factory.py` — instantiate `build_agent` with a fake credential and `delegate_id`, assert the resulting `Agent` has the expected name, instructions, and tool count. No live HTTP calls. | ✅ | 2026-05-11 |
 | TASK-011 | Manual smoke: `chainlit run agent_app/app.py`, log in as delegate `1`, type "Who am I?". Expected: agent calls `get_current_delegate_summary`, replies with delegate name + delegation. Capture output in plan notes. | | |
-| TASK-012 | `ruff format . && ruff check --fix .` clean. `pytest` exits 0. Commit each task as a separate Conventional Commit. | | |
+| TASK-012 | `ruff format . && ruff check --fix .` clean. `pytest` exits 0. Commit each task as a separate Conventional Commit. | ✅ | 2026-05-11 |
 
 ## 3. UC sequencing (Phase 3+ → Phase 5)
 
