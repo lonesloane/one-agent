@@ -53,8 +53,8 @@ def make_get_current_delegate_summary(delegate_id: str):
             A string in the format ``"<full_name> — <delegation_name>"``.
         """
         engine = get_engine(_get_db_path())
-        Session = sessionmaker(bind=engine)
-        with Session() as session:
+        session_factory = sessionmaker(bind=engine)
+        with session_factory() as session:
             stmt = (
                 select(Delegate)
                 .join(Delegation, Delegate.delegation_id == Delegation.id)
@@ -62,9 +62,7 @@ def make_get_current_delegate_summary(delegate_id: str):
             )
             delegate = session.scalars(stmt).first()
             if delegate is None:
-                logger.warning(
-                    "Delegate not found in DB: {}", delegate_id
-                )
+                logger.warning("Delegate not found in DB: {}", delegate_id)
                 return f"Unknown delegate ({delegate_id})"
             return f"{delegate.full_name} — {delegate.delegation.name}"
 
