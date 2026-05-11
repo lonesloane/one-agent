@@ -17,9 +17,11 @@ from sqlalchemy.orm import sessionmaker
 
 from shared.database import Delegate, Delegation, get_engine
 
-# Default DB path: two levels up from this file (project root).
+# Default DB path: three parent() steps up from this file lands at project root.
 # Override via ONE_AGENT_DB_PATH env var when running from a worktree.
-_DEFAULT_DB = str(Path(__file__).resolve().parents[3] / "one_agent.db")
+_DEFAULT_DB = str(
+    Path(__file__).resolve().parent.parent.parent / "one_agent.db"
+)
 
 
 def _get_db_path() -> str:

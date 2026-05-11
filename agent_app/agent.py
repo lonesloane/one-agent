@@ -11,9 +11,13 @@ import os
 from agent_framework import Agent
 from agent_framework.foundry import FoundryChatClient
 from azure.identity import AzureCliCredential
+from dotenv import load_dotenv
 from loguru import logger
 
 from agent_app.tools.delegate import make_get_current_delegate_summary
+
+# Load .env so _get_endpoint() works when invoked directly in tests or CLI.
+load_dotenv()
 
 
 def _get_endpoint() -> str:

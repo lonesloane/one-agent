@@ -18,7 +18,7 @@ from loguru import logger
 from agent_app.agent import build_agent
 
 # Default delegate for dev login bypass (no auth layer yet).
-# First seed delegate: full_name="Alice Martin", delegation="France".
+# First seed delegate: full_name="Marie Dupont", delegation="France".
 _DEV_DEFAULT_DELEGATE_ID = "DEL-2026-0001"
 
 
@@ -39,6 +39,7 @@ async def on_chat_start() -> None:
     ).send()
 
 
+# Reason: dead until UC2 registers approval-gated tools
 async def _prompt_for_approval(req: object) -> bool:
     """Render an approval prompt and return whether the user approved.
 
@@ -115,6 +116,7 @@ async def on_message(user_msg: cl.Message) -> None:
         # With a session, the framework already tracks the assistant
         # message that emitted the approval requests. Only the
         # user-side approval response needs to be sent back.
+        # Reason: dead until UC2 registers approval-gated tools
         approval_responses: list[object] = []
         for req in user_input_requests:
             approved = await _prompt_for_approval(req)
