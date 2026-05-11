@@ -98,9 +98,9 @@ right load-bearing walls.
 
 | Task | Description | Completed | Date |
 |------|-------------|-----------|------|
-| TASK-006 | Add `agent_app/session.py` — context-manager / dependency providing a SQLAlchemy session bound to `one_agent.db` (mirror `classical_app/`'s pattern). Tools acquire DB sessions through this helper, not raw connections. | | |
-| TASK-007 | In `app.py`, accept `delegate_id` from a Chainlit chat-start arg or environment variable (development-only login bypass). Document that production identity wiring (real auth) is out of scope for Phase 3 scaffold but the `cl.user_session` slot is ready. | | |
-| TASK-008 | Implement the closure-based DI in `agent_app/agent.py` `build_agent`: every tool factory receives `delegate_id` and returns a `@tool`-decorated callable. The agent's tool list is built from the factory outputs. Verify the agent can find tools by name through reflection. | | |
+| TASK-006 | Add `agent_app/session.py` — context-manager / dependency providing a SQLAlchemy session bound to `one_agent.db` (mirror `classical_app/`'s pattern). Tools acquire DB sessions through this helper, not raw connections. | ✅ | 2026-05-11 |
+| TASK-007 | In `app.py`, accept `delegate_id` from a Chainlit chat-start arg or environment variable (development-only login bypass). Document that production identity wiring (real auth) is out of scope for Phase 3 scaffold but the `cl.user_session` slot is ready. | ✅ | 2026-05-11 |
+| TASK-008 | Implement the closure-based DI in `agent_app/agent.py` `build_agent`: every tool factory receives `delegate_id` and returns a `@tool`-decorated callable. The agent's tool list is built from the factory outputs. Verify the agent can find tools by name through reflection. | ✅ | 2026-05-11 |
 
 ### Implementation Phase 3 — Smoke + tests
 
