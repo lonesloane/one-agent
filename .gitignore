@@ -8,6 +8,8 @@ eval/results/*
 !eval/results/.gitkeep
 *.db
 .playwright-cli/
+.chainlit/
+chainlit.md
 mempalace.yaml
 entities.json
 docs/entities.json
