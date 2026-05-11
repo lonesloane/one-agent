@@ -4,13 +4,21 @@ version: 1.0
 date_created: 2026-05-01
 last_updated: 2026-05-01
 owner: stephane.varin@gmail.com
-status: 'Planned'
+status: 'Completed'
 tags: [phase3, agent_app, chainlit, agent-framework, scaffold]
 ---
 
 # Introduction
 
-![Status: Planned](https://img.shields.io/badge/status-Planned-blue)
+![Status: Completed](https://img.shields.io/badge/status-Completed-brightgreen)
+
+## Smoke result (TASK-011) — 2026-05-11
+
+User prompt: **"Who am I?"** (default dev delegate `DEL-2026-0001`).
+Agent response: *"You are Marie Dupont, representing France. How can I
+assist you today?"* — confirms `get_current_delegate_summary` tool fired,
+closure-bound `delegate_id` resolved against seeded DB, FoundryChatClient
+streamed the reply through Chainlit. Scaffold end-to-end green.
 
 Phase 3 scaffold work for `agent_app/` after the 2026-05-01 reversal of
 the C# / .NET pivot (see `docs/agent-stack-decision-2026-04-29.md` §9).
@@ -111,7 +119,7 @@ right load-bearing walls.
 |------|-------------|-----------|------|
 | TASK-009 | Create `tests/agent_app/test_tools_delegate.py` — pytest covering `get_current_delegate_summary` against the seeded DB. Asserts the closure reads the right delegate. No Chainlit / agent-framework mocking — directly call the tool function. | ✅ | 2026-05-11 |
 | TASK-010 | Create `tests/agent_app/test_agent_factory.py` — instantiate `build_agent` with a fake credential and `delegate_id`, assert the resulting `Agent` has the expected name, instructions, and tool count. No live HTTP calls. | ✅ | 2026-05-11 |
-| TASK-011 | Manual smoke: `chainlit run agent_app/app.py`, log in as delegate `1`, type "Who am I?". Expected: agent calls `get_current_delegate_summary`, replies with delegate name + delegation. Capture output in plan notes. | | |
+| TASK-011 | Manual smoke: `chainlit run agent_app/app.py`, log in as delegate `1`, type "Who am I?". Expected: agent calls `get_current_delegate_summary`, replies with delegate name + delegation. Capture output in plan notes. | ✅ | 2026-05-11 |
 | TASK-012 | `ruff format . && ruff check --fix .` clean. `pytest` exits 0. Commit each task as a separate Conventional Commit. | ✅ | 2026-05-11 |
 
 ## 3. UC sequencing (Phase 3+ → Phase 5)
